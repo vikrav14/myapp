@@ -311,6 +311,7 @@ function renderAdminPanelHtml(): string {
                 <option value="awaiting_archetype">awaiting_archetype</option>
                 <option value="active">active</option>
               </select>
+              <input id="userLimit" type="number" min="1" max="100" value="20" placeholder="Limit" />
               <button id="applyUserFiltersButton" class="secondary">Apply filters</button>
             </div>
             <div class="table-wrap">
@@ -332,7 +333,7 @@ function renderAdminPanelHtml(): string {
             <div class="filters">
               <input id="outboundUserIdFilter" placeholder="Filter by user UUID" />
               <input id="outboundStatusFilter" placeholder="Filter by status" />
-              <div></div>
+              <input id="outboundLimit" type="number" min="1" max="100" value="20" placeholder="Limit" />
               <div></div>
             </div>
             <div class="table-wrap">
@@ -355,7 +356,7 @@ function renderAdminPanelHtml(): string {
               <input id="deadLetterUserIdFilter" placeholder="Filter by user UUID" />
               <input id="deadLetterStatusFilter" placeholder="Filter by status" />
               <input id="deadLetterCategoryFilter" placeholder="Filter by category" />
-              <div></div>
+              <input id="deadLetterLimit" type="number" min="1" max="100" value="20" placeholder="Limit" />
             </div>
             <div class="table-wrap">
               <table>
@@ -388,8 +389,33 @@ function renderAdminPanelHtml(): string {
               <div class="actions" style="margin-top:12px;">
                 <button id="saveUserButton" class="success">Save user changes</button>
                 <button id="reloadUserProfileButton" class="secondary">Reload profile</button>
+                <button id="focusOutboundForUserButton" class="secondary">Focus queue to user</button>
+                <button id="focusDeadLettersForUserButton" class="secondary">Focus dead letters to user</button>
+                <button id="clearSelectedUserButton" class="secondary">Clear selection</button>
               </div>
               <div id="userProfileMeta" class="panel-note" style="margin-top:10px;"></div>
+              <div style="margin-top:16px;">
+                <h3 style="margin:0 0 8px;">Recent payments</h3>
+                <div class="table-wrap" style="max-height:180px;">
+                  <table><thead><tr><th>Provider</th><th>Amount</th><th>Reference</th><th>Paid at</th></tr></thead><tbody id="userRecentPaymentsBody"><tr><td colspan="4">No user selected.</td></tr></tbody></table>
+                </div>
+                <h3 style="margin:16px 0 8px;">Recent sessions</h3>
+                <div class="table-wrap" style="max-height:180px;">
+                  <table><thead><tr><th>Provider</th><th>Status</th><th>Reference</th><th>Created</th></tr></thead><tbody id="userRecentSessionsBody"><tr><td colspan="4">No user selected.</td></tr></tbody></table>
+                </div>
+                <h3 style="margin:16px 0 8px;">Recent reports</h3>
+                <div class="table-wrap" style="max-height:180px;">
+                  <table><thead><tr><th>Status</th><th>Week start</th><th>Created</th></tr></thead><tbody id="userRecentReportsBody"><tr><td colspan="3">No user selected.</td></tr></tbody></table>
+                </div>
+                <h3 style="margin:16px 0 8px;">Recent voice notes</h3>
+                <div class="table-wrap" style="max-height:180px;">
+                  <table><thead><tr><th>Transcript preview</th><th>Created</th></tr></thead><tbody id="userRecentVoiceNotesBody"><tr><td colspan="2">No user selected.</td></tr></tbody></table>
+                </div>
+                <h3 style="margin:16px 0 8px;">Recent memories</h3>
+                <div class="table-wrap" style="max-height:180px;">
+                  <table><thead><tr><th>Type</th><th>Content</th><th>Created</th></tr></thead><tbody id="userRecentMemoriesBody"><tr><td colspan="3">No user selected.</td></tr></tbody></table>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -458,11 +484,19 @@ function renderAdminPanelHtml(): string {
           userSearch: document.getElementById('userSearch'),
           userSubscriptionFilter: document.getElementById('userSubscriptionFilter'),
           userOnboardingFilter: document.getElementById('userOnboardingFilter'),
+          userLimit: document.getElementById('userLimit'),
           outboundUserIdFilter: document.getElementById('outboundUserIdFilter'),
           outboundStatusFilter: document.getElementById('outboundStatusFilter'),
+          outboundLimit: document.getElementById('outboundLimit'),
           deadLetterUserIdFilter: document.getElementById('deadLetterUserIdFilter'),
           deadLetterStatusFilter: document.getElementById('deadLetterStatusFilter'),
-          deadLetterCategoryFilter: document.getElementById('deadLetterCategoryFilter')
+          deadLetterCategoryFilter: document.getElementById('deadLetterCategoryFilter'),
+          deadLetterLimit: document.getElementById('deadLetterLimit'),
+          userRecentPaymentsBody: document.getElementById('userRecentPaymentsBody'),
+          userRecentSessionsBody: document.getElementById('userRecentSessionsBody'),
+          userRecentReportsBody: document.getElementById('userRecentReportsBody'),
+          userRecentVoiceNotesBody: document.getElementById('userRecentVoiceNotesBody'),
+          userRecentMemoriesBody: document.getElementById('userRecentMemoriesBody')
         };
 
         el.adminKey.value = state.adminKey;
@@ -524,6 +558,7 @@ function renderAdminPanelHtml(): string {
           if (el.userSearch.value.trim()) params.set('search', el.userSearch.value.trim());
           if (el.userSubscriptionFilter.value) params.set('subscriptionStatus', el.userSubscriptionFilter.value);
           if (el.userOnboardingFilter.value) params.set('onboardingState', el.userOnboardingFilter.value);
+          if (el.userLimit.value.trim()) params.set('limit', el.userLimit.value.trim());
           const data = await api('/internal/admin/users?' + params.toString());
           renderTable(el.usersTableBody, data.users, 6, (user) =>
             '<tr>' +
@@ -578,6 +613,22 @@ function renderAdminPanelHtml(): string {
             ', reports ' + profile.recentReports.length +
             ', voice notes ' + profile.recentVoiceNotes.length +
             ', memories ' + profile.recentMemories.length + '.';
+
+          renderTable(el.userRecentPaymentsBody, profile.recentPaymentEvents, 4, (item) =>
+            '<tr><td>' + item.provider + '</td><td>' + item.amount + ' ' + item.currency + '</td><td class="mono">' + item.transaction_reference + '</td><td>' + item.paid_at + '</td></tr>'
+          );
+          renderTable(el.userRecentSessionsBody, profile.recentCheckoutSessions, 4, (item) =>
+            '<tr><td>' + item.provider + '</td><td><span class="pill">' + item.status + '</span></td><td class="mono">' + item.provider_reference + '</td><td>' + item.created_at + '</td></tr>'
+          );
+          renderTable(el.userRecentReportsBody, profile.recentReports, 3, (item) =>
+            '<tr><td><span class="pill">' + item.delivery_status + '</span></td><td>' + item.week_start + '</td><td>' + item.created_at + '</td></tr>'
+          );
+          renderTable(el.userRecentVoiceNotesBody, profile.recentVoiceNotes, 2, (item) =>
+            '<tr><td>' + (item.transcript_text || '').slice(0, 120) + '</td><td>' + item.created_at + '</td></tr>'
+          );
+          renderTable(el.userRecentMemoriesBody, profile.recentMemories, 3, (item) =>
+            '<tr><td>' + item.memory_type + '</td><td>' + (item.content_text || '').slice(0, 120) + '</td><td>' + item.created_at + '</td></tr>'
+          );
         }
 
         async function saveUserChanges() {
@@ -598,6 +649,7 @@ function renderAdminPanelHtml(): string {
           const params = new URLSearchParams();
           if (el.outboundUserIdFilter.value.trim()) params.set('userId', el.outboundUserIdFilter.value.trim());
           if (el.outboundStatusFilter.value.trim()) params.set('status', el.outboundStatusFilter.value.trim());
+          if (el.outboundLimit.value.trim()) params.set('limit', el.outboundLimit.value.trim());
           const data = await api('/internal/admin/outbound-messages?' + params.toString());
           renderTable(el.outboundTableBody, data.messages, 5, (item) =>
             '<tr>' +
@@ -633,6 +685,7 @@ function renderAdminPanelHtml(): string {
           if (el.deadLetterUserIdFilter.value.trim()) params.set('userId', el.deadLetterUserIdFilter.value.trim());
           if (el.deadLetterStatusFilter.value.trim()) params.set('status', el.deadLetterStatusFilter.value.trim());
           if (el.deadLetterCategoryFilter.value.trim()) params.set('category', el.deadLetterCategoryFilter.value.trim());
+          if (el.deadLetterLimit.value.trim()) params.set('limit', el.deadLetterLimit.value.trim());
           const data = await api('/internal/admin/dead-letters?' + params.toString());
           renderTable(el.deadLettersTableBody, data.deadLetters, 5, (item) =>
             '<tr>' +
@@ -722,6 +775,24 @@ function renderAdminPanelHtml(): string {
         document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadSessions(), loadReports(), loadAuditEvents()]));
         document.getElementById('reloadUserProfileButton').addEventListener('click', loadUserProfile);
         document.getElementById('saveUserButton').addEventListener('click', saveUserChanges);
+        document.getElementById('focusOutboundForUserButton').addEventListener('click', async () => {
+          if (!state.selectedUserId) return;
+          el.outboundUserIdFilter.value = state.selectedUserId;
+          await loadOutboundMessages();
+          setStatus('Outbound queue filtered to selected user.', 'success');
+        });
+        document.getElementById('focusDeadLettersForUserButton').addEventListener('click', async () => {
+          if (!state.selectedUserId) return;
+          el.deadLetterUserIdFilter.value = state.selectedUserId;
+          await loadDeadLetters();
+          setStatus('Dead letters filtered to selected user.', 'success');
+        });
+        document.getElementById('clearSelectedUserButton').addEventListener('click', () => {
+          state.selectedUserId = null;
+          el.userDetailEmpty.classList.remove('hidden');
+          el.userDetailContent.classList.add('hidden');
+          setStatus('Selected user cleared.', 'success');
+        });
 
         el.adminKey.value = state.adminKey;
         if (state.adminKey) refreshAll();
