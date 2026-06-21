@@ -14,6 +14,7 @@ This repository now contains the first backend foundation for the product spec i
 - Sunday diagnostic report generation with weekly storage and delivery
 - Voice note transcription for WhatsApp audio messages
 - Embedding-backed semantic memory storage and retrieval
+- Provider-specific payment callback adapters for MCB Juice and Blink
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
@@ -69,6 +70,8 @@ Copy `.env.example` to `.env` and fill in:
 - `INTERNAL_ADMIN_API_KEY`
 - `EMBEDDING_MODEL`
 - `EMBEDDING_OUTPUT_DIMENSIONS`
+- `MCB_JUICE_CALLBACK_TOKEN`
+- `BLINK_CALLBACK_TOKEN`
 
 If the WhatsApp send credentials are absent, the service will still process inbound payloads and log the reply instead of attempting delivery.
 
@@ -127,6 +130,28 @@ There is also a secured internal payment confirmation route:
 - stamps `subscription_started_at`, `subscription_ends_at`, and `last_payment_at`
 - optionally sends the unlock confirmation message back to WhatsApp
 
+There are also provider-facing payment callback routes:
+
+- `POST /webhooks/payments/juice`
+- `POST /webhooks/payments/blink`
+
+These routes:
+
+- normalize provider payloads into Mauri subscription activations
+- ignore non-final or non-successful payment states
+- resolve the user from explicit `userId`, `phoneNumber`, or a structured payment reference
+- accept duplicate callbacks safely without double-activating the subscription
+- optionally validate `x-mauri-provider-token` or `?token=` when the callback token env vars are configured
+
+Reference format supported for user resolution:
+
+- `mauri:user:<uuid>`
+- `user:<uuid>`
+- `mauri:phone:<digits>`
+- `phone:<digits>`
+- plain UUID
+- plain phone number
+
 There is also a secured weekly report generation route:
 
 - `POST /internal/reports/weekly`
@@ -153,4 +178,4 @@ Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active us
 
 This is the backend foundation, not the final production system.
 
-Provider-specific Juice/Blink callback adapters are still the next major integration layer to build.
+The next major integration layers are admin tooling hardening, richer payment-link creation flows, and operational observability.

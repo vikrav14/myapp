@@ -1,7 +1,7 @@
 import { env } from "../lib/env.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser, PaymentEvent, PaymentProvider } from "../types.js";
-import { updateUserState } from "./user.service.js";
+import { findUserById, findUserByPhoneNumber, updateUserState } from "./user.service.js";
 
 interface ActivateSubscriptionInput {
   user: MauriUser;
@@ -12,6 +12,17 @@ interface ActivateSubscriptionInput {
   paidAt?: string | undefined;
   durationDays?: number | undefined;
   rawPayload?: unknown;
+}
+
+export interface NormalizedPaymentCallback {
+  provider: Extract<PaymentProvider, "MCB_JUICE" | "BLINK">;
+  transactionReference: string;
+  amount: number;
+  currency: string;
+  paidAt?: string | undefined;
+  userId?: string | undefined;
+  phoneNumber?: string | undefined;
+  rawPayload: unknown;
 }
 
 function mapPaymentEvent(record: Record<string, unknown>): PaymentEvent {
@@ -57,6 +68,7 @@ Send the next brain dump when you’re ready. Mauri memory is open again.`;
 export async function activatePaidSubscription(input: ActivateSubscriptionInput): Promise<{
   user: MauriUser;
   paymentEvent: PaymentEvent;
+  wasDuplicate: boolean;
 }> {
   const {
     user,
@@ -124,6 +136,115 @@ export async function activatePaidSubscription(input: ActivateSubscriptionInput)
 
   return {
     user: updatedUser,
-    paymentEvent: mapPaymentEvent(paymentData)
+    paymentEvent: mapPaymentEvent(paymentData),
+    wasDuplicate: false
   };
+}
+
+export async function activatePaidSubscriptionIdempotent(input: ActivateSubscriptionInput): Promise<{
+  user: MauriUser;
+  paymentEvent: PaymentEvent;
+  wasDuplicate: boolean;
+}> {
+  const { data: existingPayment, error: existingPaymentError } = await supabase
+    .from("payment_events")
+    .select("*")
+    .eq("provider", input.provider)
+    .eq("transaction_reference", input.transactionReference)
+    .maybeSingle();
+
+  if (existingPaymentError) {
+    throw new Error(`Failed to check duplicate payment event: ${existingPaymentError.message}`);
+  }
+
+  if (existingPayment) {
+    const existingUser = await findUserById(String(existingPayment.user_id));
+    if (!existingUser) {
+      throw new Error(`Payment reference already exists but user ${String(existingPayment.user_id)} could not be loaded.`);
+    }
+
+    return {
+      user: existingUser,
+      paymentEvent: mapPaymentEvent(existingPayment),
+      wasDuplicate: true
+    };
+  }
+
+  return activatePaidSubscription(input);
+}
+
+function sanitizeReferenceValue(value: string): string {
+  return value.trim();
+}
+
+export function parseMauriPaymentReference(reference: string): {
+  userId?: string | undefined;
+  phoneNumber?: string | undefined;
+} {
+  const trimmed = sanitizeReferenceValue(reference);
+  if (!trimmed) {
+    return {};
+  }
+
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const phonePattern = /^\+?\d{6,20}$/;
+
+  const lower = trimmed.toLowerCase();
+  const prefixes = ["mauri:user:", "user:", "uid:"];
+  for (const prefix of prefixes) {
+    if (lower.startsWith(prefix) && uuidPattern.test(trimmed.slice(prefix.length))) {
+      return { userId: trimmed.slice(prefix.length) };
+    }
+  }
+
+  const phonePrefixes = ["mauri:phone:", "phone:", "tel:"];
+  for (const prefix of phonePrefixes) {
+    if (lower.startsWith(prefix) && phonePattern.test(trimmed.slice(prefix.length))) {
+      return { phoneNumber: trimmed.slice(prefix.length).replace(/^\+/, "") };
+    }
+  }
+
+  if (uuidPattern.test(trimmed)) {
+    return { userId: trimmed };
+  }
+
+  if (phonePattern.test(trimmed)) {
+    return { phoneNumber: trimmed.replace(/^\+/, "") };
+  }
+
+  return {};
+}
+
+export async function resolvePaymentCallbackUser(input: {
+  userId?: string | undefined;
+  phoneNumber?: string | undefined;
+  referenceCandidates?: string[] | undefined;
+}): Promise<MauriUser | null> {
+  if (input.userId) {
+    return findUserById(input.userId);
+  }
+
+  if (input.phoneNumber) {
+    return findUserByPhoneNumber(input.phoneNumber.replace(/^\+/, ""));
+  }
+
+  for (const candidate of input.referenceCandidates ?? []) {
+    const parsed = parseMauriPaymentReference(candidate);
+    if (parsed.userId) {
+      const user = await findUserById(parsed.userId);
+      if (user) {
+        return user;
+      }
+    }
+
+    if (parsed.phoneNumber) {
+      const user = await findUserByPhoneNumber(parsed.phoneNumber);
+      if (user) {
+        return user;
+      }
+    }
+  }
+
+  return null;
 }

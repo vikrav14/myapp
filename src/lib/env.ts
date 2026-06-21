@@ -27,7 +27,9 @@ const envSchema = z.object({
   DEFAULT_SUBSCRIPTION_DAYS: z.coerce.number().int().positive().default(30),
   INTERNAL_ADMIN_API_KEY: optionalSecret,
   EMBEDDING_MODEL: z.string().default("text-embedding-004"),
-  EMBEDDING_OUTPUT_DIMENSIONS: z.coerce.number().int().positive().default(1536)
+  EMBEDDING_OUTPUT_DIMENSIONS: z.coerce.number().int().positive().default(1536),
+  MCB_JUICE_CALLBACK_TOKEN: optionalSecret,
+  BLINK_CALLBACK_TOKEN: optionalSecret
 });
 
 export const env = envSchema.parse(process.env);

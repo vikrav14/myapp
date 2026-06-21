@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import { registerSquadJobs } from "./jobs/squad-jobs.js";
 import { env } from "./lib/env.js";
 import { logger } from "./lib/logger.js";
-import { paymentsRouter } from "./routes/payments.js";
+import { paymentsRouter, paymentWebhooksRouter } from "./routes/payments.js";
 import { reportsRouter } from "./routes/reports.js";
 import { whatsappRouter } from "./routes/whatsapp.js";
 
@@ -21,6 +21,7 @@ app.get("/health", (_request, response) => {
 });
 
 app.use("/internal/payments", paymentsRouter);
+app.use("/webhooks/payments", paymentWebhooksRouter);
 app.use("/internal/reports", reportsRouter);
 app.use("/webhooks/whatsapp", whatsappRouter);
 
