@@ -38,6 +38,49 @@ export interface PaymentEvent {
   created_at: string;
 }
 
+export interface WeeklyDiagnosticSummary {
+  window: {
+    week_start: string;
+    week_end: string;
+  };
+  finance: {
+    total_spent: number;
+    entry_count: number;
+    top_category: string | null;
+  };
+  habits: {
+    total_logs: number;
+    successful_logs: number;
+    success_rate: number;
+    total_minutes: number;
+    top_activity: string | null;
+  };
+  todos: {
+    created_count: number;
+    completed_count: number;
+    open_count: number;
+  };
+  emotions: {
+    average_anxiety: number | null;
+    latest_anxiety: number | null;
+    dominant_driver: string | null;
+  };
+  momentum_score: number;
+  trial_cliffhanger: boolean;
+}
+
+export interface WeeklyReportRecord {
+  id: string;
+  user_id: string;
+  week_start: string;
+  week_end: string;
+  report_text: string;
+  summary_json: WeeklyDiagnosticSummary;
+  delivery_status: string;
+  sent_at: string | null;
+  created_at: string;
+}
+
 export interface FinanceExtraction {
   amount: number;
   category: string;

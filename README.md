@@ -11,6 +11,7 @@ This repository now contains the first backend foundation for the product spec i
 - Onboarding flow for archetype selection with 7-day trial activation
 - Trial expiry enforcement with locked-state paywall response
 - Payment confirmation endpoint with subscription activation and payment event logging
+- Sunday diagnostic report generation with weekly storage and delivery
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
@@ -27,18 +28,21 @@ src/
   lib/logger.ts             Application logging
   lib/supabase.ts           Supabase client
   routes/whatsapp.ts        Webhook verification + inbound processing
+  routes/reports.ts         Internal weekly diagnostic generation
   schemas/extraction.ts     Mauri parser schema
   services/ai.service.ts    Gemini extraction + reply generation
   services/context.service.ts
   services/logging.service.ts
   services/onboarding.service.ts
   services/payment.service.ts
+  services/report.service.ts
   services/user.service.ts
   services/whatsapp.service.ts
 supabase/migrations/
   001_init_mauri.sql
   002_onboarding_and_subscription_state.sql
   003_payment_activation.sql
+  004_weekly_reports.sql
 ```
 
 ## Environment variables
@@ -81,6 +85,7 @@ Run the migration file in Supabase SQL Editor:
 supabase/migrations/001_init_mauri.sql
 supabase/migrations/002_onboarding_and_subscription_state.sql
 supabase/migrations/003_payment_activation.sql
+supabase/migrations/004_weekly_reports.sql
 ```
 
 ## Webhook contract
@@ -100,6 +105,14 @@ There is also a secured internal payment confirmation route:
 - stamps `subscription_started_at`, `subscription_ends_at`, and `last_payment_at`
 - optionally sends the unlock confirmation message back to WhatsApp
 
+There is also a secured weekly report generation route:
+
+- `POST /internal/reports/weekly`
+- requires header `x-mauri-admin-key: <INTERNAL_ADMIN_API_KEY>`
+- accepts `userId` or `phoneNumber`
+- can optionally send the report to WhatsApp
+- stores the report text and computed weekly summary in `weekly_reports`
+
 ## Current lifecycle behavior
 
 New users are created in `awaiting_archetype`.
@@ -112,8 +125,10 @@ When a payment confirmation is posted to the internal payment route, the user is
 
 When a paid subscription window expires, the webhook auto-locks the account again on the next inbound message.
 
+Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active users and stores the report payload in `weekly_reports`.
+
 ## Current constraints
 
 This is the backend foundation, not the final production system.
 
-Voice-note transcription, Sunday diagnostic report generation, provider-specific Juice/Blink callback adapters, embedding generation, and vector similarity search are still the next layer to build.
+Voice-note transcription, provider-specific Juice/Blink callback adapters, embedding generation, and vector similarity search are still the next layer to build.

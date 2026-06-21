@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { env } from "../lib/env.js";
+import { hasAdminAccess } from "../lib/internal-auth.js";
 import { buildPaymentActivatedReply, activatePaidSubscription } from "../services/payment.service.js";
 import { findUserById, findUserByPhoneNumber } from "../services/user.service.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
@@ -23,10 +23,6 @@ const paymentConfirmationSchema = z
     message: "Either userId or phoneNumber is required.",
     path: ["userId"]
   });
-
-function hasAdminAccess(adminKey: string | undefined): boolean {
-  return Boolean(env.INTERNAL_ADMIN_API_KEY && adminKey === env.INTERNAL_ADMIN_API_KEY);
-}
 
 export const paymentsRouter = Router();
 

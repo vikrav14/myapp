@@ -1,6 +1,11 @@
 import { env } from "../lib/env.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
-import type { MauriBrainDumpExtraction, MauriUser, UserContextSnapshot } from "../types.js";
+import type {
+  MauriBrainDumpExtraction,
+  MauriUser,
+  UserContextSnapshot,
+  WeeklyDiagnosticSummary
+} from "../types.js";
 
 interface GeminiTextResponse {
   candidates?: Array<{
@@ -163,6 +168,48 @@ If they seem scattered, help them narrow to the next move without sounding robot
 
   return callGemini({
     prompt: replyPrompt,
+    responseMimeType: "text/plain"
+  });
+}
+
+export async function generateWeeklyDiagnosticCopy(input: {
+  user: MauriUser;
+  summary: WeeklyDiagnosticSummary;
+}): Promise<string> {
+  const { user, summary } = input;
+
+  const prompt = `
+You are Mauri.
+You are writing a Sunday diagnostic report for a user inside a private WhatsApp thread.
+
+Voice rules:
+- No bullet lists.
+- No numbered lists.
+- No robotic headings.
+- No "As an AI".
+- Short paragraphs.
+- Sharp, warm, grounded.
+- Sound local, real, and emotionally intelligent.
+
+User:
+First name: ${user.first_name ?? "Unknown"}
+Archetype: ${user.archetype}
+Subscription status: ${user.subscription_status}
+
+Weekly summary:
+${JSON.stringify(summary)}
+
+Write a compact weekly diagnostic.
+Reflect what moved, what slipped, and what pattern is quietly shaping their week.
+If momentum is decent, say it clean.
+If the week was messy, be honest without being harsh.
+If trial_cliffhanger is true, end with a subtle but irresistible cliffhanger that hints deeper tracking gets locked after trial unless they unlock premium.
+
+Reply in plain text only.
+`;
+
+  return callGemini({
+    prompt,
     responseMimeType: "text/plain"
   });
 }

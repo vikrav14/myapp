@@ -2,6 +2,7 @@ import cron from "node-cron";
 
 import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
+import { runSundayDiagnosticReports } from "../services/report.service.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
 
 interface SquadMember {
@@ -163,6 +164,15 @@ export function registerSquadJobs(): void {
       logger.info("Cross-private nudge loop completed.");
     } catch (error) {
       logger.error({ error }, "Cross-private nudge loop failed.");
+    }
+  });
+
+  cron.schedule("30 19 * * 0", async () => {
+    try {
+      const processed = await runSundayDiagnosticReports();
+      logger.info({ processed }, "Sunday diagnostic reports completed.");
+    } catch (error) {
+      logger.error({ error }, "Sunday diagnostic reports failed.");
     }
   });
 
