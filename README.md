@@ -96,6 +96,11 @@ Copy `.env.example` to `.env` and fill in:
 - `OUTBOUND_RETRY_MAX_ATTEMPTS`
 - `OUTBOUND_RETRY_BASE_DELAY_SECONDS`
 - `OUTBOUND_RETRY_CRON`
+- `TRUST_PROXY`
+- `ENABLE_SECURITY_HEADERS`
+- `ADMIN_IP_ALLOWLIST`
+- `PAYMENT_WEBHOOK_IP_ALLOWLIST`
+- `WHATSAPP_WEBHOOK_IP_ALLOWLIST`
 
 If the WhatsApp send credentials are absent, the service will still process inbound payloads and log the reply instead of attempting delivery.
 
@@ -111,6 +116,11 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Health and readiness
+
+- `GET /health` checks whether the process is alive
+- `GET /ready` checks whether the process can still reach Supabase
 
 ## Supabase setup
 
@@ -165,6 +175,7 @@ There is also a secured internal admin route surface:
 - `GET /internal/admin/users/:userId`
 - `PATCH /internal/admin/users/:userId`
 - `GET /internal/admin/dashboard`
+- `GET /internal/admin/security-posture`
 - `GET /internal/admin/payment-sessions`
 - `GET /internal/admin/outbound-messages`
 - `POST /internal/admin/outbound-messages/:messageId/retry`
@@ -194,6 +205,8 @@ This supports filtering by:
 - `requestId`
 
 The dashboard route returns a lightweight HTML operations view showing overview metrics, recent dead letters, recent outbound failures, and recent audit events.
+
+The security posture route returns the live hardening summary, including whether IP allowlists, trust proxy, security headers, and Peach webhook signature verification are configured.
 
 There is also a secured internal payment link/session route:
 
@@ -260,6 +273,24 @@ Failed sends are retried automatically on the schedule defined by `OUTBOUND_RETR
 When `PEACH_WEBHOOK_SECRET` is configured, the MCB Juice callback route verifies Peach HMAC webhook signatures before processing payment activations.
 
 Permanently failed outbound messages are also surfaced as `dead_letter_events`, and can be requeued or discarded through the admin ops routes.
+
+## Hardening
+
+The server can enforce route-level IP allowlisting with separate configuration for:
+
+- internal admin and payment routes
+- payment provider webhooks
+- WhatsApp webhooks
+
+Helmet security headers are enabled by default and can be disabled only through `ENABLE_SECURITY_HEADERS=false`.
+
+When `NODE_ENV=production`, startup warnings are emitted if key hardening controls are missing, such as:
+
+- `TRUST_PROXY`
+- admin IP allowlist
+- payment webhook IP allowlist
+- WhatsApp webhook IP allowlist
+- Peach webhook secret
 
 ## Current lifecycle behavior
 

@@ -11,6 +11,14 @@ const optionalSecret = z.preprocess((value) => {
   return value;
 }, z.string().min(1).optional());
 
+const optionalCsv = z.preprocess((value) => {
+  if (typeof value === "string" && value.trim() === "") {
+    return undefined;
+  }
+
+  return value;
+}, z.string().optional());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -39,7 +47,12 @@ const envSchema = z.object({
   PEACH_WEBHOOK_TOLERANCE_SECONDS: z.coerce.number().int().positive().default(300),
   OUTBOUND_RETRY_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   OUTBOUND_RETRY_BASE_DELAY_SECONDS: z.coerce.number().int().positive().default(60),
-  OUTBOUND_RETRY_CRON: z.string().default("*/5 * * * *")
+  OUTBOUND_RETRY_CRON: z.string().default("*/5 * * * *"),
+  TRUST_PROXY: z.union([z.boolean(), z.string(), z.number()]).optional(),
+  ENABLE_SECURITY_HEADERS: z.coerce.boolean().default(true),
+  ADMIN_IP_ALLOWLIST: optionalCsv,
+  PAYMENT_WEBHOOK_IP_ALLOWLIST: optionalCsv,
+  WHATSAPP_WEBHOOK_IP_ALLOWLIST: optionalCsv
 });
 
 export const env = envSchema.parse(process.env);

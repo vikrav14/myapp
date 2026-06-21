@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { hasAdminAccess } from "../lib/internal-auth.js";
+import { getSecurityPostureSummary } from "../lib/network-security.js";
 import {
   adminUpdateUser,
   getAdminDashboardData,
@@ -206,6 +207,13 @@ adminRouter.get("/dashboard", async (_request, response, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+adminRouter.get("/security-posture", (_request, response) => {
+  response.status(200).json({
+    ok: true,
+    securityPosture: getSecurityPostureSummary()
+  });
 });
 
 adminRouter.get("/users", async (request, response, next) => {
