@@ -6,10 +6,13 @@ import {
   adminUpdateUser,
   getAdminOverview,
   getAdminUserProfile,
+  listAdminAuditEvents,
   listAdminPaymentSessions,
   listAdminReports,
   listAdminUsers
 } from "../services/admin.service.js";
+import { getRequestId } from "../lib/request-tracing.js";
+import { recordAuditEventBestEffort } from "../services/audit.service.js";
 
 const paginationSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
@@ -31,6 +34,13 @@ const listSessionsQuerySchema = paginationSchema.extend({
 const listReportsQuerySchema = paginationSchema.extend({
   userId: z.string().uuid().optional(),
   deliveryStatus: z.string().trim().min(1).optional()
+});
+
+const listAuditEventsQuerySchema = paginationSchema.extend({
+  userId: z.string().uuid().optional(),
+  eventType: z.string().trim().min(1).optional(),
+  severity: z.enum(["info", "warning", "error"]).optional(),
+  requestId: z.string().trim().min(1).optional()
 });
 
 const userParamsSchema = z.object({
@@ -121,6 +131,7 @@ adminRouter.get("/users/:userId", async (request, response, next) => {
 
 adminRouter.patch("/users/:userId", async (request, response, next) => {
   try {
+    const requestId = getRequestId(response);
     const params = userParamsSchema.parse(request.params);
     const updates = updateUserBodySchema.parse(request.body);
     const user = await adminUpdateUser({
@@ -128,9 +139,38 @@ adminRouter.patch("/users/:userId", async (request, response, next) => {
       updates
     });
 
+    await recordAuditEventBestEffort({
+      requestId,
+      eventType: "admin_user_updated",
+      severity: "info",
+      actorType: "admin_api",
+      userId: user.id,
+      entityType: "user",
+      entityId: user.id,
+      message: "Admin updated user state.",
+      metadata: updates
+    });
+
     response.status(200).json({
       ok: true,
       user
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/audit-events", async (request, response, next) => {
+  try {
+    const query = listAuditEventsQuerySchema.parse(request.query);
+    const result = await listAdminAuditEvents(query);
+
+    response.status(200).json({
+      ok: true,
+      total: result.total,
+      limit: query.limit,
+      offset: query.offset,
+      events: result.events
     });
   } catch (error) {
     next(error);

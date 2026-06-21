@@ -1,6 +1,7 @@
 import { env } from "../lib/env.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser, PaymentEvent, PaymentProvider } from "../types.js";
+import { recordAuditEventBestEffort } from "./audit.service.js";
 import { findUserById, findUserByPhoneNumber, updateUserState } from "./user.service.js";
 
 interface ActivateSubscriptionInput {
@@ -12,6 +13,7 @@ interface ActivateSubscriptionInput {
   paidAt?: string | undefined;
   durationDays?: number | undefined;
   rawPayload?: unknown;
+  requestId?: string | undefined;
 }
 
 export interface NormalizedPaymentCallback {
@@ -78,7 +80,8 @@ export async function activatePaidSubscription(input: ActivateSubscriptionInput)
     currency = "MUR",
     paidAt,
     durationDays = env.DEFAULT_SUBSCRIPTION_DAYS,
-    rawPayload
+    rawPayload,
+    requestId
   } = input;
 
   const normalizedPaidAt = paidAt ? new Date(paidAt).toISOString() : new Date().toISOString();
@@ -134,9 +137,29 @@ export async function activatePaidSubscription(input: ActivateSubscriptionInput)
     last_payment_at: normalizedPaidAt
   });
 
+  const paymentEvent = mapPaymentEvent(paymentData);
+
+  await recordAuditEventBestEffort({
+    requestId,
+    eventType: "payment_activated",
+    actorType: "payment_provider",
+    actorId: provider,
+    userId: updatedUser.id,
+    entityType: "payment_event",
+    entityId: paymentEvent.id,
+    message: "Subscription activated from payment confirmation.",
+    metadata: {
+      provider,
+      transactionReference,
+      amount,
+      currency,
+      subscriptionEndsAt: updatedUser.subscription_ends_at
+    }
+  });
+
   return {
     user: updatedUser,
-    paymentEvent: mapPaymentEvent(paymentData),
+    paymentEvent,
     wasDuplicate: false
   };
 }

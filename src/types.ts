@@ -2,6 +2,7 @@ export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
 export type OnboardingState = "awaiting_archetype" | "active";
 export type PaymentProvider = "MCB_JUICE" | "BLINK" | "MANUAL";
 export type MemoryType = "user_message" | "assistant_reply" | "emotion_signal" | "weekly_report";
+export type AuditSeverity = "info" | "warning" | "error";
 export type MauriArchetype =
   | "Life & Habit Tracking"
   | "Student Grind"
@@ -113,6 +114,21 @@ export interface VoiceNoteTranscriptionRecord {
   transcript_text: string;
   raw_payload: unknown;
   transcribed_at: string;
+  created_at: string;
+}
+
+export interface AuditEventRecord {
+  id: string;
+  request_id: string | null;
+  event_type: string;
+  severity: AuditSeverity | string;
+  actor_type: string | null;
+  actor_id: string | null;
+  user_id: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  message: string | null;
+  metadata: Record<string, unknown> | null;
   created_at: string;
 }
 

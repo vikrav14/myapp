@@ -2,7 +2,9 @@ import { Router } from "express";
 
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
+import { getRequestId } from "../lib/request-tracing.js";
 import { extractStructuredContext, generateConversationalReply } from "../services/ai.service.js";
+import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
@@ -28,6 +30,7 @@ whatsappRouter.get("/", (request, response) => {
 
 whatsappRouter.post("/", async (request, response, next) => {
   try {
+    const requestId = getRequestId(response);
     const inboundMessage = parseInboundMessage(request.body);
 
     if (!inboundMessage) {
@@ -58,7 +61,8 @@ whatsappRouter.post("/", async (request, response, next) => {
     try {
       const resolvedInbound = await resolveInboundMessageText({
         userId: accessPolicyResult.user.id,
-        message: inboundMessage
+        message: inboundMessage,
+        requestId
       });
 
       normalizedMessageText = resolvedInbound.messageText;
@@ -168,6 +172,21 @@ whatsappRouter.post("/", async (request, response, next) => {
       },
       "Processed inbound WhatsApp message."
     );
+
+    await recordAuditEventBestEffort({
+      requestId,
+      eventType: "inbound_message_processed",
+      actorType: "user_message",
+      userId: user.id,
+      entityType: "whatsapp_message",
+      entityId: inboundMessage.messageId,
+      message: "Inbound WhatsApp message processed successfully.",
+      metadata: {
+        sourceType: inboundMessage.kind,
+        hadTranscript: Boolean(transcriptPreview),
+        extractionKeys: Object.keys(extraction)
+      }
+    });
 
     response.status(200).json({
       ok: true,

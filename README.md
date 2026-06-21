@@ -16,6 +16,7 @@ This repository now contains the first backend foundation for the product spec i
 - Embedding-backed semantic memory storage and retrieval
 - Provider-specific payment callback adapters for MCB Juice and Blink
 - Internal admin and operations API surface
+- Request tracing and persistent audit events
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
@@ -30,6 +31,7 @@ src/
   jobs/squad-jobs.ts        Afternoon nudges + Sunday showdown
   lib/env.ts                Runtime environment validation
   lib/logger.ts             Application logging
+  lib/request-tracing.ts    Request IDs and request lifecycle logs
   lib/supabase.ts           Supabase client
   routes/whatsapp.ts        Webhook verification + inbound processing
   routes/admin.ts           Internal admin and ops endpoints
@@ -37,6 +39,7 @@ src/
   schemas/extraction.ts     Mauri parser schema
   services/ai.service.ts    Gemini extraction + reply generation
   services/admin.service.ts
+  services/audit.service.ts
   services/context.service.ts
   services/logging.service.ts
   services/memory.service.ts
@@ -55,6 +58,7 @@ supabase/migrations/
   005_voice_note_transcriptions.sql
   006_vector_memory.sql
   007_payment_checkout_sessions.sql
+  008_audit_events.sql
 ```
 
 ## Environment variables
@@ -110,6 +114,7 @@ supabase/migrations/004_weekly_reports.sql
 supabase/migrations/005_voice_note_transcriptions.sql
 supabase/migrations/006_vector_memory.sql
 supabase/migrations/007_payment_checkout_sessions.sql
+supabase/migrations/008_audit_events.sql
 ```
 
 ## Webhook contract
@@ -154,8 +159,20 @@ These endpoints let you:
 
 - inspect user lifecycle state
 - inspect payment sessions and reports
+- inspect audit trails
 - review recent user ops activity
 - update subscription or onboarding state without direct SQL
+
+Additional admin ops route:
+
+- `GET /internal/admin/audit-events`
+
+This supports filtering by:
+
+- `userId`
+- `eventType`
+- `severity`
+- `requestId`
 
 There is also a secured internal payment link/session route:
 
@@ -199,6 +216,21 @@ There is also a secured weekly report generation route:
 - accepts `userId` or `phoneNumber`
 - can optionally send the report to WhatsApp
 - stores the report text and computed weekly summary in `weekly_reports`
+
+## Observability
+
+Every request now gets an `x-request-id`.
+
+The server logs request start and completion with duration and status code.
+
+Major events are also persisted in `audit_events`, including:
+
+- inbound WhatsApp message processing
+- voice-note transcription
+- payment activation
+- payment checkout session creation
+- weekly report generation
+- admin user updates
 
 ## Current lifecycle behavior
 

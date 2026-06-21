@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase.js";
 import type {
+  AuditEventRecord,
   MauriUser,
   PaymentCheckoutSessionRecord,
   PaymentEvent,
@@ -77,6 +78,23 @@ function mapVoiceNote(record: Record<string, unknown>): VoiceNoteTranscriptionRe
     transcript_text: String(record.transcript_text),
     raw_payload: record.raw_payload ?? null,
     transcribed_at: String(record.transcribed_at),
+    created_at: String(record.created_at)
+  };
+}
+
+function mapAuditEvent(record: Record<string, unknown>): AuditEventRecord {
+  return {
+    id: String(record.id),
+    request_id: record.request_id ? String(record.request_id) : null,
+    event_type: String(record.event_type),
+    severity: String(record.severity),
+    actor_type: record.actor_type ? String(record.actor_type) : null,
+    actor_id: record.actor_id ? String(record.actor_id) : null,
+    user_id: record.user_id ? String(record.user_id) : null,
+    entity_type: record.entity_type ? String(record.entity_type) : null,
+    entity_id: record.entity_id ? String(record.entity_id) : null,
+    message: record.message ? String(record.message) : null,
+    metadata: isRecord(record.metadata) ? record.metadata : null,
     created_at: String(record.created_at)
   };
 }
@@ -350,6 +368,47 @@ export async function listAdminReports(input: {
 
   return {
     reports: (data ?? []).map((row) => mapWeeklyReport(row as Record<string, unknown>)),
+    total: count ?? 0
+  };
+}
+
+export async function listAdminAuditEvents(input: {
+  limit: number;
+  offset: number;
+  userId?: string | undefined;
+  eventType?: string | undefined;
+  severity?: string | undefined;
+  requestId?: string | undefined;
+}): Promise<{
+  events: AuditEventRecord[];
+  total: number;
+}> {
+  let query = supabase.from("audit_events").select("*", { count: "exact" }).order("created_at", { ascending: false });
+
+  if (input.userId) {
+    query = query.eq("user_id", input.userId);
+  }
+
+  if (input.eventType) {
+    query = query.eq("event_type", input.eventType);
+  }
+
+  if (input.severity) {
+    query = query.eq("severity", input.severity);
+  }
+
+  if (input.requestId) {
+    query = query.eq("request_id", input.requestId);
+  }
+
+  const { data, error, count } = await query.range(input.offset, input.offset + input.limit - 1);
+
+  if (error) {
+    throw new Error(`Failed to list audit events: ${error.message}`);
+  }
+
+  return {
+    events: (data ?? []).map((row) => mapAuditEvent(row as Record<string, unknown>)),
     total: count ?? 0
   };
 }

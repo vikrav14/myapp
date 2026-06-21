@@ -2,6 +2,7 @@ import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser, WeeklyDiagnosticSummary, WeeklyReportRecord } from "../types.js";
 import { generateWeeklyDiagnosticCopy } from "./ai.service.js";
+import { recordAuditEventBestEffort } from "./audit.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
 interface ReportWindow {
@@ -293,8 +294,9 @@ export async function generateWeeklyDiagnosticReport(input: {
   referenceDate?: Date | undefined;
   sendMessage?: boolean | undefined;
   forceRegenerate?: boolean | undefined;
+  requestId?: string | undefined;
 }): Promise<WeeklyReportRecord> {
-  const { user, referenceDate = new Date(), sendMessage = true, forceRegenerate = false } = input;
+  const { user, referenceDate = new Date(), sendMessage = true, forceRegenerate = false, requestId } = input;
   const window = getWeeklyReportWindow(referenceDate);
 
   if (!forceRegenerate) {
@@ -331,7 +333,7 @@ export async function generateWeeklyDiagnosticReport(input: {
     }
   }
 
-  return upsertWeeklyReport({
+  const report = await upsertWeeklyReport({
     userId: user.id,
     window,
     reportText,
@@ -339,6 +341,24 @@ export async function generateWeeklyDiagnosticReport(input: {
     deliveryStatus,
     sentAt
   });
+
+  await recordAuditEventBestEffort({
+    requestId,
+    eventType: "weekly_report_generated",
+    actorType: "system_job",
+    userId: user.id,
+    entityType: "weekly_report",
+    entityId: report.id,
+    message: "Weekly diagnostic report generated.",
+    metadata: {
+      deliveryStatus: report.delivery_status,
+      sentAt: report.sent_at,
+      weekStart: report.week_start,
+      weekEnd: report.week_end
+    }
+  });
+
+  return report;
 }
 
 export async function runSundayDiagnosticReports(referenceDate: Date = new Date()): Promise<number> {

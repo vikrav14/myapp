@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { env } from "../lib/env.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser, PaymentCheckoutSessionRecord, PaymentProvider } from "../types.js";
+import { recordAuditEventBestEffort } from "./audit.service.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -130,6 +131,7 @@ export async function createPaymentCheckoutSession(input: {
   amount: number;
   currency?: string | undefined;
   durationDays?: number | undefined;
+  requestId?: string | undefined;
 }): Promise<PaymentCheckoutSessionRecord> {
   const amount = input.amount;
   const currency = input.currency ?? "MUR";
@@ -179,7 +181,26 @@ export async function createPaymentCheckoutSession(input: {
     throw new Error(`Failed to create payment checkout session: ${error.message}`);
   }
 
-  return mapPaymentCheckoutSessionRecord(data);
+  const session = mapPaymentCheckoutSessionRecord(data);
+
+  await recordAuditEventBestEffort({
+    requestId: input.requestId,
+    eventType: "payment_session_created",
+    actorType: "admin_api",
+    userId: input.user.id,
+    entityType: "payment_checkout_session",
+    entityId: session.id,
+    message: "Payment checkout session prepared.",
+    metadata: {
+      provider: session.provider,
+      providerReference: session.provider_reference,
+      amount: session.amount,
+      currency: session.currency,
+      durationDays: session.duration_days
+    }
+  });
+
+  return session;
 }
 
 export async function markCheckoutSessionActivated(input: {

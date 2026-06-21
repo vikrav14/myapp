@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { hasAdminAccess } from "../lib/internal-auth.js";
+import { getRequestId } from "../lib/request-tracing.js";
 import { generateWeeklyDiagnosticReport } from "../services/report.service.js";
 import { findUserById, findUserByPhoneNumber } from "../services/user.service.js";
 
@@ -22,6 +23,7 @@ export const reportsRouter = Router();
 
 reportsRouter.post("/weekly", async (request, response, next) => {
   try {
+    const requestId = getRequestId(response);
     if (!hasAdminAccess(request.header("x-mauri-admin-key") ?? undefined)) {
       response.status(403).json({
         ok: false,
@@ -47,7 +49,8 @@ reportsRouter.post("/weekly", async (request, response, next) => {
       user,
       referenceDate: payload.referenceDate ? new Date(payload.referenceDate) : undefined,
       sendMessage: payload.sendMessage,
-      forceRegenerate: payload.forceRegenerate
+      forceRegenerate: payload.forceRegenerate,
+      requestId
     });
 
     response.status(200).json({

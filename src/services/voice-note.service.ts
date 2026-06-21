@@ -1,6 +1,7 @@
 import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
 import type { InboundMessage, VoiceNoteTranscriptionRecord } from "../types.js";
+import { recordAuditEventBestEffort } from "./audit.service.js";
 import { transcribeVoiceNote } from "./ai.service.js";
 import { downloadInboundAudio } from "./whatsapp.service.js";
 
@@ -22,6 +23,7 @@ function mapVoiceNoteTranscriptionRecord(record: Record<string, unknown>): Voice
 export async function transcribeInboundVoiceNote(input: {
   userId: string;
   message: InboundMessage;
+  requestId?: string | undefined;
 }): Promise<VoiceNoteTranscriptionRecord> {
   if (input.message.kind !== "audio") {
     throw new Error("Inbound message is not an audio message.");
@@ -51,12 +53,31 @@ export async function transcribeInboundVoiceNote(input: {
     throw new Error(`Failed to store voice note transcript: ${error.message}`);
   }
 
-  return mapVoiceNoteTranscriptionRecord(data);
+  const record = mapVoiceNoteTranscriptionRecord(data);
+
+  await recordAuditEventBestEffort({
+    requestId: input.requestId,
+    eventType: "voice_note_transcribed",
+    actorType: "user_message",
+    userId: input.userId,
+    entityType: "voice_note_transcription",
+    entityId: record.id,
+    message: "Inbound voice note transcribed and stored.",
+    metadata: {
+      sourceMessageId: record.source_message_id,
+      mediaId: record.media_id,
+      mimeType: record.mime_type,
+      transcriptLength: record.transcript_text.length
+    }
+  });
+
+  return record;
 }
 
 export async function resolveInboundMessageText(input: {
   userId: string;
   message: InboundMessage;
+  requestId?: string | undefined;
 }): Promise<{
   messageText: string;
   transcriptRecord?: VoiceNoteTranscriptionRecord | undefined;

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { env } from "../lib/env.js";
 import { hasAdminAccess } from "../lib/internal-auth.js";
 import { logger } from "../lib/logger.js";
+import { getRequestId } from "../lib/request-tracing.js";
 import { createPaymentCheckoutSession, markCheckoutSessionActivated } from "../services/payment-link.service.js";
 import {
   activatePaidSubscriptionIdempotent,
@@ -302,6 +303,7 @@ function normalizeBlinkCallback(body: unknown): {
 
 paymentsRouter.post("/confirm", async (request, response, next) => {
   try {
+    const requestId = getRequestId(response);
     if (!hasAdminAccess(request.header("x-mauri-admin-key") ?? undefined)) {
       response.status(403).json({
         ok: false,
@@ -331,7 +333,8 @@ paymentsRouter.post("/confirm", async (request, response, next) => {
       currency: payload.currency,
       paidAt: payload.paidAt,
       durationDays: payload.durationDays,
-      rawPayload: payload.rawPayload
+      rawPayload: payload.rawPayload,
+      requestId
     });
 
     let confirmationPreview: string | null = null;
@@ -357,6 +360,7 @@ paymentsRouter.post("/confirm", async (request, response, next) => {
 
 paymentsRouter.post("/links", async (request, response, next) => {
   try {
+    const requestId = getRequestId(response);
     if (!hasAdminAccess(request.header("x-mauri-admin-key") ?? undefined)) {
       response.status(403).json({
         ok: false,
@@ -383,7 +387,8 @@ paymentsRouter.post("/links", async (request, response, next) => {
       provider: payload.provider,
       amount: payload.amount,
       currency: payload.currency,
-      durationDays: payload.durationDays
+      durationDays: payload.durationDays,
+      requestId
     });
 
     response.status(200).json({
@@ -415,6 +420,7 @@ paymentWebhooksRouter.post(
   express.text({ type: ["application/x-www-form-urlencoded", "text/plain"] }),
   async (request, response, next) => {
     try {
+      const requestId = getRequestId(response);
       const tokenCheck = ensureProviderToken(request, "MCB_JUICE");
       if (!tokenCheck.ok) {
         response.status(403).json(tokenCheck.response);
@@ -457,7 +463,8 @@ paymentWebhooksRouter.post(
         amount: normalized.payload.amount,
         currency: normalized.payload.currency,
         paidAt: normalized.payload.paidAt,
-        rawPayload: normalized.payload.rawPayload
+        rawPayload: normalized.payload.rawPayload,
+        requestId
       });
 
       try {
@@ -496,6 +503,7 @@ paymentWebhooksRouter.post(
 
 paymentWebhooksRouter.post("/blink", async (request, response, next) => {
   try {
+    const requestId = getRequestId(response);
     const tokenCheck = ensureProviderToken(request, "BLINK");
     if (!tokenCheck.ok) {
       response.status(403).json(tokenCheck.response);
@@ -537,7 +545,8 @@ paymentWebhooksRouter.post("/blink", async (request, response, next) => {
       amount: normalized.payload.amount,
       currency: normalized.payload.currency,
       paidAt: normalized.payload.paidAt,
-      rawPayload: normalized.payload.rawPayload
+      rawPayload: normalized.payload.rawPayload,
+      requestId
     });
 
     try {
