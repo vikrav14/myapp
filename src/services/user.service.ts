@@ -7,13 +7,21 @@ function mapUser(record: Record<string, unknown>): MauriUser {
     phone_number: String(record.phone_number),
     first_name: record.first_name ? String(record.first_name) : null,
     archetype: String(record.archetype ?? "Life & Habit Tracking"),
+    onboarding_state: (record.onboarding_state ?? "active") as MauriUser["onboarding_state"],
     subscription_status: (record.subscription_status ?? "Trial_Active") as MauriUser["subscription_status"],
+    onboarding_completed_at: record.onboarding_completed_at ? String(record.onboarding_completed_at) : null,
+    trial_started_at: record.trial_started_at ? String(record.trial_started_at) : null,
+    trial_ends_at: record.trial_ends_at ? String(record.trial_ends_at) : null,
+    locked_at: record.locked_at ? String(record.locked_at) : null,
     created_at: String(record.created_at),
     updated_at: String(record.updated_at)
   };
 }
 
-export async function getOrCreateUser(phoneNumber: string, firstName?: string): Promise<MauriUser> {
+export async function getOrCreateUser(
+  phoneNumber: string,
+  firstName?: string
+): Promise<{ user: MauriUser; isNewUser: boolean }> {
   const { data: existingUser, error: existingUserError } = await supabase
     .from("users")
     .select("*")
@@ -40,17 +48,25 @@ export async function getOrCreateUser(phoneNumber: string, firstName?: string): 
         throw new Error(`Failed to update user profile: ${updatedUserError.message}`);
       }
 
-      return mapUser(updatedUser);
+      return {
+        user: mapUser(updatedUser),
+        isNewUser: false
+      };
     }
 
-    return mapUser(existingUser);
+    return {
+      user: mapUser(existingUser),
+      isNewUser: false
+    };
   }
 
   const { data: createdUser, error: createdUserError } = await supabase
     .from("users")
     .insert({
       phone_number: phoneNumber,
-      first_name: firstName ?? null
+      first_name: firstName ?? null,
+      onboarding_state: "awaiting_archetype",
+      subscription_status: "Trial_Active"
     })
     .select("*")
     .single();
@@ -59,5 +75,29 @@ export async function getOrCreateUser(phoneNumber: string, firstName?: string): 
     throw new Error(`Failed to create user: ${createdUserError.message}`);
   }
 
-  return mapUser(createdUser);
+  return {
+    user: mapUser(createdUser),
+    isNewUser: true
+  };
+}
+
+export async function updateUserState(
+  userId: string,
+  updates: Record<string, unknown>
+): Promise<MauriUser> {
+  const { data, error } = await supabase
+    .from("users")
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", userId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update user state: ${error.message}`);
+  }
+
+  return mapUser(data);
 }

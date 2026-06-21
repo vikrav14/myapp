@@ -1,11 +1,22 @@
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
+export type OnboardingState = "awaiting_archetype" | "active";
+export type MauriArchetype =
+  | "Life & Habit Tracking"
+  | "Student Grind"
+  | "Corporate / Career"
+  | "Entrepreneur Mode";
 
 export interface MauriUser {
   id: string;
   phone_number: string;
   first_name: string | null;
-  archetype: string;
+  archetype: MauriArchetype | string;
+  onboarding_state: OnboardingState;
   subscription_status: SubscriptionStatus;
+  onboarding_completed_at: string | null;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
+  locked_at: string | null;
   created_at: string;
   updated_at: string;
 }

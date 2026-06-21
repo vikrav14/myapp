@@ -8,6 +8,8 @@ This repository now contains the first backend foundation for the product spec i
 
 - Express server with health check and WhatsApp webhook endpoints
 - Supabase migration for users, finance, habits, todos, insights, and squads
+- Onboarding flow for archetype selection with 7-day trial activation
+- Trial expiry enforcement with locked-state paywall response
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
@@ -28,10 +30,12 @@ src/
   services/ai.service.ts    Gemini extraction + reply generation
   services/context.service.ts
   services/logging.service.ts
+  services/onboarding.service.ts
   services/user.service.ts
   services/whatsapp.service.ts
 supabase/migrations/
   001_init_mauri.sql
+  002_onboarding_and_subscription_state.sql
 ```
 
 ## Environment variables
@@ -45,6 +49,9 @@ Copy `.env.example` to `.env` and fill in:
 - `WHATSAPP_VERIFY_TOKEN`
 - `WHATSAPP_ACCESS_TOKEN`
 - `WHATSAPP_PHONE_NUMBER_ID`
+- `MCB_JUICE_PAYMENT_LINK`
+- `BLINK_PAYMENT_LINK`
+- `SUBSCRIPTION_MONTHLY_PRICE_RS`
 
 If the WhatsApp send credentials are absent, the service will still process inbound payloads and log the reply instead of attempting delivery.
 
@@ -76,8 +83,16 @@ The webhook route supports:
 - direct JSON payloads shaped like `{ "from": "...", "text": "..." }`
 - standard Meta WhatsApp webhook payloads with `entry -> changes -> value -> messages`
 
+## Current lifecycle behavior
+
+New users are created in `awaiting_archetype`.
+
+Their first valid archetype selection activates onboarding, stamps the trial window, and switches them into the normal Mauri conversation loop.
+
+When `trial_ends_at` is in the past and the user is still `Trial_Active`, the webhook auto-locks the account and returns a premium unlock message instead of running extraction and reply generation.
+
 ## Current constraints
 
 This is the backend foundation, not the final production system.
 
-Voice-note transcription, onboarding state machines, paid lock transitions, embedding generation, vector similarity search, and payment deep-link orchestration are still the next layer to build.
+Voice-note transcription, Sunday diagnostic report generation, embedding generation, vector similarity search, and fully automated payment confirmation are still the next layer to build.

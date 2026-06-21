@@ -20,7 +20,10 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default("gemini-1.5-flash"),
   WHATSAPP_VERIFY_TOKEN: z.string().min(1),
   WHATSAPP_ACCESS_TOKEN: optionalSecret,
-  WHATSAPP_PHONE_NUMBER_ID: optionalSecret
+  WHATSAPP_PHONE_NUMBER_ID: optionalSecret,
+  MCB_JUICE_PAYMENT_LINK: optionalSecret,
+  BLINK_PAYMENT_LINK: optionalSecret,
+  SUBSCRIPTION_MONTHLY_PRICE_RS: z.coerce.number().int().positive().default(200)
 });
 
 export const env = envSchema.parse(process.env);
