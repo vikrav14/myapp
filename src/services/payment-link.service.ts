@@ -9,13 +9,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function callbackUrlFor(provider: "MCB_JUICE" | "BLINK"): string | null {
+export function buildProviderNotificationUrl(provider: "MCB_JUICE" | "BLINK"): string | null {
   if (!env.PAYMENT_CALLBACK_BASE_URL) {
     return null;
   }
 
   const base = env.PAYMENT_CALLBACK_BASE_URL.replace(/\/$/, "");
-  return provider === "MCB_JUICE" ? `${base}/webhooks/payments/juice` : `${base}/webhooks/payments/blink`;
+  const token = provider === "MCB_JUICE" ? env.MCB_JUICE_CALLBACK_TOKEN : env.BLINK_CALLBACK_TOKEN;
+  const path = provider === "MCB_JUICE" ? "/webhooks/payments/juice" : "/webhooks/payments/blink";
+  const url = `${base}${path}`;
+
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
 }
 
 function mapPaymentCheckoutSessionRecord(record: Record<string, unknown>): PaymentCheckoutSessionRecord {
@@ -65,7 +69,7 @@ function buildMcbJuicePayload(input: {
   endpoint: string;
   payload: Record<string, string | boolean>;
 } {
-  const callbackUrl = callbackUrlFor("MCB_JUICE");
+  const callbackUrl = buildProviderNotificationUrl("MCB_JUICE");
   const payload: Record<string, string | boolean> = {
     "authentication.entityId": env.PEACH_ENTITY_ID ?? "configure-PEACH_ENTITY_ID",
     amount: input.amount.toFixed(2),
@@ -106,7 +110,7 @@ function buildBlinkPayload(input: {
   endpoint: string;
   payload: Record<string, unknown>;
 } {
-  const callbackUrl = callbackUrlFor("BLINK");
+  const callbackUrl = buildProviderNotificationUrl("BLINK");
 
   return {
     endpoint: env.BLINK_PAYLINK_API_URL,

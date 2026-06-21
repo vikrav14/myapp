@@ -7,12 +7,14 @@ import {
   getAdminOverview,
   getAdminUserProfile,
   listAdminAuditEvents,
+  listAdminOutboundMessages,
   listAdminPaymentSessions,
   listAdminReports,
   listAdminUsers
 } from "../services/admin.service.js";
 import { getRequestId } from "../lib/request-tracing.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
+import { retryOutboundMessageById } from "../services/outbound-retry.service.js";
 
 const paginationSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
@@ -41,6 +43,11 @@ const listAuditEventsQuerySchema = paginationSchema.extend({
   eventType: z.string().trim().min(1).optional(),
   severity: z.enum(["info", "warning", "error"]).optional(),
   requestId: z.string().trim().min(1).optional()
+});
+
+const listOutboundMessagesQuerySchema = paginationSchema.extend({
+  userId: z.string().uuid().optional(),
+  status: z.string().trim().min(1).optional()
 });
 
 const userParamsSchema = z.object({
@@ -188,6 +195,48 @@ adminRouter.get("/payment-sessions", async (request, response, next) => {
       limit: query.limit,
       offset: query.offset,
       sessions: result.sessions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/outbound-messages", async (request, response, next) => {
+  try {
+    const query = listOutboundMessagesQuerySchema.parse(request.query);
+    const result = await listAdminOutboundMessages(query);
+
+    response.status(200).json({
+      ok: true,
+      total: result.total,
+      limit: query.limit,
+      offset: query.offset,
+      messages: result.messages
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/outbound-messages/:messageId/retry", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const messageId = z.string().uuid().parse(request.params.messageId);
+    const result = await retryOutboundMessageById(messageId);
+
+    await recordAuditEventBestEffort({
+      requestId,
+      eventType: "admin_outbound_retry_requested",
+      actorType: "admin_api",
+      entityType: "outbound_message",
+      entityId: messageId,
+      message: "Admin requested outbound message retry.",
+      metadata: result
+    });
+
+    response.status(200).json({
+      ok: true,
+      result
     });
   } catch (error) {
     next(error);

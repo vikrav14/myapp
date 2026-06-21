@@ -324,7 +324,15 @@ export async function generateWeeklyDiagnosticReport(input: {
 
   if (sendMessage) {
     try {
-      await sendWhatsAppMessage(user.phone_number, reportText);
+      await sendWhatsAppMessage(user.phone_number, reportText, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          flow: "weekly_report",
+          weekStart: window.weekStart,
+          weekEnd: window.weekEnd
+        }
+      });
       deliveryStatus = "sent";
       sentAt = new Date().toISOString();
     } catch (error) {

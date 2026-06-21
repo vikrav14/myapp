@@ -44,6 +44,8 @@ src/
   services/logging.service.ts
   services/memory.service.ts
   services/onboarding.service.ts
+  services/outbound-message.service.ts
+  services/outbound-retry.service.ts
   services/payment-link.service.ts
   services/payment.service.ts
   services/report.service.ts
@@ -59,6 +61,7 @@ supabase/migrations/
   006_vector_memory.sql
   007_payment_checkout_sessions.sql
   008_audit_events.sql
+  009_outbound_messages.sql
 ```
 
 ## Environment variables
@@ -86,6 +89,11 @@ Copy `.env.example` to `.env` and fill in:
 - `PEACH_ENTITY_ID`
 - `PEACH_CHECKOUT_URL`
 - `BLINK_PAYLINK_API_URL`
+- `PEACH_WEBHOOK_SECRET`
+- `PEACH_WEBHOOK_TOLERANCE_SECONDS`
+- `OUTBOUND_RETRY_MAX_ATTEMPTS`
+- `OUTBOUND_RETRY_BASE_DELAY_SECONDS`
+- `OUTBOUND_RETRY_CRON`
 
 If the WhatsApp send credentials are absent, the service will still process inbound payloads and log the reply instead of attempting delivery.
 
@@ -115,6 +123,7 @@ supabase/migrations/005_voice_note_transcriptions.sql
 supabase/migrations/006_vector_memory.sql
 supabase/migrations/007_payment_checkout_sessions.sql
 supabase/migrations/008_audit_events.sql
+supabase/migrations/009_outbound_messages.sql
 ```
 
 ## Webhook contract
@@ -153,12 +162,15 @@ There is also a secured internal admin route surface:
 - `GET /internal/admin/users/:userId`
 - `PATCH /internal/admin/users/:userId`
 - `GET /internal/admin/payment-sessions`
+- `GET /internal/admin/outbound-messages`
+- `POST /internal/admin/outbound-messages/:messageId/retry`
 - `GET /internal/admin/reports`
 
 These endpoints let you:
 
 - inspect user lifecycle state
 - inspect payment sessions and reports
+- inspect outbound delivery failures
 - inspect audit trails
 - review recent user ops activity
 - update subscription or onboarding state without direct SQL
@@ -231,6 +243,12 @@ Major events are also persisted in `audit_events`, including:
 - payment checkout session creation
 - weekly report generation
 - admin user updates
+
+Outbound WhatsApp sends are also persisted in `outbound_messages`.
+
+Failed sends are retried automatically on the schedule defined by `OUTBOUND_RETRY_CRON`, with exponential backoff controlled by the retry env vars.
+
+When `PEACH_WEBHOOK_SECRET` is configured, the MCB Juice callback route verifies Peach HMAC webhook signatures before processing payment activations.
 
 ## Current lifecycle behavior
 

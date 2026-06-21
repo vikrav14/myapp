@@ -2,6 +2,7 @@ import { supabase } from "../lib/supabase.js";
 import type {
   AuditEventRecord,
   MauriUser,
+  OutboundMessageRecord,
   PaymentCheckoutSessionRecord,
   PaymentEvent,
   WeeklyReportRecord,
@@ -82,6 +83,26 @@ function mapVoiceNote(record: Record<string, unknown>): VoiceNoteTranscriptionRe
   };
 }
 
+function mapOutboundMessage(record: Record<string, unknown>): OutboundMessageRecord {
+  return {
+    id: String(record.id),
+    provider: String(record.provider),
+    channel: String(record.channel),
+    user_id: record.user_id ? String(record.user_id) : null,
+    phone_number: String(record.phone_number),
+    body: String(record.body),
+    status: String(record.status),
+    request_id: record.request_id ? String(record.request_id) : null,
+    metadata: isRecord(record.metadata) ? record.metadata : null,
+    attempt_count: Number(record.attempt_count ?? 0),
+    last_error: record.last_error ? String(record.last_error) : null,
+    next_attempt_at: String(record.next_attempt_at),
+    sent_at: record.sent_at ? String(record.sent_at) : null,
+    created_at: String(record.created_at),
+    updated_at: String(record.updated_at)
+  };
+}
+
 function mapAuditEvent(record: Record<string, unknown>): AuditEventRecord {
   return {
     id: String(record.id),
@@ -131,6 +152,8 @@ export async function getAdminOverview(): Promise<{
     activatedSessions: number;
     paymentEvents: number;
     voiceNotes: number;
+    outboundPending: number;
+    outboundFailed: number;
   };
 }> {
   const weekStart = startOfWeekIso();
@@ -146,7 +169,9 @@ export async function getAdminOverview(): Promise<{
     preparedSessions,
     activatedSessions,
     paymentEvents,
-    voiceNotes
+    voiceNotes,
+    outboundPending,
+    outboundFailed
   ] = await Promise.all([
     countRows(supabase.from("users").select("*", { count: "exact", head: true })),
     countRows(supabase.from("users").select("*", { count: "exact", head: true }).eq("subscription_status", "Trial_Active")),
@@ -158,7 +183,9 @@ export async function getAdminOverview(): Promise<{
     countRows(supabase.from("payment_checkout_sessions").select("*", { count: "exact", head: true }).eq("status", "prepared")),
     countRows(supabase.from("payment_checkout_sessions").select("*", { count: "exact", head: true }).eq("status", "activated")),
     countRows(supabase.from("payment_events").select("*", { count: "exact", head: true }).gte("created_at", weekStart)),
-    countRows(supabase.from("voice_note_transcriptions").select("*", { count: "exact", head: true }).gte("created_at", weekStart))
+    countRows(supabase.from("voice_note_transcriptions").select("*", { count: "exact", head: true }).gte("created_at", weekStart)),
+    countRows(supabase.from("outbound_messages").select("*", { count: "exact", head: true }).eq("status", "pending")),
+    countRows(supabase.from("outbound_messages").select("*", { count: "exact", head: true }).in("status", ["failed", "permanent_failed"]))
   ]);
 
   return {
@@ -175,7 +202,9 @@ export async function getAdminOverview(): Promise<{
       preparedSessions,
       activatedSessions,
       paymentEvents,
-      voiceNotes
+      voiceNotes,
+      outboundPending,
+      outboundFailed
     }
   };
 }
@@ -409,6 +438,37 @@ export async function listAdminAuditEvents(input: {
 
   return {
     events: (data ?? []).map((row) => mapAuditEvent(row as Record<string, unknown>)),
+    total: count ?? 0
+  };
+}
+
+export async function listAdminOutboundMessages(input: {
+  limit: number;
+  offset: number;
+  userId?: string | undefined;
+  status?: string | undefined;
+}): Promise<{
+  messages: OutboundMessageRecord[];
+  total: number;
+}> {
+  let query = supabase.from("outbound_messages").select("*", { count: "exact" }).order("created_at", { ascending: false });
+
+  if (input.userId) {
+    query = query.eq("user_id", input.userId);
+  }
+
+  if (input.status) {
+    query = query.eq("status", input.status);
+  }
+
+  const { data, error, count } = await query.range(input.offset, input.offset + input.limit - 1);
+
+  if (error) {
+    throw new Error(`Failed to list outbound messages: ${error.message}`);
+  }
+
+  return {
+    messages: (data ?? []).map((row) => mapOutboundMessage(row as Record<string, unknown>)),
     total: count ?? 0
   };
 }

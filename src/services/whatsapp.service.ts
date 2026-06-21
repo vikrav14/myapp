@@ -1,6 +1,13 @@
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import type { InboundMessage } from "../types.js";
+import {
+  createOutboundMessage,
+  markOutboundMessageFailed,
+  markOutboundMessageSending,
+  markOutboundMessageLoggedOnly,
+  markOutboundMessageSent
+} from "./outbound-message.service.js";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -129,10 +136,9 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
   return null;
 }
 
-export async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
+export async function deliverWhatsAppText(to: string, body: string): Promise<void> {
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
-    logger.info({ to, body }, "WhatsApp credentials missing. Reply logged instead of sent.");
-    return;
+    throw new Error("WhatsApp credentials are not configured for delivery.");
   }
 
   const response = await fetch(
@@ -157,6 +163,43 @@ export async function sendWhatsAppMessage(to: string, body: string): Promise<voi
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Failed to send WhatsApp message: ${errorText}`);
+  }
+}
+
+export async function sendWhatsAppMessage(
+  to: string,
+  body: string,
+  options?: {
+    userId?: string | null | undefined;
+    requestId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }
+): Promise<void> {
+  const outbound = await createOutboundMessage({
+    phoneNumber: to,
+    body,
+    userId: options?.userId ?? null,
+    requestId: options?.requestId,
+    metadata: options?.metadata
+  });
+
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    logger.info({ to, body }, "WhatsApp credentials missing. Reply logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return;
+  }
+
+  try {
+    await markOutboundMessageSending(outbound.id);
+    await deliverWhatsAppText(to, body);
+    await markOutboundMessageSent(outbound.id);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown outbound send error";
+    await markOutboundMessageFailed({
+      messageId: outbound.id,
+      errorMessage
+    });
+    throw error;
   }
 }
 

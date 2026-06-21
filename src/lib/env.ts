@@ -34,7 +34,12 @@ const envSchema = z.object({
   PAYMENT_RETURN_URL: optionalSecret,
   PEACH_ENTITY_ID: optionalSecret,
   PEACH_CHECKOUT_URL: z.string().url().default("https://secure.peachpayments.com/checkout/initiate"),
-  BLINK_PAYLINK_API_URL: z.string().url().default("https://api.blinkpayment.co.uk/api/paylink/v1/paylinks")
+  BLINK_PAYLINK_API_URL: z.string().url().default("https://api.blinkpayment.co.uk/api/paylink/v1/paylinks"),
+  PEACH_WEBHOOK_SECRET: optionalSecret,
+  PEACH_WEBHOOK_TOLERANCE_SECONDS: z.coerce.number().int().positive().default(300),
+  OUTBOUND_RETRY_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  OUTBOUND_RETRY_BASE_DELAY_SECONDS: z.coerce.number().int().positive().default(60),
+  OUTBOUND_RETRY_CRON: z.string().default("*/5 * * * *")
 });
 
 export const env = envSchema.parse(process.env);

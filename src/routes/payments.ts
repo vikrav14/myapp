@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import express, { Router } from "express";
 import { z } from "zod";
 
@@ -5,7 +6,11 @@ import { env } from "../lib/env.js";
 import { hasAdminAccess } from "../lib/internal-auth.js";
 import { logger } from "../lib/logger.js";
 import { getRequestId } from "../lib/request-tracing.js";
-import { createPaymentCheckoutSession, markCheckoutSessionActivated } from "../services/payment-link.service.js";
+import {
+  buildProviderNotificationUrl,
+  createPaymentCheckoutSession,
+  markCheckoutSessionActivated
+} from "../services/payment-link.service.js";
 import {
   activatePaidSubscriptionIdempotent,
   buildPaymentActivatedReply,
@@ -113,6 +118,64 @@ function ensureProviderToken(
         ok: false,
         error: `${provider} callback token validation failed.`
       }
+    };
+  }
+
+  return { ok: true };
+}
+
+function verifyPeachWebhookSignature(request: express.Request, rawBody: string): {
+  ok: true;
+} | {
+  ok: false;
+  reason: string;
+} {
+  if (!env.PEACH_WEBHOOK_SECRET) {
+    return { ok: true };
+  }
+
+  const timestamp = request.header("x-webhook-timestamp");
+  const webhookId = request.header("x-webhook-id");
+  const receivedSignature = request.header("x-webhook-signature");
+
+  if (!timestamp || !webhookId || !receivedSignature) {
+    return {
+      ok: false,
+      reason: "missing_peach_signature_headers"
+    };
+  }
+
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds)) {
+    return {
+      ok: false,
+      reason: "invalid_peach_signature_timestamp"
+    };
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - timestampSeconds) > env.PEACH_WEBHOOK_TOLERANCE_SECONDS) {
+    return {
+      ok: false,
+      reason: "stale_peach_signature_timestamp"
+    };
+  }
+
+  const callbackUrl =
+    buildProviderNotificationUrl("MCB_JUICE") ??
+    `${request.protocol}://${request.get("host")}${request.originalUrl}`;
+  const message = `${timestamp}.${webhookId}.${callbackUrl}.${rawBody}`;
+  const calculatedSignature = createHmac("sha256", env.PEACH_WEBHOOK_SECRET).update(message).digest("hex");
+
+  const receivedBuffer = Buffer.from(receivedSignature.trim().toLowerCase(), "hex");
+  const calculatedBuffer = Buffer.from(calculatedSignature, "hex");
+  if (
+    receivedBuffer.length !== calculatedBuffer.length ||
+    !timingSafeEqual(receivedBuffer, calculatedBuffer)
+  ) {
+    return {
+      ok: false,
+      reason: "invalid_peach_signature"
     };
   }
 
@@ -340,7 +403,14 @@ paymentsRouter.post("/confirm", async (request, response, next) => {
     let confirmationPreview: string | null = null;
     if (payload.sendConfirmationMessage && !result.wasDuplicate) {
       confirmationPreview = buildPaymentActivatedReply(result.user);
-      await sendWhatsAppMessage(result.user.phone_number, confirmationPreview);
+      await sendWhatsAppMessage(result.user.phone_number, confirmationPreview, {
+        userId: result.user.id,
+        requestId,
+        metadata: {
+          flow: "manual_payment_confirmation",
+          provider: payload.provider
+        }
+      });
     }
 
     response.status(200).json({
@@ -428,6 +498,15 @@ paymentWebhooksRouter.post(
       }
 
       const rawBody = typeof request.body === "string" ? request.body : "";
+      const signatureCheck = verifyPeachWebhookSignature(request, rawBody);
+      if (!signatureCheck.ok) {
+        response.status(403).json({
+          ok: false,
+          error: signatureCheck.reason
+        });
+        return;
+      }
+
       const normalized = normalizeMcbJuiceCallback(rawBody);
       if (!normalized.shouldProcess || !normalized.payload) {
         response.status(200).json({
@@ -483,7 +562,14 @@ paymentWebhooksRouter.post(
       let confirmationPreview: string | null = null;
       if (!result.wasDuplicate) {
         confirmationPreview = buildPaymentActivatedReply(result.user);
-        await sendWhatsAppMessage(result.user.phone_number, confirmationPreview);
+        await sendWhatsAppMessage(result.user.phone_number, confirmationPreview, {
+          userId: result.user.id,
+          requestId,
+          metadata: {
+            flow: "juice_callback_confirmation",
+            provider: "MCB_JUICE"
+          }
+        });
       }
 
       response.status(200).json({
@@ -565,7 +651,14 @@ paymentWebhooksRouter.post("/blink", async (request, response, next) => {
     let confirmationPreview: string | null = null;
     if (!result.wasDuplicate) {
       confirmationPreview = buildPaymentActivatedReply(result.user);
-      await sendWhatsAppMessage(result.user.phone_number, confirmationPreview);
+      await sendWhatsAppMessage(result.user.phone_number, confirmationPreview, {
+        userId: result.user.id,
+        requestId,
+        metadata: {
+          flow: "blink_callback_confirmation",
+          provider: "BLINK"
+        }
+      });
     }
 
     response.status(200).json({

@@ -12,8 +12,8 @@ import { whatsappRouter } from "./routes/whatsapp.js";
 
 const app = express();
 
-app.use(express.json({ limit: "1mb" }));
 app.use(requestTracingMiddleware);
+app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (_request, response) => {
   response.status(200).json({

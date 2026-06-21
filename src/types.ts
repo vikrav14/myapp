@@ -132,6 +132,24 @@ export interface AuditEventRecord {
   created_at: string;
 }
 
+export interface OutboundMessageRecord {
+  id: string;
+  provider: string;
+  channel: string;
+  user_id: string | null;
+  phone_number: string;
+  body: string;
+  status: string;
+  request_id: string | null;
+  metadata: Record<string, unknown> | null;
+  attempt_count: number;
+  last_error: string | null;
+  next_attempt_at: string;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SemanticMemoryMatch {
   source: "conversation_memory" | "emotion_memory";
   text: string;

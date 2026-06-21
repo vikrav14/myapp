@@ -42,7 +42,14 @@ whatsappRouter.post("/", async (request, response, next) => {
     const accessPolicyResult = await enforceAccessPolicy(initialUser);
 
     if (accessPolicyResult.handled && accessPolicyResult.reply) {
-      await sendWhatsAppMessage(inboundMessage.from, accessPolicyResult.reply);
+      await sendWhatsAppMessage(inboundMessage.from, accessPolicyResult.reply, {
+        userId: accessPolicyResult.user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "access_policy"
+        }
+      });
 
       response.status(200).json({
         ok: true,
@@ -82,7 +89,14 @@ whatsappRouter.post("/", async (request, response, next) => {
           ? "I couldn’t catch that voice note cleanly. Send it again, keep it a bit clearer, or type the main part here."
           : "I hit a processing issue on that message. Send it again and I’ll pick it up.";
 
-      await sendWhatsAppMessage(inboundMessage.from, fallbackReply);
+      await sendWhatsAppMessage(inboundMessage.from, fallbackReply, {
+        userId: accessPolicyResult.user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "fallback_processing_error"
+        }
+      });
 
       response.status(200).json({
         ok: true,
@@ -102,7 +116,14 @@ whatsappRouter.post("/", async (request, response, next) => {
     });
 
     if (onboardingResult.handled && onboardingResult.reply) {
-      await sendWhatsAppMessage(inboundMessage.from, onboardingResult.reply);
+      await sendWhatsAppMessage(inboundMessage.from, onboardingResult.reply, {
+        userId: onboardingResult.user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "onboarding"
+        }
+      });
 
       response.status(200).json({
         ok: true,
@@ -158,7 +179,14 @@ whatsappRouter.post("/", async (request, response, next) => {
       logger.warn({ error, userId: user.id }, "Failed to store assistant reply memory.");
     }
 
-    await sendWhatsAppMessage(inboundMessage.from, reply);
+    await sendWhatsAppMessage(inboundMessage.from, reply, {
+      userId: user.id,
+      requestId,
+      metadata: {
+        sourceType: inboundMessage.kind,
+        flow: "conversational_reply"
+      }
+    });
 
     logger.info(
       {

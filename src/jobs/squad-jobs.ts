@@ -1,7 +1,9 @@
 import cron from "node-cron";
 
+import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
+import { runOutboundMessageRetryLoop } from "../services/outbound-retry.service.js";
 import { runSundayDiagnosticReports } from "../services/report.service.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
 
@@ -124,7 +126,13 @@ export async function runCrossPrivateNudgeLoop(): Promise<void> {
         squad.squad_name
       )}. You’re drifting a bit. Lock one win before tonight and drop it here.`;
 
-      await sendWhatsAppMessage(lagger.member.phone_number, message);
+      await sendWhatsAppMessage(lagger.member.phone_number, message, {
+        userId: lagger.member.id,
+        metadata: {
+          flow: "squad_nudge",
+          squadName: String(squad.squad_name)
+        }
+      });
     }
   }
 }
@@ -152,12 +160,29 @@ export async function runSundayShowdown(): Promise<void> {
     )}.\n${scoreboard}\n\nNew week starts now. Send your first win when you’re ready.`;
 
     for (const entry of rankings) {
-      await sendWhatsAppMessage(entry.member.phone_number, message);
+      await sendWhatsAppMessage(entry.member.phone_number, message, {
+        userId: entry.member.id,
+        metadata: {
+          flow: "sunday_showdown",
+          squadName: String(squad.squad_name)
+        }
+      });
     }
   }
 }
 
 export function registerSquadJobs(): void {
+  cron.schedule(env.OUTBOUND_RETRY_CRON, async () => {
+    try {
+      const result = await runOutboundMessageRetryLoop();
+      if (result.scanned > 0) {
+        logger.info(result, "Outbound retry loop completed.");
+      }
+    } catch (error) {
+      logger.error({ error }, "Outbound retry loop failed.");
+    }
+  });
+
   cron.schedule("0 15 * * *", async () => {
     try {
       await runCrossPrivateNudgeLoop();
