@@ -9,7 +9,9 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "ci": "npm run build && npm run typecheck"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ci": "npm run build && npm run typecheck && npm run test"
   },
   "engines": {
     "node": ">=22"
@@ -39,7 +41,10 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.0.0",
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }
