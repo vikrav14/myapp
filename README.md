@@ -15,6 +15,7 @@ This repository now contains the first backend foundation for the product spec i
 - Voice note transcription for WhatsApp audio messages
 - Embedding-backed semantic memory storage and retrieval
 - Provider-specific payment callback adapters for MCB Juice and Blink
+- Internal admin and operations API surface
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
@@ -31,9 +32,11 @@ src/
   lib/logger.ts             Application logging
   lib/supabase.ts           Supabase client
   routes/whatsapp.ts        Webhook verification + inbound processing
+  routes/admin.ts           Internal admin and ops endpoints
   routes/reports.ts         Internal weekly diagnostic generation
   schemas/extraction.ts     Mauri parser schema
   services/ai.service.ts    Gemini extraction + reply generation
+  services/admin.service.ts
   services/context.service.ts
   services/logging.service.ts
   services/memory.service.ts
@@ -137,6 +140,22 @@ There is also a secured internal payment confirmation route:
 - flips the user to `Paid_Active`
 - stamps `subscription_started_at`, `subscription_ends_at`, and `last_payment_at`
 - optionally sends the unlock confirmation message back to WhatsApp
+
+There is also a secured internal admin route surface:
+
+- `GET /internal/admin/overview`
+- `GET /internal/admin/users`
+- `GET /internal/admin/users/:userId`
+- `PATCH /internal/admin/users/:userId`
+- `GET /internal/admin/payment-sessions`
+- `GET /internal/admin/reports`
+
+These endpoints let you:
+
+- inspect user lifecycle state
+- inspect payment sessions and reports
+- review recent user ops activity
+- update subscription or onboarding state without direct SQL
 
 There is also a secured internal payment link/session route:
 

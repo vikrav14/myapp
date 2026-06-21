@@ -1,7 +1,7 @@
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser } from "../types.js";
 
-function mapUser(record: Record<string, unknown>): MauriUser {
+export function mapUser(record: Record<string, unknown>): MauriUser {
   return {
     id: String(record.id),
     phone_number: String(record.phone_number),
