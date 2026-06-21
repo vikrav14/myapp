@@ -109,6 +109,57 @@ describe("Admin routes", () => {
     expect(mockListAdminDeadLetters).toHaveBeenCalled();
   });
 
+  it("returns the live security posture summary", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .get("/internal/admin/security-posture")
+      .set("x-mauri-admin-key", "test-admin-key");
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(response.body.securityPosture).toEqual(
+      expect.objectContaining({
+        securityHeadersEnabled: false,
+        peachSignatureEnabled: true,
+        outboundRetryEnabled: true
+      })
+    );
+  });
+
+  it("patches a user and records an admin audit event", async () => {
+    mockAdminUpdateUser.mockResolvedValue({
+      id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      first_name: "Nia",
+      archetype: "Student Grind",
+      onboarding_state: "active",
+      subscription_status: "Paid_Active"
+    });
+
+    const app = createApp();
+    const response = await request(app)
+      .patch("/internal/admin/users/ffffffff-ffff-4fff-8fff-ffffffffffff")
+      .set("x-mauri-admin-key", "test-admin-key")
+      .send({
+        subscription_status: "Paid_Active"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(mockAdminUpdateUser).toHaveBeenCalledWith({
+      userId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      updates: {
+        subscription_status: "Paid_Active"
+      }
+    });
+    expect(mockRecordAuditEventBestEffort).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "admin_user_updated",
+        entityType: "user",
+        entityId: "ffffffff-ffff-4fff-8fff-ffffffffffff"
+      })
+    );
+  });
+
   it("requeues an outbound message and updates dead-letter state", async () => {
     const messageId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
@@ -142,6 +193,41 @@ describe("Admin routes", () => {
         sourceTable: "outbound_messages",
         sourceId: messageId,
         status: "requeued"
+      })
+    );
+  });
+
+  it("discards an outbound message and updates dead-letter state", async () => {
+    const messageId = "abababab-abab-4bab-8bab-abababababab";
+
+    mockGetOutboundMessageById.mockResolvedValue({
+      id: messageId,
+      status: "permanent_failed",
+      phone_number: "23059999999"
+    });
+    mockDiscardOutboundMessage.mockResolvedValue({
+      id: messageId,
+      status: "discarded",
+      phone_number: "23059999999"
+    });
+    mockUpdateDeadLetterStatus.mockResolvedValue({
+      id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+      status: "discarded"
+    });
+
+    const app = createApp();
+    const response = await request(app)
+      .post(`/internal/admin/outbound-messages/${messageId}/discard`)
+      .set("x-mauri-admin-key", "test-admin-key");
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(response.body.message.status).toBe("discarded");
+    expect(mockDiscardOutboundMessage).toHaveBeenCalledWith(messageId);
+    expect(mockUpdateDeadLetterStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceId: messageId,
+        status: "discarded"
       })
     );
   });
