@@ -19,6 +19,25 @@ const optionalCsv = z.preprocess((value) => {
   return value;
 }, z.string().optional());
 
+const envBoolean = z.preprocess((value) => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+
+    if (normalized === "false") {
+      return false;
+    }
+  }
+
+  return value;
+}, z.boolean());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -49,7 +68,7 @@ const envSchema = z.object({
   OUTBOUND_RETRY_BASE_DELAY_SECONDS: z.coerce.number().int().positive().default(60),
   OUTBOUND_RETRY_CRON: z.string().default("*/5 * * * *"),
   TRUST_PROXY: z.union([z.boolean(), z.string(), z.number()]).optional(),
-  ENABLE_SECURITY_HEADERS: z.coerce.boolean().default(true),
+  ENABLE_SECURITY_HEADERS: envBoolean.default(true),
   ADMIN_IP_ALLOWLIST: optionalCsv,
   PAYMENT_WEBHOOK_IP_ALLOWLIST: optionalCsv,
   WHATSAPP_WEBHOOK_IP_ALLOWLIST: optionalCsv
