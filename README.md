@@ -38,6 +38,7 @@ src/
   services/logging.service.ts
   services/memory.service.ts
   services/onboarding.service.ts
+  services/payment-link.service.ts
   services/payment.service.ts
   services/report.service.ts
   services/user.service.ts
@@ -50,6 +51,7 @@ supabase/migrations/
   004_weekly_reports.sql
   005_voice_note_transcriptions.sql
   006_vector_memory.sql
+  007_payment_checkout_sessions.sql
 ```
 
 ## Environment variables
@@ -72,6 +74,11 @@ Copy `.env.example` to `.env` and fill in:
 - `EMBEDDING_OUTPUT_DIMENSIONS`
 - `MCB_JUICE_CALLBACK_TOKEN`
 - `BLINK_CALLBACK_TOKEN`
+- `PAYMENT_CALLBACK_BASE_URL`
+- `PAYMENT_RETURN_URL`
+- `PEACH_ENTITY_ID`
+- `PEACH_CHECKOUT_URL`
+- `BLINK_PAYLINK_API_URL`
 
 If the WhatsApp send credentials are absent, the service will still process inbound payloads and log the reply instead of attempting delivery.
 
@@ -99,6 +106,7 @@ supabase/migrations/003_payment_activation.sql
 supabase/migrations/004_weekly_reports.sql
 supabase/migrations/005_voice_note_transcriptions.sql
 supabase/migrations/006_vector_memory.sql
+supabase/migrations/007_payment_checkout_sessions.sql
 ```
 
 ## Webhook contract
@@ -130,6 +138,15 @@ There is also a secured internal payment confirmation route:
 - stamps `subscription_started_at`, `subscription_ends_at`, and `last_payment_at`
 - optionally sends the unlock confirmation message back to WhatsApp
 
+There is also a secured internal payment link/session route:
+
+- `POST /internal/payments/links`
+- requires header `x-mauri-admin-key: <INTERNAL_ADMIN_API_KEY>`
+- accepts `userId` or `phoneNumber`, plus `provider`, `amount`, and optional `durationDays`
+- generates a provider-specific checkout session
+- stores a `payment_checkout_sessions` row
+- returns provider-ready payload data for Juice or Blink
+
 There are also provider-facing payment callback routes:
 
 - `POST /webhooks/payments/juice`
@@ -151,6 +168,10 @@ Reference format supported for user resolution:
 - `phone:<digits>`
 - plain UUID
 - plain phone number
+
+For Blink, the generated `transaction_unique` is parseable by Mauri and unique per session.
+
+For MCB Juice, the generated `merchantTransactionId` stays short for Peach constraints, while the full Mauri user reference is stored in `customParameters`.
 
 There is also a secured weekly report generation route:
 
@@ -178,4 +199,4 @@ Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active us
 
 This is the backend foundation, not the final production system.
 
-The next major integration layers are admin tooling hardening, richer payment-link creation flows, and operational observability.
+The next major integration layers are admin tooling hardening and operational observability.

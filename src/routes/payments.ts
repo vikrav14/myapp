@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { env } from "../lib/env.js";
 import { hasAdminAccess } from "../lib/internal-auth.js";
+import { logger } from "../lib/logger.js";
+import { createPaymentCheckoutSession, markCheckoutSessionActivated } from "../services/payment-link.service.js";
 import {
   activatePaidSubscriptionIdempotent,
   buildPaymentActivatedReply,
@@ -23,6 +25,20 @@ const paymentConfirmationSchema = z
     durationDays: z.coerce.number().int().positive().optional(),
     sendConfirmationMessage: z.boolean().default(true),
     rawPayload: z.unknown().optional()
+  })
+  .refine((value) => Boolean(value.userId || value.phoneNumber), {
+    message: "Either userId or phoneNumber is required.",
+    path: ["userId"]
+  });
+
+const paymentLinkSchema = z
+  .object({
+    userId: z.string().uuid().optional(),
+    phoneNumber: z.string().min(6).optional(),
+    provider: z.enum(["MCB_JUICE", "BLINK"]),
+    amount: z.coerce.number().positive().default(200),
+    currency: z.string().min(3).default("MUR"),
+    durationDays: z.coerce.number().int().positive().optional()
   })
   .refine((value) => Boolean(value.userId || value.phoneNumber), {
     message: "Either userId or phoneNumber is required.",
@@ -339,6 +355,61 @@ paymentsRouter.post("/confirm", async (request, response, next) => {
   }
 });
 
+paymentsRouter.post("/links", async (request, response, next) => {
+  try {
+    if (!hasAdminAccess(request.header("x-mauri-admin-key") ?? undefined)) {
+      response.status(403).json({
+        ok: false,
+        error: "Unauthorized payment link request."
+      });
+      return;
+    }
+
+    const payload = paymentLinkSchema.parse(request.body);
+    const user = payload.userId
+      ? await findUserById(payload.userId)
+      : await findUserByPhoneNumber(payload.phoneNumber ?? "");
+
+    if (!user) {
+      response.status(404).json({
+        ok: false,
+        error: "User not found for payment link generation."
+      });
+      return;
+    }
+
+    const session = await createPaymentCheckoutSession({
+      user,
+      provider: payload.provider,
+      amount: payload.amount,
+      currency: payload.currency,
+      durationDays: payload.durationDays
+    });
+
+    response.status(200).json({
+      ok: true,
+      sessionId: session.id,
+      userId: session.user_id,
+      provider: session.provider,
+      status: session.status,
+      userReference: session.user_reference,
+      providerReference: session.provider_reference,
+      amount: session.amount,
+      currency: session.currency,
+      durationDays: session.duration_days,
+      providerEndpoint: session.provider_endpoint,
+      providerPayload: session.provider_payload,
+      checkoutUrl: session.checkout_url,
+      notes:
+        session.provider === "MCB_JUICE"
+          ? "Submit the payload to the Peach/MCB Juice checkout initiate endpoint after adding your merchant signature."
+          : "Submit the payload to the Blink paylink creation endpoint to generate the customer-facing payment link."
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 paymentWebhooksRouter.post(
   "/juice",
   express.text({ type: ["application/x-www-form-urlencoded", "text/plain"] }),
@@ -388,6 +459,19 @@ paymentWebhooksRouter.post(
         paidAt: normalized.payload.paidAt,
         rawPayload: normalized.payload.rawPayload
       });
+
+      try {
+        await markCheckoutSessionActivated({
+          provider: normalized.payload.provider,
+          candidateReferences: [
+            normalized.payload.transactionReference,
+            ...normalized.payload.referenceCandidates
+          ],
+          paymentEventId: result.paymentEvent.id
+        });
+      } catch (error) {
+        logger.warn({ error, provider: "MCB_JUICE" }, "Failed to reconcile Juice checkout session.");
+      }
 
       let confirmationPreview: string | null = null;
       if (!result.wasDuplicate) {
@@ -455,6 +539,19 @@ paymentWebhooksRouter.post("/blink", async (request, response, next) => {
       paidAt: normalized.payload.paidAt,
       rawPayload: normalized.payload.rawPayload
     });
+
+    try {
+      await markCheckoutSessionActivated({
+        provider: normalized.payload.provider,
+        candidateReferences: [
+          normalized.payload.transactionReference,
+          ...normalized.payload.referenceCandidates
+        ],
+        paymentEventId: result.paymentEvent.id
+      });
+    } catch (error) {
+      logger.warn({ error, provider: "BLINK" }, "Failed to reconcile Blink checkout session.");
+    }
 
     let confirmationPreview: string | null = null;
     if (!result.wasDuplicate) {

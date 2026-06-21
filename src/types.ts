@@ -39,6 +39,27 @@ export interface PaymentEvent {
   created_at: string;
 }
 
+export interface PaymentCheckoutSessionRecord {
+  id: string;
+  user_id: string;
+  provider: PaymentProvider | string;
+  status: string;
+  user_reference: string;
+  provider_reference: string;
+  amount: number;
+  currency: string;
+  duration_days: number;
+  provider_payload: Record<string, unknown>;
+  provider_endpoint: string | null;
+  checkout_url: string | null;
+  provider_session_id: string | null;
+  provider_response: Record<string, unknown> | null;
+  activated_payment_event_id: string | null;
+  activated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WeeklyDiagnosticSummary {
   window: {
     week_start: string;

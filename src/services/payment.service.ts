@@ -193,15 +193,21 @@ export function parseMauriPaymentReference(reference: string): {
   const lower = trimmed.toLowerCase();
   const prefixes = ["mauri:user:", "user:", "uid:"];
   for (const prefix of prefixes) {
-    if (lower.startsWith(prefix) && uuidPattern.test(trimmed.slice(prefix.length))) {
-      return { userId: trimmed.slice(prefix.length) };
+    if (lower.startsWith(prefix)) {
+      const candidate = trimmed.slice(prefix.length).split(":")[0]?.trim() ?? "";
+      if (uuidPattern.test(candidate)) {
+        return { userId: candidate };
+      }
     }
   }
 
   const phonePrefixes = ["mauri:phone:", "phone:", "tel:"];
   for (const prefix of phonePrefixes) {
-    if (lower.startsWith(prefix) && phonePattern.test(trimmed.slice(prefix.length))) {
-      return { phoneNumber: trimmed.slice(prefix.length).replace(/^\+/, "") };
+    if (lower.startsWith(prefix)) {
+      const candidate = trimmed.slice(prefix.length).split(":")[0]?.trim() ?? "";
+      if (phonePattern.test(candidate)) {
+        return { phoneNumber: candidate.replace(/^\+/, "") };
+      }
     }
   }
 

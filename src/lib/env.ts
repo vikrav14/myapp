@@ -29,7 +29,12 @@ const envSchema = z.object({
   EMBEDDING_MODEL: z.string().default("text-embedding-004"),
   EMBEDDING_OUTPUT_DIMENSIONS: z.coerce.number().int().positive().default(1536),
   MCB_JUICE_CALLBACK_TOKEN: optionalSecret,
-  BLINK_CALLBACK_TOKEN: optionalSecret
+  BLINK_CALLBACK_TOKEN: optionalSecret,
+  PAYMENT_CALLBACK_BASE_URL: optionalSecret,
+  PAYMENT_RETURN_URL: optionalSecret,
+  PEACH_ENTITY_ID: optionalSecret,
+  PEACH_CHECKOUT_URL: z.string().url().default("https://secure.peachpayments.com/checkout/initiate"),
+  BLINK_PAYLINK_API_URL: z.string().url().default("https://api.blinkpayment.co.uk/api/paylink/v1/paylinks")
 });
 
 export const env = envSchema.parse(process.env);
