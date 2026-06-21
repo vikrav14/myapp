@@ -19,6 +19,7 @@ process.env.PAYMENT_RETURN_URL = "https://mauri.example.com/payments/return";
 process.env.PEACH_ENTITY_ID = "test-peach-entity";
 process.env.PEACH_CHECKOUT_URL = "https://secure.peachpayments.com/checkout/initiate";
 process.env.BLINK_PAYLINK_API_URL = "https://api.blinkpayment.co.uk/api/paylink/v1/paylinks";
+process.env.PEACH_WEBHOOK_SECRET = "test-peach-webhook-secret";
 process.env.PEACH_WEBHOOK_TOLERANCE_SECONDS = "300";
 process.env.OUTBOUND_RETRY_MAX_ATTEMPTS = "5";
 process.env.OUTBOUND_RETRY_BASE_DELAY_SECONDS = "60";

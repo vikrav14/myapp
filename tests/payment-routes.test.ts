@@ -180,4 +180,23 @@ describe("Payment routes", () => {
       })
     );
   });
+
+  it("rejects a Juice webhook with an invalid Peach signature", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/webhooks/payments/juice?token=test-juice-token")
+      .set("content-type", "application/x-www-form-urlencoded")
+      .set("x-webhook-timestamp", String(Math.floor(Date.now() / 1000)))
+      .set("x-webhook-id", "wh_123")
+      .set("x-webhook-signature", "deadbeef")
+      .send(
+        "result.code=000.100.110&paymentBrand=MCBJUICE&amount=200.00&currency=MUR&checkoutId=ck_123456789"
+      );
+
+    expect(response.status).toBe(403);
+    expect(response.body.ok).toBe(false);
+    expect(response.body.error).toBe("invalid_peach_signature");
+    expect(mockResolvePaymentCallbackUser).not.toHaveBeenCalled();
+    expect(mockActivatePaidSubscriptionIdempotent).not.toHaveBeenCalled();
+  });
 });
