@@ -3,6 +3,7 @@ import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
 import type { OutboundMessageRecord } from "../types.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
+import { updateDeadLetterStatus, upsertDeadLetter } from "./dead-letter.service.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -85,6 +86,14 @@ export async function markOutboundMessageSent(messageId: string): Promise<Outbou
 
   const record = mapOutboundMessage(data as Record<string, unknown>);
 
+  await updateDeadLetterStatus({
+    sourceTable: "outbound_messages",
+    sourceId: record.id,
+    status: "resolved",
+    requestId: record.request_id ?? undefined,
+    message: "Outbound message eventually sent."
+  });
+
   await recordAuditEventBestEffort({
     requestId: record.request_id ?? undefined,
     eventType: "outbound_message_sent",
@@ -154,6 +163,23 @@ export async function markOutboundMessageFailed(input: {
   }
 
   const record = mapOutboundMessage(data as Record<string, unknown>);
+
+  if (permanentFailure) {
+    await upsertDeadLetter({
+      sourceTable: "outbound_messages",
+      sourceId: record.id,
+      category: "outbound_message",
+      userId: record.user_id,
+      requestId: record.request_id ?? undefined,
+      lastError: record.last_error ?? undefined,
+      payload: {
+        phoneNumber: record.phone_number,
+        body: record.body,
+        attemptCount: record.attempt_count,
+        nextAttemptAt: record.next_attempt_at
+      }
+    });
+  }
 
   await recordAuditEventBestEffort({
     requestId: record.request_id ?? undefined,
@@ -273,9 +299,48 @@ export async function getOutboundMessageById(messageId: string): Promise<Outboun
 }
 
 export function isRetryableStatus(status: string): boolean {
-  return status === "failed" || status === "pending" || status === "retrying";
+  return status === "failed" || status === "pending" || status === "retrying" || status === "permanent_failed";
 }
 
 export async function noteRetryLoopFailure(error: unknown): Promise<void> {
   logger.error({ error }, "Outbound retry loop failed.");
+}
+
+export async function requeueOutboundMessage(messageId: string): Promise<OutboundMessageRecord> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("outbound_messages")
+    .update({
+      status: "failed",
+      next_attempt_at: now,
+      updated_at: now
+    })
+    .eq("id", messageId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to requeue outbound message: ${error.message}`);
+  }
+
+  return mapOutboundMessage(data as Record<string, unknown>);
+}
+
+export async function discardOutboundMessage(messageId: string): Promise<OutboundMessageRecord> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("outbound_messages")
+    .update({
+      status: "discarded",
+      updated_at: now
+    })
+    .eq("id", messageId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to discard outbound message: ${error.message}`);
+  }
+
+  return mapOutboundMessage(data as Record<string, unknown>);
 }

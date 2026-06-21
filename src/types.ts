@@ -150,6 +150,21 @@ export interface OutboundMessageRecord {
   updated_at: string;
 }
 
+export interface DeadLetterEventRecord {
+  id: string;
+  source_table: string;
+  source_id: string;
+  category: string;
+  status: string;
+  user_id: string | null;
+  request_id: string | null;
+  last_error: string | null;
+  payload: Record<string, unknown> | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SemanticMemoryMatch {
   source: "conversation_memory" | "emotion_memory";
   text: string;

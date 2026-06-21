@@ -44,6 +44,7 @@ src/
   services/logging.service.ts
   services/memory.service.ts
   services/onboarding.service.ts
+  services/dead-letter.service.ts
   services/outbound-message.service.ts
   services/outbound-retry.service.ts
   services/payment-link.service.ts
@@ -62,6 +63,7 @@ supabase/migrations/
   007_payment_checkout_sessions.sql
   008_audit_events.sql
   009_outbound_messages.sql
+  010_dead_letter_events.sql
 ```
 
 ## Environment variables
@@ -124,6 +126,7 @@ supabase/migrations/006_vector_memory.sql
 supabase/migrations/007_payment_checkout_sessions.sql
 supabase/migrations/008_audit_events.sql
 supabase/migrations/009_outbound_messages.sql
+supabase/migrations/010_dead_letter_events.sql
 ```
 
 ## Webhook contract
@@ -161,9 +164,12 @@ There is also a secured internal admin route surface:
 - `GET /internal/admin/users`
 - `GET /internal/admin/users/:userId`
 - `PATCH /internal/admin/users/:userId`
+- `GET /internal/admin/dashboard`
 - `GET /internal/admin/payment-sessions`
 - `GET /internal/admin/outbound-messages`
 - `POST /internal/admin/outbound-messages/:messageId/retry`
+- `POST /internal/admin/outbound-messages/:messageId/requeue`
+- `POST /internal/admin/outbound-messages/:messageId/discard`
 - `GET /internal/admin/reports`
 
 These endpoints let you:
@@ -178,6 +184,7 @@ These endpoints let you:
 Additional admin ops route:
 
 - `GET /internal/admin/audit-events`
+- `GET /internal/admin/dead-letters`
 
 This supports filtering by:
 
@@ -185,6 +192,8 @@ This supports filtering by:
 - `eventType`
 - `severity`
 - `requestId`
+
+The dashboard route returns a lightweight HTML operations view showing overview metrics, recent dead letters, recent outbound failures, and recent audit events.
 
 There is also a secured internal payment link/session route:
 
@@ -249,6 +258,8 @@ Outbound WhatsApp sends are also persisted in `outbound_messages`.
 Failed sends are retried automatically on the schedule defined by `OUTBOUND_RETRY_CRON`, with exponential backoff controlled by the retry env vars.
 
 When `PEACH_WEBHOOK_SECRET` is configured, the MCB Juice callback route verifies Peach HMAC webhook signatures before processing payment activations.
+
+Permanently failed outbound messages are also surfaced as `dead_letter_events`, and can be requeued or discarded through the admin ops routes.
 
 ## Current lifecycle behavior
 

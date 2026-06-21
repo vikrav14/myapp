@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase.js";
 import type {
   AuditEventRecord,
+  DeadLetterEventRecord,
   MauriUser,
   OutboundMessageRecord,
   PaymentCheckoutSessionRecord,
@@ -120,6 +121,23 @@ function mapAuditEvent(record: Record<string, unknown>): AuditEventRecord {
   };
 }
 
+function mapDeadLetter(record: Record<string, unknown>): DeadLetterEventRecord {
+  return {
+    id: String(record.id),
+    source_table: String(record.source_table),
+    source_id: String(record.source_id),
+    category: String(record.category),
+    status: String(record.status),
+    user_id: record.user_id ? String(record.user_id) : null,
+    request_id: record.request_id ? String(record.request_id) : null,
+    last_error: record.last_error ? String(record.last_error) : null,
+    payload: isRecord(record.payload) ? record.payload : null,
+    resolved_at: record.resolved_at ? String(record.resolved_at) : null,
+    created_at: String(record.created_at),
+    updated_at: String(record.updated_at)
+  };
+}
+
 function startOfWeekIso(): string {
   const now = new Date();
   const anchor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -154,6 +172,7 @@ export async function getAdminOverview(): Promise<{
     voiceNotes: number;
     outboundPending: number;
     outboundFailed: number;
+    openDeadLetters: number;
   };
 }> {
   const weekStart = startOfWeekIso();
@@ -171,7 +190,8 @@ export async function getAdminOverview(): Promise<{
     paymentEvents,
     voiceNotes,
     outboundPending,
-    outboundFailed
+    outboundFailed,
+    openDeadLetters
   ] = await Promise.all([
     countRows(supabase.from("users").select("*", { count: "exact", head: true })),
     countRows(supabase.from("users").select("*", { count: "exact", head: true }).eq("subscription_status", "Trial_Active")),
@@ -185,7 +205,8 @@ export async function getAdminOverview(): Promise<{
     countRows(supabase.from("payment_events").select("*", { count: "exact", head: true }).gte("created_at", weekStart)),
     countRows(supabase.from("voice_note_transcriptions").select("*", { count: "exact", head: true }).gte("created_at", weekStart)),
     countRows(supabase.from("outbound_messages").select("*", { count: "exact", head: true }).eq("status", "pending")),
-    countRows(supabase.from("outbound_messages").select("*", { count: "exact", head: true }).in("status", ["failed", "permanent_failed"]))
+    countRows(supabase.from("outbound_messages").select("*", { count: "exact", head: true }).in("status", ["failed", "permanent_failed"])),
+    countRows(supabase.from("dead_letter_events").select("*", { count: "exact", head: true }).eq("status", "open"))
   ]);
 
   return {
@@ -204,7 +225,8 @@ export async function getAdminOverview(): Promise<{
       paymentEvents,
       voiceNotes,
       outboundPending,
-      outboundFailed
+      outboundFailed,
+      openDeadLetters
     }
   };
 }
@@ -470,6 +492,73 @@ export async function listAdminOutboundMessages(input: {
   return {
     messages: (data ?? []).map((row) => mapOutboundMessage(row as Record<string, unknown>)),
     total: count ?? 0
+  };
+}
+
+export async function listAdminDeadLetters(input: {
+  limit: number;
+  offset: number;
+  status?: string | undefined;
+  category?: string | undefined;
+  userId?: string | undefined;
+}): Promise<{
+  deadLetters: DeadLetterEventRecord[];
+  total: number;
+}> {
+  let query = supabase.from("dead_letter_events").select("*", { count: "exact" }).order("created_at", { ascending: false });
+
+  if (input.status) {
+    query = query.eq("status", input.status);
+  }
+
+  if (input.category) {
+    query = query.eq("category", input.category);
+  }
+
+  if (input.userId) {
+    query = query.eq("user_id", input.userId);
+  }
+
+  const { data, error, count } = await query.range(input.offset, input.offset + input.limit - 1);
+
+  if (error) {
+    throw new Error(`Failed to list dead letters: ${error.message}`);
+  }
+
+  return {
+    deadLetters: (data ?? []).map((row) => mapDeadLetter(row as Record<string, unknown>)),
+    total: count ?? 0
+  };
+}
+
+export async function getAdminDashboardData(): Promise<{
+  overview: Awaited<ReturnType<typeof getAdminOverview>>;
+  recentDeadLetters: DeadLetterEventRecord[];
+  recentOutboundFailures: OutboundMessageRecord[];
+  recentAuditEvents: AuditEventRecord[];
+}> {
+  const [overview, deadLettersResult, outboundResult, auditResult] = await Promise.all([
+    getAdminOverview(),
+    supabase.from("dead_letter_events").select("*").order("created_at", { ascending: false }).limit(10),
+    supabase
+      .from("outbound_messages")
+      .select("*")
+      .in("status", ["failed", "permanent_failed", "retrying"])
+      .order("updated_at", { ascending: false })
+      .limit(10),
+    supabase.from("audit_events").select("*").order("created_at", { ascending: false }).limit(15)
+  ]);
+
+  const errors = [deadLettersResult.error, outboundResult.error, auditResult.error].filter(Boolean);
+  if (errors.length > 0) {
+    throw new Error(errors.map((error) => error?.message).join("; "));
+  }
+
+  return {
+    overview,
+    recentDeadLetters: (deadLettersResult.data ?? []).map((row) => mapDeadLetter(row as Record<string, unknown>)),
+    recentOutboundFailures: (outboundResult.data ?? []).map((row) => mapOutboundMessage(row as Record<string, unknown>)),
+    recentAuditEvents: (auditResult.data ?? []).map((row) => mapAuditEvent(row as Record<string, unknown>))
   };
 }
 

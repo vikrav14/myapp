@@ -23,14 +23,24 @@ export async function retryOutboundMessageById(messageId: string): Promise<{
 
   await markOutboundMessageRetrying(messageId);
 
+  let delivered = false;
   try {
     await deliverWhatsAppText(message.phone_number, message.body);
+    delivered = true;
     await markOutboundMessageSent(messageId);
     return {
       messageId,
       status: "sent"
     };
   } catch (error) {
+    if (delivered) {
+      logger.error(
+        { error, messageId },
+        "Outbound retry delivered to WhatsApp but failed during finalization. Leaving message in retrying state to avoid duplicate retries."
+      );
+      throw error;
+    }
+
     const errorMessage = error instanceof Error ? error.message : "Unknown retry error";
     logger.warn({ error, messageId }, "Outbound message retry failed.");
     await markOutboundMessageFailed({

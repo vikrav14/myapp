@@ -189,11 +189,21 @@ export async function sendWhatsAppMessage(
     return;
   }
 
+  let delivered = false;
   try {
     await markOutboundMessageSending(outbound.id);
     await deliverWhatsAppText(to, body);
+    delivered = true;
     await markOutboundMessageSent(outbound.id);
   } catch (error) {
+    if (delivered) {
+      logger.error(
+        { error, outboundMessageId: outbound.id },
+        "WhatsApp delivery succeeded but outbound finalization failed. Leaving message in sending state to avoid duplicate retries."
+      );
+      throw error;
+    }
+
     const errorMessage = error instanceof Error ? error.message : "Unknown outbound send error";
     await markOutboundMessageFailed({
       messageId: outbound.id,
