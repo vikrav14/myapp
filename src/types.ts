@@ -81,6 +81,19 @@ export interface WeeklyReportRecord {
   created_at: string;
 }
 
+export interface VoiceNoteTranscriptionRecord {
+  id: string;
+  user_id: string;
+  provider: string;
+  source_message_id: string | null;
+  media_id: string | null;
+  mime_type: string | null;
+  transcript_text: string;
+  raw_payload: unknown;
+  transcribed_at: string;
+  created_at: string;
+}
+
 export interface FinanceExtraction {
   amount: number;
   category: string;
@@ -142,7 +155,14 @@ export interface UserContextSnapshot {
 
 export interface InboundMessage {
   from: string;
-  text: string;
+  kind: "text" | "audio";
+  text?: string | undefined;
+  messageId?: string | undefined;
   profileName?: string | undefined;
+  audio?: {
+    mediaId?: string | undefined;
+    mimeType?: string | undefined;
+    url?: string | undefined;
+  };
   rawPayload: unknown;
 }

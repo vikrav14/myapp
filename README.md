@@ -12,6 +12,7 @@ This repository now contains the first backend foundation for the product spec i
 - Trial expiry enforcement with locked-state paywall response
 - Payment confirmation endpoint with subscription activation and payment event logging
 - Sunday diagnostic report generation with weekly storage and delivery
+- Voice note transcription for WhatsApp audio messages
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
@@ -37,12 +38,14 @@ src/
   services/payment.service.ts
   services/report.service.ts
   services/user.service.ts
+  services/voice-note.service.ts
   services/whatsapp.service.ts
 supabase/migrations/
   001_init_mauri.sql
   002_onboarding_and_subscription_state.sql
   003_payment_activation.sql
   004_weekly_reports.sql
+  005_voice_note_transcriptions.sql
 ```
 
 ## Environment variables
@@ -86,6 +89,7 @@ supabase/migrations/001_init_mauri.sql
 supabase/migrations/002_onboarding_and_subscription_state.sql
 supabase/migrations/003_payment_activation.sql
 supabase/migrations/004_weekly_reports.sql
+supabase/migrations/005_voice_note_transcriptions.sql
 ```
 
 ## Webhook contract
@@ -93,7 +97,15 @@ supabase/migrations/004_weekly_reports.sql
 The webhook route supports:
 
 - direct JSON payloads shaped like `{ "from": "...", "text": "..." }`
+- direct audio payloads shaped like `{ "from": "...", "audioUrl": "...", "mimeType": "audio/ogg" }`
 - standard Meta WhatsApp webhook payloads with `entry -> changes -> value -> messages`
+
+When the inbound payload is an audio message, the server:
+
+- downloads the media
+- transcribes it with Gemini
+- stores the transcript in `voice_note_transcriptions`
+- feeds the transcript into the same onboarding, extraction, and reply loop as a typed message
 
 There is also a secured internal payment confirmation route:
 
@@ -131,4 +143,4 @@ Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active us
 
 This is the backend foundation, not the final production system.
 
-Voice-note transcription, provider-specific Juice/Blink callback adapters, embedding generation, and vector similarity search are still the next layer to build.
+Provider-specific Juice/Blink callback adapters, embedding generation, and vector similarity search are still the next layer to build.

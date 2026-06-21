@@ -7,6 +7,7 @@ import { loadUserContext } from "../services/context.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
+import { resolveInboundMessageText } from "../services/voice-note.service.js";
 import { parseInboundMessage, sendWhatsAppMessage } from "../services/whatsapp.service.js";
 
 export const whatsappRouter = Router();
@@ -42,6 +43,7 @@ whatsappRouter.post("/", async (request, response, next) => {
       response.status(200).json({
         ok: true,
         userId: accessPolicyResult.user.id,
+        sourceType: inboundMessage.kind,
         onboardingState: accessPolicyResult.user.onboarding_state,
         subscriptionStatus: accessPolicyResult.user.subscription_status,
         replyPreview: accessPolicyResult.reply
@@ -49,10 +51,49 @@ whatsappRouter.post("/", async (request, response, next) => {
       return;
     }
 
+    let normalizedMessageText: string;
+    let transcriptPreview: string | undefined;
+
+    try {
+      const resolvedInbound = await resolveInboundMessageText({
+        userId: accessPolicyResult.user.id,
+        message: inboundMessage
+      });
+
+      normalizedMessageText = resolvedInbound.messageText;
+      transcriptPreview = resolvedInbound.transcriptRecord?.transcript_text;
+    } catch (error) {
+      logger.error(
+        {
+          error,
+          phoneNumber: inboundMessage.from,
+          kind: inboundMessage.kind
+        },
+        "Failed to resolve inbound message text."
+      );
+
+      const fallbackReply =
+        inboundMessage.kind === "audio"
+          ? "I couldn’t catch that voice note cleanly. Send it again, keep it a bit clearer, or type the main part here."
+          : "I hit a processing issue on that message. Send it again and I’ll pick it up.";
+
+      await sendWhatsAppMessage(inboundMessage.from, fallbackReply);
+
+      response.status(200).json({
+        ok: true,
+        userId: accessPolicyResult.user.id,
+        onboardingState: accessPolicyResult.user.onboarding_state,
+        subscriptionStatus: accessPolicyResult.user.subscription_status,
+        sourceType: inboundMessage.kind,
+        replyPreview: fallbackReply
+      });
+      return;
+    }
+
     const onboardingResult = await handleOnboardingMessage({
       user: accessPolicyResult.user,
       isNewUser,
-      message: inboundMessage.text
+      message: normalizedMessageText
     });
 
     if (onboardingResult.handled && onboardingResult.reply) {
@@ -61,8 +102,10 @@ whatsappRouter.post("/", async (request, response, next) => {
       response.status(200).json({
         ok: true,
         userId: onboardingResult.user.id,
+        sourceType: inboundMessage.kind,
         onboardingState: onboardingResult.user.onboarding_state,
         subscriptionStatus: onboardingResult.user.subscription_status,
+        transcriptPreview,
         replyPreview: onboardingResult.reply
       });
       return;
@@ -70,13 +113,13 @@ whatsappRouter.post("/", async (request, response, next) => {
 
     const user = onboardingResult.user;
     const context = await loadUserContext(user.id);
-    const extraction = await extractStructuredContext(inboundMessage.text);
+    const extraction = await extractStructuredContext(normalizedMessageText);
 
     await persistExtraction(user.id, extraction);
 
     const reply = await generateConversationalReply({
       user,
-      message: inboundMessage.text,
+      message: normalizedMessageText,
       extraction,
       context
     });
@@ -87,8 +130,10 @@ whatsappRouter.post("/", async (request, response, next) => {
       {
         userId: user.id,
         phoneNumber: inboundMessage.from,
+        sourceType: inboundMessage.kind,
         onboardingState: user.onboarding_state,
         subscriptionStatus: user.subscription_status,
+        transcriptPreview,
         extraction
       },
       "Processed inbound WhatsApp message."
@@ -97,8 +142,10 @@ whatsappRouter.post("/", async (request, response, next) => {
     response.status(200).json({
       ok: true,
       userId: user.id,
+      sourceType: inboundMessage.kind,
       onboardingState: user.onboarding_state,
       subscriptionStatus: user.subscription_status,
+      transcriptPreview,
       extraction,
       replyPreview: reply
     });

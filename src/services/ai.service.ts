@@ -17,12 +17,30 @@ interface GeminiTextResponse {
   }>;
 }
 
+type GeminiPart =
+  | {
+      text: string;
+    }
+  | {
+      inlineData: {
+        mimeType: string;
+        data: string;
+      };
+    };
+
 async function callGemini(input: {
-  prompt: string;
+  prompt?: string | undefined;
+  parts?: GeminiPart[] | undefined;
   responseMimeType?: "application/json" | "text/plain";
   responseSchema?: object;
 }): Promise<string> {
-  const { prompt, responseMimeType, responseSchema } = input;
+  const { prompt, parts, responseMimeType, responseSchema } = input;
+  const requestParts = parts ?? (prompt ? [{ text: prompt }] : []);
+
+  if (requestParts.length === 0) {
+    throw new Error("Gemini request requires prompt text or parts.");
+  }
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GOOGLE_AI_API_KEY}`,
     {
@@ -34,7 +52,7 @@ async function callGemini(input: {
         contents: [
           {
             role: "user",
-            parts: [{ text: prompt }]
+            parts: requestParts
           }
         ],
         generationConfig: responseMimeType
@@ -60,6 +78,37 @@ async function callGemini(input: {
   }
 
   return text;
+}
+
+export async function transcribeVoiceNote(input: {
+  audioBuffer: Buffer;
+  mimeType: string;
+}): Promise<string> {
+  const { audioBuffer, mimeType } = input;
+  const prompt = `
+Transcribe this voice note into clean plain text.
+
+Rules:
+- Preserve the speaker's wording as closely as possible.
+- Remove filler only when it does not change meaning.
+- Keep Mauritian Creole, French, and English naturally if they appear.
+- Do not summarize.
+- Do not explain.
+- Return only the transcript text.
+`;
+
+  return callGemini({
+    parts: [
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType,
+          data: audioBuffer.toString("base64")
+        }
+      }
+    ],
+    responseMimeType: "text/plain"
+  });
 }
 
 export async function extractStructuredContext(message: string): Promise<MauriBrainDumpExtraction> {
