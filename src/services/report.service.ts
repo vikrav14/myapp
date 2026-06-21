@@ -196,8 +196,9 @@ async function buildWeeklyDiagnosticSummary(user: MauriUser, window: ReportWindo
     anxietyValues.length > 0
       ? roundToSingleDecimal(anxietyValues.reduce((sum, value) => sum + value, 0) / anxietyValues.length)
       : null;
+  const latestAnxiety = anxietyValues.length > 0 ? (anxietyValues[anxietyValues.length - 1] ?? null) : null;
 
-  const summaryWithoutScore = {
+  const summaryWithoutScore: Omit<WeeklyDiagnosticSummary, "momentum_score"> = {
     window: {
       week_start: window.weekStart,
       week_end: window.weekEnd
@@ -221,7 +222,7 @@ async function buildWeeklyDiagnosticSummary(user: MauriUser, window: ReportWindo
     },
     emotions: {
       average_anxiety: averageAnxiety,
-      latest_anxiety: anxietyValues.length > 0 ? anxietyValues[anxietyValues.length - 1] : null,
+      latest_anxiety: latestAnxiety,
       dominant_driver: tallyTopKey(emotionRows.map((row) => String(row.core_emotional_driver ?? "")))
     },
     trial_cliffhanger: Boolean(
