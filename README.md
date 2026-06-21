@@ -171,6 +171,7 @@ There is also a secured internal payment confirmation route:
 There is also a secured internal admin route surface:
 
 - `GET /internal/admin/overview`
+- `GET /internal/admin/panel`
 - `GET /internal/admin/users`
 - `GET /internal/admin/users/:userId`
 - `PATCH /internal/admin/users/:userId`
@@ -191,6 +192,8 @@ These endpoints let you:
 - inspect audit trails
 - review recent user ops activity
 - update subscription or onboarding state without direct SQL
+
+The panel route serves a lightweight browser UI that stores the admin API key locally in the browser and uses it to call the existing internal admin JSON endpoints.
 
 Additional admin ops route:
 

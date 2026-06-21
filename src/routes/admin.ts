@@ -173,7 +173,570 @@ function renderDashboardHtml(input: Awaited<ReturnType<typeof getAdminDashboardD
 </html>`;
 }
 
+function renderAdminPanelHtml(): string {
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mauri Admin Panel</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: #131a2e;
+        --panel-soft: #1a2340;
+        --line: #29365d;
+        --text: #eef2ff;
+        --muted: #9aa6c8;
+        --accent: #8b5cf6;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #09101d 0%, #101728 100%);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .shell { padding: 24px; display: grid; gap: 18px; }
+      .panel, .card {
+        background: rgba(19, 26, 46, 0.96);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+      }
+      .panel { padding: 18px; }
+      .hero { display: grid; gap: 14px; }
+      .hero-top { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+      .hero h1 { margin: 0; font-size: 32px; }
+      .hero p { margin: 0; color: var(--muted); }
+      .key-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
+      .cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+      .card { padding: 16px; }
+      .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+      .value { margin-top: 8px; font-size: 28px; font-weight: 700; }
+      .layout { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; }
+      .stack { display: grid; gap: 18px; }
+      .panel-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+      .panel-header h2 { margin: 0; font-size: 18px; }
+      .panel-note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+      .filters, .two-col { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+      .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      input, select, textarea, button {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--panel-soft);
+        color: var(--text);
+        font: inherit;
+      }
+      textarea { min-height: 90px; resize: vertical; }
+      button {
+        width: auto;
+        cursor: pointer;
+        background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%);
+        border: 0;
+        font-weight: 600;
+      }
+      button.secondary { background: #26314f; border: 1px solid var(--line); }
+      button.success { background: linear-gradient(135deg, var(--success) 0%, #16a34a 100%); }
+      button.warning { background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%); }
+      button.danger { background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%); }
+      .small { padding: 7px 10px; font-size: 12px; }
+      .status { color: var(--muted); font-size: 13px; }
+      .status.error { color: #fecaca; }
+      .status.success { color: #bbf7d0; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
+      th { color: var(--muted); font-weight: 600; }
+      .table-wrap { max-height: 340px; overflow: auto; }
+      .pill { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; background: rgba(255,255,255,.08); }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+      .kv { padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .hidden { display: none; }
+      @media (max-width: 1200px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } .layout { grid-template-columns: 1fr; } }
+      @media (max-width: 900px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters, .two-col, .key-row, .stats-grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="panel hero">
+        <div class="hero-top">
+          <div>
+            <h1>Mauri Admin Panel</h1>
+            <p>Internal browser UI for users, reports, outbound delivery, dead letters, sessions, audit events, and security posture.</p>
+          </div>
+        </div>
+        <div class="key-row">
+          <input id="adminKey" type="password" placeholder="Paste x-mauri-admin-key" />
+          <button id="saveKeyButton" class="secondary">Save key</button>
+          <button id="refreshAllButton">Refresh all</button>
+        </div>
+        <div id="globalStatus" class="status">Save the admin key, then refresh the panel.</div>
+      </div>
+
+      <div id="overviewCards" class="cards">
+        <div class="card"><div class="label">Users</div><div class="value">-</div></div>
+        <div class="card"><div class="label">Paid Active</div><div class="value">-</div></div>
+        <div class="card"><div class="label">Open Dead Letters</div><div class="value">-</div></div>
+        <div class="card"><div class="label">Outbound Pending</div><div class="value">-</div></div>
+        <div class="card"><div class="label">Reports This Week</div><div class="value">-</div></div>
+      </div>
+
+      <div class="layout">
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Users</h2>
+                <div class="panel-note">Search, inspect, and patch user state.</div>
+              </div>
+              <button id="reloadUsersButton" class="secondary small">Reload users</button>
+            </div>
+            <div class="filters">
+              <input id="userSearch" placeholder="Search phone or first name" />
+              <select id="userSubscriptionFilter">
+                <option value="">All subscription states</option>
+                <option value="Trial_Active">Trial_Active</option>
+                <option value="Paid_Active">Paid_Active</option>
+                <option value="Locked">Locked</option>
+              </select>
+              <select id="userOnboardingFilter">
+                <option value="">All onboarding states</option>
+                <option value="awaiting_archetype">awaiting_archetype</option>
+                <option value="active">active</option>
+              </select>
+              <button id="applyUserFiltersButton" class="secondary">Apply filters</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Name</th><th>Phone</th><th>Subscription</th><th>Onboarding</th><th>Updated</th><th></th></tr></thead>
+                <tbody id="usersTableBody"><tr><td colspan="6">No data loaded yet.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Outbound queue</h2>
+                <div class="panel-note">Retry, requeue, or discard failed sends.</div>
+              </div>
+              <button id="reloadOutboundButton" class="secondary small">Reload queue</button>
+            </div>
+            <div class="filters">
+              <input id="outboundUserIdFilter" placeholder="Filter by user UUID" />
+              <input id="outboundStatusFilter" placeholder="Filter by status" />
+              <div></div>
+              <div></div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Status</th><th>Phone</th><th>Attempts</th><th>Error</th><th>Actions</th></tr></thead>
+                <tbody id="outboundTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Dead letters</h2>
+                <div class="panel-note">Persistent recovery queue for permanently failed operations.</div>
+              </div>
+              <button id="reloadDeadLettersButton" class="secondary small">Reload dead letters</button>
+            </div>
+            <div class="filters">
+              <input id="deadLetterUserIdFilter" placeholder="Filter by user UUID" />
+              <input id="deadLetterStatusFilter" placeholder="Filter by status" />
+              <input id="deadLetterCategoryFilter" placeholder="Filter by category" />
+              <div></div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Category</th><th>Status</th><th>Source</th><th>Error</th><th>Created</th></tr></thead>
+                <tbody id="deadLettersTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>User detail</h2>
+                <div class="panel-note">Click a user row to load profile details and patch lifecycle fields.</div>
+              </div>
+            </div>
+            <div id="userDetailEmpty" class="status">Select a user from the left table.</div>
+            <div id="userDetailContent" class="hidden">
+              <div id="userDetailStats" class="stats-grid"></div>
+              <div class="two-col">
+                <div><label class="label">First name</label><input id="editFirstName" /></div>
+                <div><label class="label">Archetype</label><input id="editArchetype" /></div>
+                <div><label class="label">Onboarding state</label><select id="editOnboardingState"><option value="">No change</option><option value="awaiting_archetype">awaiting_archetype</option><option value="active">active</option></select></div>
+                <div><label class="label">Subscription status</label><select id="editSubscriptionStatus"><option value="">No change</option><option value="Trial_Active">Trial_Active</option><option value="Paid_Active">Paid_Active</option><option value="Locked">Locked</option></select></div>
+                <div><label class="label">Trial ends at (ISO)</label><input id="editTrialEndsAt" placeholder="2026-06-30T23:59:59.000Z" /></div>
+                <div><label class="label">Subscription ends at (ISO)</label><input id="editSubscriptionEndsAt" placeholder="2026-07-30T23:59:59.000Z" /></div>
+              </div>
+              <div class="actions" style="margin-top:12px;">
+                <button id="saveUserButton" class="success">Save user changes</button>
+                <button id="reloadUserProfileButton" class="secondary">Reload profile</button>
+              </div>
+              <div id="userProfileMeta" class="panel-note" style="margin-top:10px;"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Security posture</h2>
+                <div class="panel-note">Live hardening summary for deployment posture.</div>
+              </div>
+              <button id="reloadSecurityButton" class="secondary small">Reload security</button>
+            </div>
+            <div id="securityPostureContent" class="stats-grid"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Sessions, reports, and audit</h2>
+                <div class="panel-note">Recent operational state across checkout, reports, and audit trails.</div>
+              </div>
+              <button id="reloadOpsButton" class="secondary small">Reload ops</button>
+            </div>
+            <h3 style="margin:8px 0;">Payment sessions</h3>
+            <div class="table-wrap" style="max-height:180px;">
+              <table><thead><tr><th>Provider</th><th>Status</th><th>User</th><th>Amount</th><th>Created</th></tr></thead><tbody id="sessionsTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody></table>
+            </div>
+            <h3 style="margin:18px 0 8px;">Weekly reports</h3>
+            <div class="table-wrap" style="max-height:180px;">
+              <table><thead><tr><th>User</th><th>Status</th><th>Week start</th><th>Created</th></tr></thead><tbody id="reportsTableBody"><tr><td colspan="4">No data loaded yet.</td></tr></tbody></table>
+            </div>
+            <h3 style="margin:18px 0 8px;">Audit events</h3>
+            <div class="table-wrap" style="max-height:220px;">
+              <table><thead><tr><th>Event</th><th>Severity</th><th>User</th><th>Created</th></tr></thead><tbody id="auditTableBody"><tr><td colspan="4">No data loaded yet.</td></tr></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const state = {
+          adminKey: localStorage.getItem('mauri-admin-key') || '',
+          selectedUserId: null
+        };
+
+        const el = {
+          adminKey: document.getElementById('adminKey'),
+          globalStatus: document.getElementById('globalStatus'),
+          overviewCards: document.getElementById('overviewCards'),
+          usersTableBody: document.getElementById('usersTableBody'),
+          outboundTableBody: document.getElementById('outboundTableBody'),
+          deadLettersTableBody: document.getElementById('deadLettersTableBody'),
+          sessionsTableBody: document.getElementById('sessionsTableBody'),
+          reportsTableBody: document.getElementById('reportsTableBody'),
+          auditTableBody: document.getElementById('auditTableBody'),
+          securityPostureContent: document.getElementById('securityPostureContent'),
+          userDetailEmpty: document.getElementById('userDetailEmpty'),
+          userDetailContent: document.getElementById('userDetailContent'),
+          userDetailStats: document.getElementById('userDetailStats'),
+          userProfileMeta: document.getElementById('userProfileMeta'),
+          editFirstName: document.getElementById('editFirstName'),
+          editArchetype: document.getElementById('editArchetype'),
+          editOnboardingState: document.getElementById('editOnboardingState'),
+          editSubscriptionStatus: document.getElementById('editSubscriptionStatus'),
+          editTrialEndsAt: document.getElementById('editTrialEndsAt'),
+          editSubscriptionEndsAt: document.getElementById('editSubscriptionEndsAt'),
+          userSearch: document.getElementById('userSearch'),
+          userSubscriptionFilter: document.getElementById('userSubscriptionFilter'),
+          userOnboardingFilter: document.getElementById('userOnboardingFilter'),
+          outboundUserIdFilter: document.getElementById('outboundUserIdFilter'),
+          outboundStatusFilter: document.getElementById('outboundStatusFilter'),
+          deadLetterUserIdFilter: document.getElementById('deadLetterUserIdFilter'),
+          deadLetterStatusFilter: document.getElementById('deadLetterStatusFilter'),
+          deadLetterCategoryFilter: document.getElementById('deadLetterCategoryFilter')
+        };
+
+        el.adminKey.value = state.adminKey;
+
+        function setStatus(message, kind = '') {
+          el.globalStatus.textContent = message;
+          el.globalStatus.className = 'status' + (kind ? ' ' + kind : '');
+        }
+
+        function headers() {
+          return state.adminKey ? { 'x-mauri-admin-key': state.adminKey } : {};
+        }
+
+        async function api(path, options = {}) {
+          const response = await fetch(path, {
+            ...options,
+            headers: {
+              ...(options.body ? { 'content-type': 'application/json' } : {}),
+              ...headers(),
+              ...(options.headers || {})
+            }
+          });
+          const contentType = response.headers.get('content-type') || '';
+          const payload = contentType.includes('application/json') ? await response.json() : await response.text();
+          if (!response.ok) {
+            throw new Error(typeof payload === 'string' ? payload : (payload.error || 'Request failed'));
+          }
+          return payload;
+        }
+
+        function renderTable(target, rows, colspan, renderer) {
+          if (!rows.length) {
+            target.innerHTML = '<tr><td colspan="' + colspan + '">No records found.</td></tr>';
+            return;
+          }
+          target.innerHTML = rows.map(renderer).join('');
+        }
+
+        function renderOverview(overview) {
+          const cards = [
+            ['Users', overview.users.total],
+            ['Paid Active', overview.users.paidActive],
+            ['Open Dead Letters', overview.operations.openDeadLetters],
+            ['Outbound Pending', overview.operations.outboundPending],
+            ['Reports This Week', overview.operations.reportsThisWeek]
+          ];
+          el.overviewCards.innerHTML = cards.map(([label, value]) =>
+            '<div class="card"><div class="label">' + label + '</div><div class="value">' + value + '</div></div>'
+          ).join('');
+        }
+
+        async function loadOverview() {
+          const data = await api('/internal/admin/overview');
+          renderOverview(data.overview);
+        }
+
+        async function loadUsers() {
+          const params = new URLSearchParams();
+          if (el.userSearch.value.trim()) params.set('search', el.userSearch.value.trim());
+          if (el.userSubscriptionFilter.value) params.set('subscriptionStatus', el.userSubscriptionFilter.value);
+          if (el.userOnboardingFilter.value) params.set('onboardingState', el.userOnboardingFilter.value);
+          const data = await api('/internal/admin/users?' + params.toString());
+          renderTable(el.usersTableBody, data.users, 6, (user) =>
+            '<tr>' +
+              '<td>' + (user.first_name || '-') + '</td>' +
+              '<td class="mono">' + user.phone_number + '</td>' +
+              '<td><span class="pill">' + user.subscription_status + '</span></td>' +
+              '<td><span class="pill">' + user.onboarding_state + '</span></td>' +
+              '<td>' + user.updated_at + '</td>' +
+              '<td><button class="small secondary" data-user-id="' + user.id + '">Inspect</button></td>' +
+            '</tr>'
+          );
+          el.usersTableBody.querySelectorAll('button[data-user-id]').forEach((button) => {
+            button.addEventListener('click', () => {
+              state.selectedUserId = button.getAttribute('data-user-id');
+              loadUserProfile();
+            });
+          });
+        }
+
+        async function loadUserProfile() {
+          if (!state.selectedUserId) return;
+          const data = await api('/internal/admin/users/' + state.selectedUserId);
+          const profile = data.profile;
+          const user = profile.user;
+
+          el.userDetailEmpty.classList.add('hidden');
+          el.userDetailContent.classList.remove('hidden');
+          el.editFirstName.value = user.first_name || '';
+          el.editArchetype.value = user.archetype || '';
+          el.editOnboardingState.value = '';
+          el.editSubscriptionStatus.value = '';
+          el.editTrialEndsAt.value = user.trial_ends_at || '';
+          el.editSubscriptionEndsAt.value = user.subscription_ends_at || '';
+
+          const stats = [
+            ['User ID', user.id],
+            ['Phone', user.phone_number],
+            ['Pending todos', profile.stats.pendingTodos],
+            ['Payment events', profile.stats.totalPaymentEvents],
+            ['Weekly reports', profile.stats.totalReports],
+            ['Voice notes', profile.stats.totalVoiceNotes],
+            ['Memories', profile.stats.totalMemories],
+            ['Latest report', profile.stats.latestWeeklyReportAt || '-']
+          ];
+          el.userDetailStats.innerHTML = stats.map(([label, value]) =>
+            '<div class="kv"><div class="label">' + label + '</div><div>' + value + '</div></div>'
+          ).join('');
+
+          el.userProfileMeta.innerHTML =
+            '<strong>Recent:</strong> payments ' + profile.recentPaymentEvents.length +
+            ', sessions ' + profile.recentCheckoutSessions.length +
+            ', reports ' + profile.recentReports.length +
+            ', voice notes ' + profile.recentVoiceNotes.length +
+            ', memories ' + profile.recentMemories.length + '.';
+        }
+
+        async function saveUserChanges() {
+          if (!state.selectedUserId) return;
+          const payload = {};
+          if (el.editFirstName.value.trim()) payload.first_name = el.editFirstName.value.trim();
+          if (el.editArchetype.value.trim()) payload.archetype = el.editArchetype.value.trim();
+          if (el.editOnboardingState.value) payload.onboarding_state = el.editOnboardingState.value;
+          if (el.editSubscriptionStatus.value) payload.subscription_status = el.editSubscriptionStatus.value;
+          if (el.editTrialEndsAt.value.trim()) payload.trial_ends_at = el.editTrialEndsAt.value.trim();
+          if (el.editSubscriptionEndsAt.value.trim()) payload.subscription_ends_at = el.editSubscriptionEndsAt.value.trim();
+          await api('/internal/admin/users/' + state.selectedUserId, { method: 'PATCH', body: JSON.stringify(payload) });
+          setStatus('User changes saved.', 'success');
+          await Promise.all([loadOverview(), loadUsers(), loadUserProfile()]);
+        }
+
+        async function loadOutboundMessages() {
+          const params = new URLSearchParams();
+          if (el.outboundUserIdFilter.value.trim()) params.set('userId', el.outboundUserIdFilter.value.trim());
+          if (el.outboundStatusFilter.value.trim()) params.set('status', el.outboundStatusFilter.value.trim());
+          const data = await api('/internal/admin/outbound-messages?' + params.toString());
+          renderTable(el.outboundTableBody, data.messages, 5, (item) =>
+            '<tr>' +
+              '<td><span class="pill">' + item.status + '</span></td>' +
+              '<td class="mono">' + item.phone_number + '</td>' +
+              '<td>' + item.attempt_count + '</td>' +
+              '<td>' + (item.last_error || '-') + '</td>' +
+              '<td class="actions">' +
+                '<button class="small secondary" data-action="retry" data-id="' + item.id + '">Retry</button>' +
+                '<button class="small warning" data-action="requeue" data-id="' + item.id + '">Requeue</button>' +
+                '<button class="small danger" data-action="discard" data-id="' + item.id + '">Discard</button>' +
+              '</td>' +
+            '</tr>'
+          );
+          el.outboundTableBody.querySelectorAll('button[data-action]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              const id = button.getAttribute('data-id');
+              const action = button.getAttribute('data-action');
+              const path = action === 'retry'
+                ? '/internal/admin/outbound-messages/' + id + '/retry'
+                : action === 'requeue'
+                  ? '/internal/admin/outbound-messages/' + id + '/requeue'
+                  : '/internal/admin/outbound-messages/' + id + '/discard';
+              await api(path, { method: 'POST' });
+              setStatus('Outbound action completed: ' + action + '.', 'success');
+              await Promise.all([loadOverview(), loadOutboundMessages(), loadDeadLetters(), loadAuditEvents()]);
+            });
+          });
+        }
+
+        async function loadDeadLetters() {
+          const params = new URLSearchParams();
+          if (el.deadLetterUserIdFilter.value.trim()) params.set('userId', el.deadLetterUserIdFilter.value.trim());
+          if (el.deadLetterStatusFilter.value.trim()) params.set('status', el.deadLetterStatusFilter.value.trim());
+          if (el.deadLetterCategoryFilter.value.trim()) params.set('category', el.deadLetterCategoryFilter.value.trim());
+          const data = await api('/internal/admin/dead-letters?' + params.toString());
+          renderTable(el.deadLettersTableBody, data.deadLetters, 5, (item) =>
+            '<tr>' +
+              '<td>' + item.category + '</td>' +
+              '<td><span class="pill">' + item.status + '</span></td>' +
+              '<td class="mono">' + item.source_id + '</td>' +
+              '<td>' + (item.last_error || '-') + '</td>' +
+              '<td>' + item.created_at + '</td>' +
+            '</tr>'
+          );
+        }
+
+        async function loadSecurityPosture() {
+          const data = await api('/internal/admin/security-posture');
+          const posture = data.securityPosture;
+          const rows = [
+            ['Trust proxy configured', posture.trustProxyConfigured],
+            ['Security headers enabled', posture.securityHeadersEnabled],
+            ['Admin allowlist configured', posture.adminAllowlistConfigured],
+            ['Payment webhook allowlist configured', posture.paymentWebhookAllowlistConfigured],
+            ['WhatsApp allowlist configured', posture.whatsappWebhookAllowlistConfigured],
+            ['Peach signature enabled', posture.peachSignatureEnabled],
+            ['Outbound retry enabled', posture.outboundRetryEnabled],
+            ['Warnings', posture.warnings.length ? posture.warnings.join(' | ') : 'None']
+          ];
+          document.getElementById('securityPostureContent').innerHTML = rows.map(([label, value]) =>
+            '<div class="kv"><div class="label">' + label + '</div><div>' + value + '</div></div>'
+          ).join('');
+        }
+
+        async function loadSessions() {
+          const data = await api('/internal/admin/payment-sessions');
+          renderTable(el.sessionsTableBody, data.sessions, 5, (item) =>
+            '<tr><td>' + item.provider + '</td><td><span class="pill">' + item.status + '</span></td><td class="mono">' + item.user_id + '</td><td>' + item.amount + ' ' + item.currency + '</td><td>' + item.created_at + '</td></tr>'
+          );
+        }
+
+        async function loadReports() {
+          const data = await api('/internal/admin/reports');
+          renderTable(el.reportsTableBody, data.reports, 4, (item) =>
+            '<tr><td class="mono">' + item.user_id + '</td><td><span class="pill">' + item.delivery_status + '</span></td><td>' + item.week_start + '</td><td>' + item.created_at + '</td></tr>'
+          );
+        }
+
+        async function loadAuditEvents() {
+          const data = await api('/internal/admin/audit-events');
+          renderTable(el.auditTableBody, data.events, 4, (item) =>
+            '<tr><td>' + item.event_type + '</td><td><span class="pill">' + item.severity + '</span></td><td class="mono">' + (item.user_id || '-') + '</td><td>' + item.created_at + '</td></tr>'
+          );
+        }
+
+        async function refreshAll() {
+          if (!state.adminKey) {
+            setStatus('Paste and save the admin key first.', 'error');
+            return;
+          }
+          setStatus('Refreshing panel data...');
+          try {
+            await Promise.all([
+              loadOverview(),
+              loadUsers(),
+              loadOutboundMessages(),
+              loadDeadLetters(),
+              loadSecurityPosture(),
+              loadSessions(),
+              loadReports(),
+              loadAuditEvents(),
+              state.selectedUserId ? loadUserProfile() : Promise.resolve()
+            ]);
+            setStatus('Panel refreshed successfully.', 'success');
+          } catch (error) {
+            setStatus(error.message || 'Refresh failed.', 'error');
+          }
+        }
+
+        document.getElementById('saveKeyButton').addEventListener('click', () => {
+          state.adminKey = el.adminKey.value.trim();
+          localStorage.setItem('mauri-admin-key', state.adminKey);
+          setStatus('Admin key saved locally in this browser.', 'success');
+        });
+        document.getElementById('refreshAllButton').addEventListener('click', refreshAll);
+        document.getElementById('reloadUsersButton').addEventListener('click', loadUsers);
+        document.getElementById('applyUserFiltersButton').addEventListener('click', loadUsers);
+        document.getElementById('reloadOutboundButton').addEventListener('click', loadOutboundMessages);
+        document.getElementById('reloadDeadLettersButton').addEventListener('click', loadDeadLetters);
+        document.getElementById('reloadSecurityButton').addEventListener('click', loadSecurityPosture);
+        document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadSessions(), loadReports(), loadAuditEvents()]));
+        document.getElementById('reloadUserProfileButton').addEventListener('click', loadUserProfile);
+        document.getElementById('saveUserButton').addEventListener('click', saveUserChanges);
+
+        el.adminKey.value = state.adminKey;
+        if (state.adminKey) refreshAll();
+      </script>
+    </div>
+  </body>
+</html>`;
+}
+
 export const adminRouter = Router();
+
+adminRouter.get("/panel", (_request, response) => {
+  response.setHeader("content-type", "text/html; charset=utf-8");
+  response.status(200).send(renderAdminPanelHtml());
+});
 
 adminRouter.use((request, response, next) => {
   if (!ensureAdmin(request.header("x-mauri-admin-key") ?? undefined)) {
