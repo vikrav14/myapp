@@ -5,6 +5,7 @@ const mockExtractStructuredContext = vi.fn();
 const mockGenerateConversationalReply = vi.fn();
 const mockRecordAuditEventBestEffort = vi.fn();
 const mockLoadUserContext = vi.fn();
+const mockRegisterInboundEvent = vi.fn();
 const mockPersistExtraction = vi.fn();
 const mockStoreConversationMemory = vi.fn();
 const mockEnforceAccessPolicy = vi.fn();
@@ -24,6 +25,10 @@ vi.mock("../src/services/audit.service.js", () => ({
 
 vi.mock("../src/services/context.service.js", () => ({
   loadUserContext: mockLoadUserContext
+}));
+
+vi.mock("../src/services/inbound-event.service.js", () => ({
+  registerInboundEvent: mockRegisterInboundEvent
 }));
 
 vi.mock("../src/services/logging.service.js", () => ({
@@ -81,6 +86,7 @@ const baseUser = {
 describe("WhatsApp webhook route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRegisterInboundEvent.mockResolvedValue({ duplicate: false });
   });
 
   it("returns the onboarding reply for a new user awaiting archetype", async () => {
@@ -104,7 +110,7 @@ describe("WhatsApp webhook route", () => {
     const app = createApp();
     const response = await request(app)
       .post("/webhooks/whatsapp")
-      .send({ from: baseUser.phone_number, text: "hello mauri", profileName: "Ava" });
+      .send({ from: baseUser.phone_number, text: "hello mauri", profileName: "Ava", messageId: "wamid-1" });
 
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
@@ -170,7 +176,7 @@ describe("WhatsApp webhook route", () => {
     const app = createApp();
     const response = await request(app)
       .post("/webhooks/whatsapp")
-      .send({ from: activeUser.phone_number, text: "I spent 150 on food and studied for 90 minutes" });
+      .send({ from: activeUser.phone_number, text: "I spent 150 on food and studied for 90 minutes", messageId: "wamid-2" });
 
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
@@ -200,5 +206,22 @@ describe("WhatsApp webhook route", () => {
         userId: activeUser.id
       })
     );
+  });
+
+  it("ignores a duplicate inbound WhatsApp message before processing", async () => {
+    mockRegisterInboundEvent.mockResolvedValue({ duplicate: true });
+
+    const app = createApp();
+    const response = await request(app)
+      .post("/webhooks/whatsapp")
+      .send({ from: baseUser.phone_number, text: "hello again", messageId: "wamid-duplicate" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(response.body.duplicate).toBe(true);
+    expect(mockGetOrCreateUser).not.toHaveBeenCalled();
+    expect(mockResolveInboundMessageText).not.toHaveBeenCalled();
+    expect(mockExtractStructuredContext).not.toHaveBeenCalled();
+    expect(mockSendWhatsAppMessage).not.toHaveBeenCalled();
   });
 });

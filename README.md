@@ -17,6 +17,7 @@ This repository now contains the first backend foundation for the product spec i
 - Provider-specific payment callback adapters for MCB Juice and Blink
 - Internal admin and operations API surface
 - Request tracing and persistent audit events
+- Duplicate inbound WhatsApp event protection
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
@@ -65,6 +66,7 @@ supabase/migrations/
   008_audit_events.sql
   009_outbound_messages.sql
   010_dead_letter_events.sql
+  011_processed_inbound_events.sql
 ```
 
 ## Environment variables
@@ -165,6 +167,7 @@ supabase/migrations/007_payment_checkout_sessions.sql
 supabase/migrations/008_audit_events.sql
 supabase/migrations/009_outbound_messages.sql
 supabase/migrations/010_dead_letter_events.sql
+supabase/migrations/011_processed_inbound_events.sql
 ```
 
 ## Webhook contract
@@ -185,6 +188,8 @@ When the inbound payload is an audio message, the server:
 The semantic memory layer stores embedded user messages, Mauri replies, and emotional signals.
 
 When a new message arrives, Mauri can retrieve similar past memories from vector search and inject them into the hidden reply context before generating the response.
+
+Inbound WhatsApp messages with the same `messageId` are now deduplicated before user lookup and downstream processing, which prevents duplicate replies and duplicate logging when webhook deliveries are retried.
 
 There is also a secured internal payment confirmation route:
 

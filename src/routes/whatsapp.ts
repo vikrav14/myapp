@@ -6,6 +6,7 @@ import { getRequestId } from "../lib/request-tracing.js";
 import { extractStructuredContext, generateConversationalReply } from "../services/ai.service.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
+import { registerInboundEvent } from "../services/inbound-event.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
@@ -36,6 +37,27 @@ whatsappRouter.post("/", async (request, response, next) => {
     if (!inboundMessage) {
       response.status(200).json({ ok: true, ignored: true });
       return;
+    }
+
+    if (inboundMessage.messageId) {
+      const inboundEvent = await registerInboundEvent({
+        provider: "whatsapp",
+        eventId: inboundMessage.messageId,
+        eventKind: inboundMessage.kind,
+        rawPayload: inboundMessage.rawPayload,
+        requestId
+      });
+
+      if (inboundEvent.duplicate) {
+        response.status(200).json({
+          ok: true,
+          ignored: true,
+          duplicate: true,
+          sourceType: inboundMessage.kind,
+          messageId: inboundMessage.messageId
+        });
+        return;
+      }
     }
 
     const { user: initialUser, isNewUser } = await getOrCreateUser(inboundMessage.from, inboundMessage.profileName);

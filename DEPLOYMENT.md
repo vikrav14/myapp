@@ -24,6 +24,7 @@ supabase/migrations/007_payment_checkout_sessions.sql
 supabase/migrations/008_audit_events.sql
 supabase/migrations/009_outbound_messages.sql
 supabase/migrations/010_dead_letter_events.sql
+supabase/migrations/011_processed_inbound_events.sql
 ```
 
 ## Critical environment variables
