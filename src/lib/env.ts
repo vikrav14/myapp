@@ -71,7 +71,13 @@ const envSchema = z.object({
   ENABLE_SECURITY_HEADERS: envBoolean.default(true),
   ADMIN_IP_ALLOWLIST: optionalCsv,
   PAYMENT_WEBHOOK_IP_ALLOWLIST: optionalCsv,
-  WHATSAPP_WEBHOOK_IP_ALLOWLIST: optionalCsv
+  WHATSAPP_WEBHOOK_IP_ALLOWLIST: optionalCsv,
+  METRICS_IP_ALLOWLIST: optionalCsv,
+  ALERT_OUTBOUND_PENDING_THRESHOLD: z.coerce.number().int().nonnegative().default(25),
+  ALERT_OUTBOUND_FAILED_THRESHOLD: z.coerce.number().int().nonnegative().default(10),
+  ALERT_OPEN_DEAD_LETTER_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
+  ALERT_SECURITY_WARNINGS_THRESHOLD: z.coerce.number().int().nonnegative().default(1),
+  ALERT_EVALUATION_CRON: z.string().default("*/5 * * * *")
 });
 
 export const env = envSchema.parse(process.env);

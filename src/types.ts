@@ -165,6 +165,43 @@ export interface DeadLetterEventRecord {
   updated_at: string;
 }
 
+export interface OperationalAlertStateRecord {
+  id: string;
+  alert_key: string;
+  severity: AuditSeverity | string;
+  status: string;
+  message: string;
+  current_value: number | null;
+  threshold_value: number | null;
+  metadata: Record<string, unknown> | null;
+  last_evaluated_at: string;
+  triggered_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MetricsSnapshot {
+  generated_at: string;
+  uptime_seconds: number;
+  process_resident_memory_bytes: number;
+  users_total: number;
+  users_trial_active: number;
+  users_paid_active: number;
+  users_locked: number;
+  users_awaiting_archetype: number;
+  outbound_pending: number;
+  outbound_failed: number;
+  outbound_permanent_failed: number;
+  dead_letters_open: number;
+  alerts_open: number;
+  payments_24h: number;
+  reports_24h: number;
+  voice_notes_24h: number;
+  audit_errors_24h: number;
+  inbound_duplicate_deliveries_24h: number;
+}
+
 export interface SemanticMemoryMatch {
   source: "conversation_memory" | "emotion_memory";
   text: string;

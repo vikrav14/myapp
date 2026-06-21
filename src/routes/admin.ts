@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { hasAdminAccess } from "../lib/internal-auth.js";
 import { getSecurityPostureSummary } from "../lib/network-security.js";
+import { evaluateAndPersistOperationalAlerts, listOperationalAlerts } from "../services/alerting.service.js";
 import {
   adminUpdateUser,
   getAdminDashboardData,
@@ -17,6 +18,7 @@ import {
 } from "../services/admin.service.js";
 import { getRequestId } from "../lib/request-tracing.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
+import { getMetricsSnapshot } from "../services/metrics.service.js";
 import { retryOutboundMessageById } from "../services/outbound-retry.service.js";
 import { updateDeadLetterStatus } from "../services/dead-letter.service.js";
 import {
@@ -436,7 +438,14 @@ function renderAdminPanelHtml(): string {
                 <h2>Sessions, reports, and audit</h2>
                 <div class="panel-note">Recent operational state across checkout, reports, and audit trails.</div>
               </div>
-              <button id="reloadOpsButton" class="secondary small">Reload ops</button>
+              <div class="actions">
+                <button id="evaluateAlertsButton" class="warning small">Evaluate alerts now</button>
+                <button id="reloadOpsButton" class="secondary small">Reload ops</button>
+              </div>
+            </div>
+            <h3 style="margin:8px 0;">Operational alerts</h3>
+            <div class="table-wrap" style="max-height:180px;">
+              <table><thead><tr><th>Alert</th><th>Severity</th><th>Status</th><th>Value</th></tr></thead><tbody id="alertsTableBody"><tr><td colspan="4">No data loaded yet.</td></tr></tbody></table>
             </div>
             <h3 style="margin:8px 0;">Payment sessions</h3>
             <div class="table-wrap" style="max-height:180px;">
@@ -470,6 +479,7 @@ function renderAdminPanelHtml(): string {
           sessionsTableBody: document.getElementById('sessionsTableBody'),
           reportsTableBody: document.getElementById('reportsTableBody'),
           auditTableBody: document.getElementById('auditTableBody'),
+          alertsTableBody: document.getElementById('alertsTableBody'),
           securityPostureContent: document.getElementById('securityPostureContent'),
           userDetailEmpty: document.getElementById('userDetailEmpty'),
           userDetailContent: document.getElementById('userDetailContent'),
@@ -723,6 +733,13 @@ function renderAdminPanelHtml(): string {
           );
         }
 
+        async function loadAlerts() {
+          const data = await api('/internal/admin/alerts');
+          renderTable(el.alertsTableBody, data.alerts, 4, (item) =>
+            '<tr><td>' + item.alert_key + '</td><td><span class="pill">' + item.severity + '</span></td><td><span class="pill">' + item.status + '</span></td><td>' + (item.current_value ?? '-') + ' / ' + (item.threshold_value ?? '-') + '</td></tr>'
+          );
+        }
+
         async function loadReports() {
           const data = await api('/internal/admin/reports');
           renderTable(el.reportsTableBody, data.reports, 4, (item) =>
@@ -750,6 +767,7 @@ function renderAdminPanelHtml(): string {
               loadOutboundMessages(),
               loadDeadLetters(),
               loadSecurityPosture(),
+              loadAlerts(),
               loadSessions(),
               loadReports(),
               loadAuditEvents(),
@@ -772,7 +790,12 @@ function renderAdminPanelHtml(): string {
         document.getElementById('reloadOutboundButton').addEventListener('click', loadOutboundMessages);
         document.getElementById('reloadDeadLettersButton').addEventListener('click', loadDeadLetters);
         document.getElementById('reloadSecurityButton').addEventListener('click', loadSecurityPosture);
-        document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadSessions(), loadReports(), loadAuditEvents()]));
+        document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadAlerts(), loadSessions(), loadReports(), loadAuditEvents()]));
+        document.getElementById('evaluateAlertsButton').addEventListener('click', async () => {
+          await api('/internal/admin/alerts/evaluate', { method: 'POST' });
+          await Promise.all([loadOverview(), loadAlerts(), loadAuditEvents()]);
+          setStatus('Operational alerts evaluated.', 'success');
+        });
         document.getElementById('reloadUserProfileButton').addEventListener('click', loadUserProfile);
         document.getElementById('saveUserButton').addEventListener('click', saveUserChanges);
         document.getElementById('focusOutboundForUserButton').addEventListener('click', async () => {
@@ -848,6 +871,47 @@ adminRouter.get("/security-posture", (_request, response) => {
     ok: true,
     securityPosture: getSecurityPostureSummary()
   });
+});
+
+adminRouter.get("/metrics", async (_request, response, next) => {
+  try {
+    const snapshot = await getMetricsSnapshot();
+    response.status(200).json({
+      ok: true,
+      metrics: snapshot
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/alerts", async (request, response, next) => {
+  try {
+    const status =
+      typeof request.query.status === "string" && request.query.status.trim()
+        ? request.query.status.trim()
+        : undefined;
+    const alerts = await listOperationalAlerts(status);
+    response.status(200).json({
+      ok: true,
+      alerts
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/alerts/evaluate", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const alerts = await evaluateAndPersistOperationalAlerts({ requestId });
+    response.status(200).json({
+      ok: true,
+      alerts
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 adminRouter.get("/users", async (request, response, next) => {

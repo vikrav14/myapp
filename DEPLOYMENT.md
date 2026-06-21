@@ -25,6 +25,7 @@ supabase/migrations/008_audit_events.sql
 supabase/migrations/009_outbound_messages.sql
 supabase/migrations/010_dead_letter_events.sql
 supabase/migrations/011_processed_inbound_events.sql
+supabase/migrations/012_operational_alert_states.sql
 ```
 
 ## Critical environment variables
@@ -40,6 +41,7 @@ Must be configured before production traffic:
 - `INTERNAL_ADMIN_API_KEY`
 - `PAYMENT_CALLBACK_BASE_URL`
 - `PAYMENT_RETURN_URL`
+- `METRICS_IP_ALLOWLIST`
 
 Strongly recommended in production:
 
@@ -50,6 +52,7 @@ Strongly recommended in production:
 - `WHATSAPP_WEBHOOK_IP_ALLOWLIST`
 - `TRUST_PROXY=true`
 - `ENABLE_SECURITY_HEADERS=true`
+- alert thresholds tuned for expected volume
 
 Provider-specific if enabled:
 
@@ -94,7 +97,9 @@ After deploy, confirm:
 
 - `GET /health` returns 200
 - `GET /ready` returns 200
+- `GET /metrics` returns Prometheus-formatted output from an allowed IP
 - `GET /internal/admin/security-posture` shows expected production settings
+- `GET /internal/admin/alerts` returns current alert state
 - `GET /internal/admin/panel` loads in browser
 - WhatsApp webhook verification succeeds
 - a test outbound message lands in `outbound_messages`
@@ -107,6 +112,7 @@ Before opening production traffic:
 - configure `ADMIN_IP_ALLOWLIST`
 - configure `PAYMENT_WEBHOOK_IP_ALLOWLIST`
 - configure `WHATSAPP_WEBHOOK_IP_ALLOWLIST`
+- configure `METRICS_IP_ALLOWLIST`
 - configure `PEACH_WEBHOOK_SECRET`
 - rotate `INTERNAL_ADMIN_API_KEY` away from defaults
 - keep the Supabase service role key server-side only

@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
+import { evaluateAndPersistOperationalAlerts } from "../services/alerting.service.js";
 import { runOutboundMessageRetryLoop } from "../services/outbound-retry.service.js";
 import { runSundayDiagnosticReports } from "../services/report.service.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
@@ -172,6 +173,18 @@ export async function runSundayShowdown(): Promise<void> {
 }
 
 export function registerSquadJobs(): void {
+  cron.schedule(env.ALERT_EVALUATION_CRON, async () => {
+    try {
+      const alerts = await evaluateAndPersistOperationalAlerts();
+      const openAlerts = alerts.filter((alert) => alert.status === "open").length;
+      if (alerts.length > 0) {
+        logger.info({ alertsEvaluated: alerts.length, openAlerts }, "Operational alerts evaluated.");
+      }
+    } catch (error) {
+      logger.error({ error }, "Operational alert evaluation failed.");
+    }
+  });
+
   cron.schedule(env.OUTBOUND_RETRY_CRON, async () => {
     try {
       const result = await runOutboundMessageRetryLoop();

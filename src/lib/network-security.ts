@@ -162,6 +162,7 @@ export function getSecurityPostureSummary(): {
   adminAllowlistConfigured: boolean;
   paymentWebhookAllowlistConfigured: boolean;
   whatsappWebhookAllowlistConfigured: boolean;
+  metricsAllowlistConfigured: boolean;
   peachSignatureEnabled: boolean;
   outboundRetryEnabled: boolean;
   warnings: string[];
@@ -172,6 +173,7 @@ export function getSecurityPostureSummary(): {
     adminAllowlistConfigured: Boolean(env.ADMIN_IP_ALLOWLIST?.trim()),
     paymentWebhookAllowlistConfigured: Boolean(env.PAYMENT_WEBHOOK_IP_ALLOWLIST?.trim()),
     whatsappWebhookAllowlistConfigured: Boolean(env.WHATSAPP_WEBHOOK_IP_ALLOWLIST?.trim()),
+    metricsAllowlistConfigured: Boolean((env.METRICS_IP_ALLOWLIST ?? env.ADMIN_IP_ALLOWLIST)?.trim()),
     peachSignatureEnabled: Boolean(env.PEACH_WEBHOOK_SECRET),
     outboundRetryEnabled: env.OUTBOUND_RETRY_MAX_ATTEMPTS > 0,
     warnings: [] as string[]
@@ -192,6 +194,10 @@ export function getSecurityPostureSummary(): {
 
     if (!summary.whatsappWebhookAllowlistConfigured) {
       summary.warnings.push("WHATSAPP_WEBHOOK_IP_ALLOWLIST is not configured.");
+    }
+
+    if (!summary.metricsAllowlistConfigured) {
+      summary.warnings.push("METRICS_IP_ALLOWLIST is not configured.");
     }
 
     if (!summary.peachSignatureEnabled) {

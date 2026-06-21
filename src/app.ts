@@ -9,6 +9,7 @@ import {
   parseTrustProxySetting
 } from "./lib/network-security.js";
 import { getRequestId, requestTracingMiddleware } from "./lib/request-tracing.js";
+import { renderPrometheusMetrics, getMetricsSnapshot } from "./services/metrics.service.js";
 import { supabase } from "./lib/supabase.js";
 import { adminRouter } from "./routes/admin.js";
 import { paymentsRouter, paymentWebhooksRouter } from "./routes/payments.js";
@@ -52,6 +53,20 @@ export function createApp(): express.Express {
       ready: true
     });
   });
+
+  app.get(
+    "/metrics",
+    createIpAllowlistMiddleware({ label: "metrics", allowlist: env.METRICS_IP_ALLOWLIST ?? env.ADMIN_IP_ALLOWLIST }),
+    async (_request, response, next) => {
+      try {
+        const snapshot = await getMetricsSnapshot();
+        response.setHeader("content-type", "text/plain; version=0.0.4; charset=utf-8");
+        response.status(200).send(renderPrometheusMetrics(snapshot));
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
   app.use(
     "/internal/admin",

@@ -63,11 +63,23 @@ services:
         value: "60"
       - key: OUTBOUND_RETRY_CRON
         value: "*/5 * * * *"
+      - key: ALERT_OUTBOUND_PENDING_THRESHOLD
+        value: "25"
+      - key: ALERT_OUTBOUND_FAILED_THRESHOLD
+        value: "10"
+      - key: ALERT_OPEN_DEAD_LETTER_THRESHOLD
+        value: "5"
+      - key: ALERT_SECURITY_WARNINGS_THRESHOLD
+        value: "1"
+      - key: ALERT_EVALUATION_CRON
+        value: "*/5 * * * *"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS
         value: "true"
       - key: ADMIN_IP_ALLOWLIST
+        sync: false
+      - key: METRICS_IP_ALLOWLIST
         sync: false
       - key: PAYMENT_WEBHOOK_IP_ALLOWLIST
         sync: false

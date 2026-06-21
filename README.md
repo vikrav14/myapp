@@ -17,6 +17,7 @@ This repository now contains the first backend foundation for the product spec i
 - Provider-specific payment callback adapters for MCB Juice and Blink
 - Internal admin and operations API surface
 - Request tracing and persistent audit events
+- Metrics endpoint and operational alert evaluation
 - Duplicate inbound WhatsApp event protection
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
@@ -67,6 +68,7 @@ supabase/migrations/
   009_outbound_messages.sql
   010_dead_letter_events.sql
   011_processed_inbound_events.sql
+  012_operational_alert_states.sql
 ```
 
 ## Environment variables
@@ -104,6 +106,12 @@ Copy `.env.example` to `.env` and fill in:
 - `ADMIN_IP_ALLOWLIST`
 - `PAYMENT_WEBHOOK_IP_ALLOWLIST`
 - `WHATSAPP_WEBHOOK_IP_ALLOWLIST`
+- `METRICS_IP_ALLOWLIST`
+- `ALERT_OUTBOUND_PENDING_THRESHOLD`
+- `ALERT_OUTBOUND_FAILED_THRESHOLD`
+- `ALERT_OPEN_DEAD_LETTER_THRESHOLD`
+- `ALERT_SECURITY_WARNINGS_THRESHOLD`
+- `ALERT_EVALUATION_CRON`
 
 If the WhatsApp send credentials are absent, the service will still process inbound payloads and log the reply instead of attempting delivery.
 
@@ -151,6 +159,7 @@ Recommended next step for production deployment:
 
 - `GET /health` checks whether the process is alive
 - `GET /ready` checks whether the process can still reach Supabase
+- `GET /metrics` exposes Prometheus-style metrics output
 
 ## Supabase setup
 
@@ -168,6 +177,7 @@ supabase/migrations/008_audit_events.sql
 supabase/migrations/009_outbound_messages.sql
 supabase/migrations/010_dead_letter_events.sql
 supabase/migrations/011_processed_inbound_events.sql
+supabase/migrations/012_operational_alert_states.sql
 ```
 
 ## Webhook contract
@@ -210,6 +220,9 @@ There is also a secured internal admin route surface:
 - `PATCH /internal/admin/users/:userId`
 - `GET /internal/admin/dashboard`
 - `GET /internal/admin/security-posture`
+- `GET /internal/admin/metrics`
+- `GET /internal/admin/alerts`
+- `POST /internal/admin/alerts/evaluate`
 - `GET /internal/admin/payment-sessions`
 - `GET /internal/admin/outbound-messages`
 - `POST /internal/admin/outbound-messages/:messageId/retry`
@@ -243,6 +256,10 @@ This supports filtering by:
 The dashboard route returns a lightweight HTML operations view showing overview metrics, recent dead letters, recent outbound failures, and recent audit events.
 
 The security posture route returns the live hardening summary, including whether IP allowlists, trust proxy, security headers, and Peach webhook signature verification are configured.
+
+The metrics route returns a live JSON snapshot for the same core operational counters exposed via `/metrics`.
+
+The alerts routes let you inspect persisted operational alerts and force an immediate alert evaluation cycle.
 
 There is also a secured internal payment link/session route:
 
@@ -309,6 +326,8 @@ Failed sends are retried automatically on the schedule defined by `OUTBOUND_RETR
 When `PEACH_WEBHOOK_SECRET` is configured, the MCB Juice callback route verifies Peach HMAC webhook signatures before processing payment activations.
 
 Permanently failed outbound messages are also surfaced as `dead_letter_events`, and can be requeued or discarded through the admin ops routes.
+
+Operational thresholds are evaluated on the schedule defined by `ALERT_EVALUATION_CRON` and persisted in `operational_alert_states`.
 
 ## Hardening
 
