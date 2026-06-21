@@ -1,0 +1,75 @@
+services:
+  - type: web
+    name: mauri-backend
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    autoDeployTrigger: commit
+    healthCheckPath: /ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GOOGLE_AI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: MCB_JUICE_PAYMENT_LINK
+        sync: false
+      - key: BLINK_PAYMENT_LINK
+        sync: false
+      - key: SUBSCRIPTION_MONTHLY_PRICE_RS
+        value: "200"
+      - key: DEFAULT_SUBSCRIPTION_DAYS
+        value: "30"
+      - key: INTERNAL_ADMIN_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        value: text-embedding-004
+      - key: EMBEDDING_OUTPUT_DIMENSIONS
+        value: "1536"
+      - key: MCB_JUICE_CALLBACK_TOKEN
+        sync: false
+      - key: BLINK_CALLBACK_TOKEN
+        sync: false
+      - key: PAYMENT_CALLBACK_BASE_URL
+        sync: false
+      - key: PAYMENT_RETURN_URL
+        sync: false
+      - key: PEACH_ENTITY_ID
+        sync: false
+      - key: PEACH_CHECKOUT_URL
+        value: https://secure.peachpayments.com/checkout/initiate
+      - key: BLINK_PAYLINK_API_URL
+        value: https://api.blinkpayment.co.uk/api/paylink/v1/paylinks
+      - key: PEACH_WEBHOOK_SECRET
+        sync: false
+      - key: PEACH_WEBHOOK_TOLERANCE_SECONDS
+        value: "300"
+      - key: OUTBOUND_RETRY_MAX_ATTEMPTS
+        value: "5"
+      - key: OUTBOUND_RETRY_BASE_DELAY_SECONDS
+        value: "60"
+      - key: OUTBOUND_RETRY_CRON
+        value: "*/5 * * * *"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: ENABLE_SECURITY_HEADERS
+        value: "true"
+      - key: ADMIN_IP_ALLOWLIST
+        sync: false
+      - key: PAYMENT_WEBHOOK_IP_ALLOWLIST
+        sync: false
+      - key: WHATSAPP_WEBHOOK_IP_ALLOWLIST
+        sync: false

@@ -21,6 +21,7 @@ This repository now contains the first backend foundation for the product spec i
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
 - Scheduled squad nudges at 15:00 and Sunday showdown runs at 20:30
+- Deployment-ready Docker, Render, and CI configuration
 - Environment template for local setup
 
 ## Project structure
@@ -116,6 +117,33 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## CI
+
+GitHub Actions is configured to run:
+
+- `npm ci`
+- `npm run build`
+- `npm run typecheck`
+
+on pushes and pull requests.
+
+## Deployment
+
+This repository now includes:
+
+- `Dockerfile`
+- `.dockerignore`
+- `render.yaml`
+- `DEPLOYMENT.md`
+
+Recommended next step for production deployment:
+
+- read `DEPLOYMENT.md`
+- apply all Supabase migrations
+- configure the required environment variables
+- deploy the container service
+- validate `/ready` and `/internal/admin/security-posture`
 
 ## Health and readiness
 
