@@ -25,7 +25,9 @@ const envSchema = z.object({
   BLINK_PAYMENT_LINK: optionalSecret,
   SUBSCRIPTION_MONTHLY_PRICE_RS: z.coerce.number().int().positive().default(200),
   DEFAULT_SUBSCRIPTION_DAYS: z.coerce.number().int().positive().default(30),
-  INTERNAL_ADMIN_API_KEY: optionalSecret
+  INTERNAL_ADMIN_API_KEY: optionalSecret,
+  EMBEDDING_MODEL: z.string().default("text-embedding-004"),
+  EMBEDDING_OUTPUT_DIMENSIONS: z.coerce.number().int().positive().default(1536)
 });
 
 export const env = envSchema.parse(process.env);

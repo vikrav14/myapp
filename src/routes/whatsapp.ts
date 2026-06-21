@@ -5,6 +5,7 @@ import { logger } from "../lib/logger.js";
 import { extractStructuredContext, generateConversationalReply } from "../services/ai.service.js";
 import { loadUserContext } from "../services/context.service.js";
 import { persistExtraction } from "../services/logging.service.js";
+import { storeConversationMemory } from "../services/memory.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
@@ -112,7 +113,22 @@ whatsappRouter.post("/", async (request, response, next) => {
     }
 
     const user = onboardingResult.user;
-    const context = await loadUserContext(user.id);
+    const context = await loadUserContext(user.id, normalizedMessageText);
+
+    try {
+      await storeConversationMemory({
+        userId: user.id,
+        memoryType: "user_message",
+        contentText: normalizedMessageText,
+        sourceMessageId: inboundMessage.messageId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          hadTranscript: Boolean(transcriptPreview)
+        }
+      });
+    } catch (error) {
+      logger.warn({ error, userId: user.id }, "Failed to store inbound conversation memory.");
+    }
     const extraction = await extractStructuredContext(normalizedMessageText);
 
     await persistExtraction(user.id, extraction);
@@ -123,6 +139,20 @@ whatsappRouter.post("/", async (request, response, next) => {
       extraction,
       context
     });
+
+    try {
+      await storeConversationMemory({
+        userId: user.id,
+        memoryType: "assistant_reply",
+        contentText: reply,
+        metadata: {
+          sourceType: "assistant",
+          respondingTo: inboundMessage.kind
+        }
+      });
+    } catch (error) {
+      logger.warn({ error, userId: user.id }, "Failed to store assistant reply memory.");
+    }
 
     await sendWhatsAppMessage(inboundMessage.from, reply);
 

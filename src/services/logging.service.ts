@@ -1,5 +1,7 @@
+import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriBrainDumpExtraction } from "../types.js";
+import { buildEmotionEmbedding } from "./memory.service.js";
 
 export async function persistExtraction(userId: string, extraction: MauriBrainDumpExtraction): Promise<void> {
   const writes: Array<Promise<unknown>> = [];
@@ -48,13 +50,22 @@ export async function persistExtraction(userId: string, extraction: MauriBrainDu
   }
 
   if (extraction.emotions) {
+    let emotionEmbedding: string | null = null;
+
+    try {
+      emotionEmbedding = await buildEmotionEmbedding(extraction.emotions.raw_unfiltered_vent);
+    } catch (error) {
+      logger.warn({ error, userId }, "Failed to embed emotional insight. Continuing without vector.");
+    }
+
     writes.push(
       Promise.resolve(
         supabase.from("insights_vault").insert({
           user_id: userId,
           anxiety_score: extraction.emotions.anxiety_score,
           core_emotional_driver: extraction.emotions.core_emotional_driver ?? null,
-          raw_unfiltered_vent: extraction.emotions.raw_unfiltered_vent
+          raw_unfiltered_vent: extraction.emotions.raw_unfiltered_vent,
+          embedding: emotionEmbedding
         })
       )
     );

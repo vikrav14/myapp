@@ -1,6 +1,7 @@
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
 export type OnboardingState = "awaiting_archetype" | "active";
 export type PaymentProvider = "MCB_JUICE" | "BLINK" | "MANUAL";
+export type MemoryType = "user_message" | "assistant_reply" | "emotion_signal" | "weekly_report";
 export type MauriArchetype =
   | "Life & Habit Tracking"
   | "Student Grind"
@@ -94,6 +95,17 @@ export interface VoiceNoteTranscriptionRecord {
   created_at: string;
 }
 
+export interface SemanticMemoryMatch {
+  source: "conversation_memory" | "emotion_memory";
+  text: string;
+  similarity: number;
+  created_at: string;
+  memory_type?: MemoryType | string | undefined;
+  metadata?: Record<string, unknown> | null | undefined;
+  anxiety_score?: number | null | undefined;
+  core_emotional_driver?: string | null | undefined;
+}
+
 export interface FinanceExtraction {
   amount: number;
   category: string;
@@ -151,6 +163,7 @@ export interface UserContextSnapshot {
     raw_unfiltered_vent: string;
     logged_at: string;
   }>;
+  semanticMemories: SemanticMemoryMatch[];
 }
 
 export interface InboundMessage {

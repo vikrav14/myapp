@@ -1,8 +1,9 @@
 import { supabase } from "../lib/supabase.js";
 import type { UserContextSnapshot } from "../types.js";
+import { searchRelevantMemories } from "./memory.service.js";
 
-export async function loadUserContext(userId: string): Promise<UserContextSnapshot> {
-  const [todosResult, financeResult, habitsResult, emotionsResult] = await Promise.all([
+export async function loadUserContext(userId: string, queryText?: string): Promise<UserContextSnapshot> {
+  const [todosResult, financeResult, habitsResult, emotionsResult, semanticMemories] = await Promise.all([
     supabase
       .from("todo_logs")
       .select("id, task_description, priority, due_date")
@@ -27,7 +28,8 @@ export async function loadUserContext(userId: string): Promise<UserContextSnapsh
       .select("anxiety_score, core_emotional_driver, raw_unfiltered_vent, logged_at")
       .eq("user_id", userId)
       .order("logged_at", { ascending: false })
-      .limit(5)
+      .limit(5),
+    queryText ? searchRelevantMemories(userId, queryText) : Promise.resolve([])
   ]);
 
   const failures = [todosResult, financeResult, habitsResult, emotionsResult]
@@ -62,6 +64,7 @@ export async function loadUserContext(userId: string): Promise<UserContextSnapsh
       core_emotional_driver: row.core_emotional_driver ? String(row.core_emotional_driver) : null,
       raw_unfiltered_vent: String(row.raw_unfiltered_vent),
       logged_at: String(row.logged_at)
-    }))
+    })),
+    semanticMemories
   };
 }

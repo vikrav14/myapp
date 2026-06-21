@@ -13,6 +13,7 @@ This repository now contains the first backend foundation for the product spec i
 - Payment confirmation endpoint with subscription activation and payment event logging
 - Sunday diagnostic report generation with weekly storage and delivery
 - Voice note transcription for WhatsApp audio messages
+- Embedding-backed semantic memory storage and retrieval
 - Structured extraction pipeline for finance, todos, habits, and emotions
 - Context-aware reply generation with Mauri voice guardrails
 - Silent persistence into the relevant storage tables
@@ -34,6 +35,7 @@ src/
   services/ai.service.ts    Gemini extraction + reply generation
   services/context.service.ts
   services/logging.service.ts
+  services/memory.service.ts
   services/onboarding.service.ts
   services/payment.service.ts
   services/report.service.ts
@@ -46,6 +48,7 @@ supabase/migrations/
   003_payment_activation.sql
   004_weekly_reports.sql
   005_voice_note_transcriptions.sql
+  006_vector_memory.sql
 ```
 
 ## Environment variables
@@ -64,6 +67,8 @@ Copy `.env.example` to `.env` and fill in:
 - `SUBSCRIPTION_MONTHLY_PRICE_RS`
 - `DEFAULT_SUBSCRIPTION_DAYS`
 - `INTERNAL_ADMIN_API_KEY`
+- `EMBEDDING_MODEL`
+- `EMBEDDING_OUTPUT_DIMENSIONS`
 
 If the WhatsApp send credentials are absent, the service will still process inbound payloads and log the reply instead of attempting delivery.
 
@@ -90,6 +95,7 @@ supabase/migrations/002_onboarding_and_subscription_state.sql
 supabase/migrations/003_payment_activation.sql
 supabase/migrations/004_weekly_reports.sql
 supabase/migrations/005_voice_note_transcriptions.sql
+supabase/migrations/006_vector_memory.sql
 ```
 
 ## Webhook contract
@@ -106,6 +112,10 @@ When the inbound payload is an audio message, the server:
 - transcribes it with Gemini
 - stores the transcript in `voice_note_transcriptions`
 - feeds the transcript into the same onboarding, extraction, and reply loop as a typed message
+
+The semantic memory layer stores embedded user messages, Mauri replies, and emotional signals.
+
+When a new message arrives, Mauri can retrieve similar past memories from vector search and inject them into the hidden reply context before generating the response.
 
 There is also a secured internal payment confirmation route:
 
@@ -143,4 +153,4 @@ Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active us
 
 This is the backend foundation, not the final production system.
 
-Provider-specific Juice/Blink callback adapters, embedding generation, and vector similarity search are still the next layer to build.
+Provider-specific Juice/Blink callback adapters are still the next major integration layer to build.

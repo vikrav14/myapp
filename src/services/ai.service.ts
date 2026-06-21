@@ -111,6 +111,47 @@ Rules:
   });
 }
 
+export async function embedText(input: {
+  text: string;
+  taskType: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY";
+}): Promise<number[]> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${env.EMBEDDING_MODEL}:embedContent?key=${env.GOOGLE_AI_API_KEY}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        content: {
+          role: "user",
+          parts: [{ text: input.text }]
+        },
+        taskType: input.taskType,
+        outputDimensionality: env.EMBEDDING_OUTPUT_DIMENSIONS
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Embedding request failed (${response.status}): ${errorText}`);
+  }
+
+  const data = (await response.json()) as {
+    embedding?: {
+      values?: number[];
+    };
+  };
+
+  const values = data.embedding?.values;
+  if (!values?.length) {
+    throw new Error("Embedding model returned no values.");
+  }
+
+  return values;
+}
+
 export async function extractStructuredContext(message: string): Promise<MauriBrainDumpExtraction> {
   const extractionPrompt = `
 You are Mauri's parser engine.
@@ -202,6 +243,9 @@ ${JSON.stringify(context.recentHabits)}
 
 Recent emotional logs:
 ${JSON.stringify(context.recentEmotions)}
+
+Semantically relevant older memories:
+${JSON.stringify(context.semanticMemories)}
 
 Structured extraction from the latest message:
 ${JSON.stringify(extraction)}
