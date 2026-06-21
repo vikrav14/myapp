@@ -13,34 +13,34 @@ export interface MauriUser {
 export interface FinanceExtraction {
   amount: number;
   category: string;
-  context_tags?: string[];
+  context_tags?: string[] | undefined;
   raw_source_text: string;
 }
 
 export interface TodoExtraction {
   task_description: string;
-  due_date?: string;
-  priority?: "High" | "Medium" | "Low";
+  due_date?: string | undefined;
+  priority?: "High" | "Medium" | "Low" | undefined;
 }
 
 export interface HabitExtraction {
   activity_type: string;
-  duration_minutes?: number;
+  duration_minutes?: number | undefined;
   is_success: boolean;
-  context_note?: string;
+  context_note?: string | undefined;
 }
 
 export interface EmotionExtraction {
   anxiety_score: number;
-  core_emotional_driver?: string;
+  core_emotional_driver?: string | undefined;
   raw_unfiltered_vent: string;
 }
 
 export interface MauriBrainDumpExtraction {
-  finance?: FinanceExtraction;
-  todos?: TodoExtraction[];
-  habits?: HabitExtraction;
-  emotions?: EmotionExtraction;
+  finance?: FinanceExtraction | undefined;
+  todos?: TodoExtraction[] | undefined;
+  habits?: HabitExtraction | undefined;
+  emotions?: EmotionExtraction | undefined;
 }
 
 export interface UserContextSnapshot {
@@ -72,6 +72,6 @@ export interface UserContextSnapshot {
 export interface InboundMessage {
   from: string;
   text: string;
-  profileName?: string;
+  profileName?: string | undefined;
   rawPayload: unknown;
 }
