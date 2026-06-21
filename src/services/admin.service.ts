@@ -57,7 +57,9 @@ function mapWeeklyReport(record: Record<string, unknown>): WeeklyReportRecord {
     week_start: String(record.week_start),
     week_end: String(record.week_end),
     report_text: String(record.report_text),
-    summary_json: isRecord(record.summary_json) ? (record.summary_json as WeeklyReportRecord["summary_json"]) : ({} as WeeklyReportRecord["summary_json"]),
+    summary_json: isRecord(record.summary_json)
+      ? (record.summary_json as unknown as WeeklyReportRecord["summary_json"])
+      : ({} as WeeklyReportRecord["summary_json"]),
     delivery_status: String(record.delivery_status),
     sent_at: record.sent_at ? String(record.sent_at) : null,
     created_at: String(record.created_at)
