@@ -23,7 +23,9 @@ const envSchema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: optionalSecret,
   MCB_JUICE_PAYMENT_LINK: optionalSecret,
   BLINK_PAYMENT_LINK: optionalSecret,
-  SUBSCRIPTION_MONTHLY_PRICE_RS: z.coerce.number().int().positive().default(200)
+  SUBSCRIPTION_MONTHLY_PRICE_RS: z.coerce.number().int().positive().default(200),
+  DEFAULT_SUBSCRIPTION_DAYS: z.coerce.number().int().positive().default(30),
+  INTERNAL_ADMIN_API_KEY: optionalSecret
 });
 
 export const env = envSchema.parse(process.env);

@@ -1,5 +1,6 @@
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
 export type OnboardingState = "awaiting_archetype" | "active";
+export type PaymentProvider = "MCB_JUICE" | "BLINK" | "MANUAL";
 export type MauriArchetype =
   | "Life & Habit Tracking"
   | "Student Grind"
@@ -17,8 +18,24 @@ export interface MauriUser {
   trial_started_at: string | null;
   trial_ends_at: string | null;
   locked_at: string | null;
+  subscription_started_at: string | null;
+  subscription_ends_at: string | null;
+  last_payment_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PaymentEvent {
+  id: string;
+  user_id: string;
+  provider: PaymentProvider | string;
+  status: string;
+  amount: number;
+  currency: string;
+  transaction_reference: string;
+  paid_at: string;
+  raw_payload: unknown;
+  created_at: string;
 }
 
 export interface FinanceExtraction {

@@ -4,6 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import { registerSquadJobs } from "./jobs/squad-jobs.js";
 import { env } from "./lib/env.js";
 import { logger } from "./lib/logger.js";
+import { paymentsRouter } from "./routes/payments.js";
 import { whatsappRouter } from "./routes/whatsapp.js";
 
 const app = express();
@@ -18,6 +19,7 @@ app.get("/health", (_request, response) => {
   });
 });
 
+app.use("/internal/payments", paymentsRouter);
 app.use("/webhooks/whatsapp", whatsappRouter);
 
 app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {

@@ -87,8 +87,8 @@ function buildLockedReply(user: MauriUser): string {
     env.MCB_JUICE_PAYMENT_LINK || env.BLINK_PAYMENT_LINK
       ? `Unlock it here. Juice: ${env.MCB_JUICE_PAYMENT_LINK ?? "not set yet"}. Blink: ${
           env.BLINK_PAYMENT_LINK ?? "not set yet"
-        }.`
-      : "Payment links are not wired yet, so flip this user to Paid_Active in Supabase after payment for now.";
+        }. Once payment lands and gets confirmed, Mauri opens back up automatically.`
+      : "Payment links are not wired yet, so confirm the payment through the internal activation route after payment for now.";
 
   return `${name}, your Mauri vault is locked right now.
 
@@ -144,9 +144,30 @@ export async function handleOnboardingMessage(input: {
 
 export async function enforceAccessPolicy(user: MauriUser): Promise<OnboardingResult> {
   if (user.subscription_status === "Paid_Active") {
+    if (!user.subscription_ends_at) {
+      return {
+        handled: false,
+        user
+      };
+    }
+
+    const subscriptionExpired = new Date(user.subscription_ends_at).getTime() <= Date.now();
+    if (!subscriptionExpired) {
+      return {
+        handled: false,
+        user
+      };
+    }
+
+    const updatedPaidUser = await updateUserState(user.id, {
+      subscription_status: "Locked",
+      locked_at: new Date().toISOString()
+    });
+
     return {
-      handled: false,
-      user
+      handled: true,
+      user: updatedPaidUser,
+      reply: buildLockedReply(updatedPaidUser)
     };
   }
 

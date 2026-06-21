@@ -13,9 +13,32 @@ function mapUser(record: Record<string, unknown>): MauriUser {
     trial_started_at: record.trial_started_at ? String(record.trial_started_at) : null,
     trial_ends_at: record.trial_ends_at ? String(record.trial_ends_at) : null,
     locked_at: record.locked_at ? String(record.locked_at) : null,
+    subscription_started_at: record.subscription_started_at ? String(record.subscription_started_at) : null,
+    subscription_ends_at: record.subscription_ends_at ? String(record.subscription_ends_at) : null,
+    last_payment_at: record.last_payment_at ? String(record.last_payment_at) : null,
     created_at: String(record.created_at),
     updated_at: String(record.updated_at)
   };
+}
+
+export async function findUserByPhoneNumber(phoneNumber: string): Promise<MauriUser | null> {
+  const { data, error } = await supabase.from("users").select("*").eq("phone_number", phoneNumber).maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load user by phone number: ${error.message}`);
+  }
+
+  return data ? mapUser(data) : null;
+}
+
+export async function findUserById(userId: string): Promise<MauriUser | null> {
+  const { data, error } = await supabase.from("users").select("*").eq("id", userId).maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load user by id: ${error.message}`);
+  }
+
+  return data ? mapUser(data) : null;
 }
 
 export async function getOrCreateUser(
