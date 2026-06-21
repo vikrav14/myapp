@@ -35,6 +35,10 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
       inboundMessage.profileName = payload.profileName;
     }
 
+    if (typeof payload.messageId === "string") {
+      inboundMessage.messageId = payload.messageId;
+    }
+
     return inboundMessage;
   }
 
