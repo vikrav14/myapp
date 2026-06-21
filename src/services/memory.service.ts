@@ -15,6 +15,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+interface ConversationMemoryMatchRow {
+  content_text: string;
+  memory_type: string;
+  metadata: unknown;
+  similarity: number;
+  created_at: string;
+}
+
+interface InsightMemoryMatchRow {
+  raw_unfiltered_vent: string;
+  similarity: number;
+  logged_at: string;
+  anxiety_score: number | null;
+  core_emotional_driver: string | null;
+}
+
 export async function generateEmbeddingLiteral(input: {
   text: string;
   taskType: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY";
@@ -91,7 +107,10 @@ export async function searchRelevantMemories(userId: string, queryText: string):
       throw new Error(errors.map((error) => error?.message).join("; "));
     }
 
-    const conversationMemories: SemanticMemoryMatch[] = (conversationResult.data ?? [])
+    const conversationRows = (conversationResult.data ?? []) as ConversationMemoryMatchRow[];
+    const insightRows = (insightResult.data ?? []) as InsightMemoryMatchRow[];
+
+    const conversationMemories: SemanticMemoryMatch[] = conversationRows
       .map((row) => ({
         source: "conversation_memory" as const,
         text: String(row.content_text),
@@ -102,7 +121,7 @@ export async function searchRelevantMemories(userId: string, queryText: string):
       }))
       .filter((row) => row.similarity > 0.55);
 
-    const emotionMemories: SemanticMemoryMatch[] = (insightResult.data ?? [])
+    const emotionMemories: SemanticMemoryMatch[] = insightRows
       .map((row) => ({
         source: "emotion_memory" as const,
         text: String(row.raw_unfiltered_vent),
