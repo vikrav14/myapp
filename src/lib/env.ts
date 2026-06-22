@@ -98,7 +98,11 @@ const envSchema = z.object({
   MORNING_BRIEF_CURATE_CRON: z.string().default("0 5 * * *"),
   MORNING_BRIEF_DELIVER_CRON: z.string().default("0 7 * * *"),
   MORNING_BRIEF_RSS_FEEDS: optionalCsv,
-  GOOGLE_MAPS_API_KEY: optionalSecret
+  GOOGLE_MAPS_API_KEY: optionalSecret,
+  QUANTUM_PICK_ENABLED: envBoolean.default(true),
+  ANU_QUANTUM_API_KEY: optionalSecret,
+  ANU_QUANTUM_API_URL: z.string().url().default("https://api.quantumnumbers.anu.edu.au"),
+  QUANTUM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(2500)
 });
 
 export const env = envSchema.parse(process.env);

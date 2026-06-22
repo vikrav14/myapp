@@ -11,6 +11,7 @@ import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
+import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
@@ -198,6 +199,34 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: topicPreferenceResult.user.subscription_status,
         transcriptPreview,
         replyPreview: topicPreferenceResult.reply
+      });
+      return;
+    }
+
+    const quantumPickResult = await handleQuantumPickMessage({
+      user: topicPreferenceResult.user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (quantumPickResult.handled && quantumPickResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, quantumPickResult.reply, {
+        userId: topicPreferenceResult.user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "quantum_pick"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: topicPreferenceResult.user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: topicPreferenceResult.user.onboarding_state,
+        subscriptionStatus: topicPreferenceResult.user.subscription_status,
+        transcriptPreview,
+        replyPreview: quantumPickResult.reply
       });
       return;
     }

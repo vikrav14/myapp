@@ -400,6 +400,7 @@ Premium users can manage Mauri Squads directly in WhatsApp:
 - `my topics` (show your 7:00 morning brief tags)
 - `update topics Traffic Money Tech` (change morning brief tags)
 - `digest on` / `digest off` (pause or resume the 7:00 morning brief)
+- `quantum pick 1 5` or `quantum pick Tribeca, Docker, Nandos` (true-random decision helper)
 - `leave squad`
 
 Squad nudges and Sunday showdowns only include members with an active paid subscription.
@@ -444,6 +445,24 @@ Environment:
 - `MORNING_BRIEF_SCRAPE_CRON` / `MORNING_BRIEF_CURATE_CRON` / `MORNING_BRIEF_DELIVER_CRON`
 - `MORNING_BRIEF_RSS_FEEDS` (optional comma-separated override)
 - `GOOGLE_MAPS_API_KEY` (optional, for live traffic lines)
+
+## Quantum pick
+
+Active users can ask Mauri to break decision deadlock with true randomness from the [ANU Quantum Numbers API](https://quantumnumbers.anu.edu.au) when configured.
+
+Commands:
+
+- `quantum pick 1 5`
+- `quantum pick Tribeca, Docker, Nandos`
+- `lucky pick`, `pick for me`, `mauri pick`
+- Natural language: `pick a number between 1 and 5`
+
+Environment:
+
+- `QUANTUM_PICK_ENABLED` (default `true`)
+- `ANU_QUANTUM_API_KEY` (optional; without it Mauri uses cryptographic fallback randomness and says so honestly)
+- `ANU_QUANTUM_API_URL` (default `https://api.quantumnumbers.anu.edu.au`)
+- `QUANTUM_REQUEST_TIMEOUT_MS` (default `2500`)
 
 ## Current constraints
 
