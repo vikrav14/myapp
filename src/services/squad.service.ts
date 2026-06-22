@@ -100,6 +100,135 @@ export async function findSquadForUser(userId: string): Promise<SquadRecord | nu
   return data ? mapSquad(data as Record<string, unknown>) : null;
 }
 
+export async function getSquadById(squadId: string): Promise<SquadRecord | null> {
+  const { data, error } = await supabase.from("squads").select("*").eq("id", squadId).maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load squad: ${error.message}`);
+  }
+
+  return data ? mapSquad(data as Record<string, unknown>) : null;
+}
+
+export async function updateSquadName(
+  squadId: string,
+  squadName: string,
+  requestId?: string | undefined
+): Promise<SquadRecord> {
+  const { data, error } = await supabase
+    .from("squads")
+    .update({
+      squad_name: squadName.trim()
+    })
+    .eq("id", squadId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update squad name: ${error.message}`);
+  }
+
+  const squad = mapSquad(data as Record<string, unknown>);
+  await recordAuditEventBestEffort({
+    requestId,
+    eventType: "admin_squad_updated",
+    severity: "info",
+    actorType: "admin_api",
+    entityType: "squad",
+    entityId: squad.id,
+    message: "Admin updated squad name.",
+    metadata: {
+      squadCode: squad.squad_code,
+      squadName: squad.squad_name
+    }
+  });
+
+  return squad;
+}
+
+export async function removeSquadMemberById(input: {
+  squadId: string;
+  userId: string;
+  requestId?: string | undefined;
+}): Promise<SquadRecord | null> {
+  const squad = await getSquadById(input.squadId);
+  if (!squad) {
+    throw new Error("Squad not found.");
+  }
+
+  if (!squad.member_ids.includes(input.userId)) {
+    throw new Error("User is not a member of this squad.");
+  }
+
+  const remainingMembers = squad.member_ids.filter((memberId) => memberId !== input.userId);
+  if (remainingMembers.length === 0) {
+    const { error: deleteError } = await supabase.from("squads").delete().eq("id", squad.id);
+    if (deleteError) {
+      throw new Error(`Failed to delete empty squad: ${deleteError.message}`);
+    }
+
+    await recordAuditEventBestEffort({
+      requestId: input.requestId,
+      eventType: "admin_squad_member_removed",
+      severity: "info",
+      actorType: "admin_api",
+      userId: input.userId,
+      entityType: "squad",
+      entityId: squad.id,
+      message: "Admin removed the last squad member and dissolved the squad.",
+      metadata: {
+        squadCode: squad.squad_code
+      }
+    });
+
+    return null;
+  }
+
+  const updated = await saveSquadMembers(squad.id, remainingMembers);
+  await recordAuditEventBestEffort({
+    requestId: input.requestId,
+    eventType: "admin_squad_member_removed",
+    severity: "info",
+    actorType: "admin_api",
+    userId: input.userId,
+    entityType: "squad",
+    entityId: updated.id,
+    message: "Admin removed a squad member.",
+    metadata: {
+      squadCode: updated.squad_code
+    }
+  });
+
+  return updated;
+}
+
+export async function dissolveSquadById(squadId: string, requestId?: string | undefined): Promise<void> {
+  const squad = await getSquadById(squadId);
+  if (!squad) {
+    throw new Error("Squad not found.");
+  }
+
+  const { error } = await supabase.from("squads").delete().eq("id", squadId);
+  if (error) {
+    throw new Error(`Failed to dissolve squad: ${error.message}`);
+  }
+
+  await recordAuditEventBestEffort({
+    requestId,
+    eventType: "admin_squad_dissolved",
+    severity: "info",
+    actorType: "admin_api",
+    entityType: "squad",
+    entityId: squad.id,
+    message: "Admin dissolved a Mauri squad.",
+    metadata: {
+      squadCode: squad.squad_code,
+      squadName: squad.squad_name,
+      memberCount: squad.member_ids.length
+    }
+  });
+}
+
 async function saveSquadMembers(squadId: string, memberIds: string[]): Promise<SquadRecord> {
   const { data, error } = await supabase
     .from("squads")

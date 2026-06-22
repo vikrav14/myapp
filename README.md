@@ -239,6 +239,11 @@ There is also a secured internal admin route surface:
 - `POST /internal/admin/outbound-messages/:messageId/requeue`
 - `POST /internal/admin/outbound-messages/:messageId/discard`
 - `GET /internal/admin/reports`
+- `GET /internal/admin/squads`
+- `GET /internal/admin/squads/:squadId`
+- `PATCH /internal/admin/squads/:squadId`
+- `DELETE /internal/admin/squads/:squadId`
+- `DELETE /internal/admin/squads/:squadId/members/:userId`
 
 These endpoints let you:
 
@@ -390,6 +395,16 @@ Premium users can manage Mauri Squads directly in WhatsApp:
 - `leave squad`
 
 Squad nudges and Sunday showdowns only include members with an active paid subscription.
+
+The admin panel also exposes squad operations:
+
+- `GET /internal/admin/squads`
+- `GET /internal/admin/squads/:squadId`
+- `PATCH /internal/admin/squads/:squadId`
+- `DELETE /internal/admin/squads/:squadId`
+- `DELETE /internal/admin/squads/:squadId/members/:userId`
+
+From the panel you can list squads, inspect members, rename squads, remove members, dissolve squads, and jump from a user profile to their squad.
 
 Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active users and stores the report payload in `weekly_reports`.
 

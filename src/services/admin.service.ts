@@ -10,9 +10,28 @@ import type {
   VoiceNoteTranscriptionRecord
 } from "../types.js";
 import { mapUser, updateUserState } from "./user.service.js";
+import {
+  dissolveSquadById,
+  findSquadForUser,
+  getSquadById,
+  listPaidMemberIds,
+  removeSquadMemberById,
+  updateSquadName,
+  type SquadRecord
+} from "./squad.service.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function mapSquad(record: Record<string, unknown>): SquadRecord {
+  return {
+    id: String(record.id),
+    squad_code: String(record.squad_code),
+    squad_name: String(record.squad_name),
+    member_ids: Array.isArray(record.member_ids) ? record.member_ids.map(String) : [],
+    created_at: String(record.created_at)
+  };
 }
 
 function mapPaymentEvent(record: Record<string, unknown>): PaymentEvent {
@@ -270,6 +289,7 @@ export async function listAdminUsers(input: {
 
 export async function getAdminUserProfile(userId: string): Promise<{
   user: MauriUser | null;
+  squad: SquadRecord | null;
   stats: {
     pendingTodos: number;
     totalPaymentEvents: number;
@@ -291,6 +311,7 @@ export async function getAdminUserProfile(userId: string): Promise<{
 }> {
   const [
     userResult,
+    squad,
     pendingTodoCount,
     paymentEventCount,
     reportCount,
@@ -303,6 +324,7 @@ export async function getAdminUserProfile(userId: string): Promise<{
     memoriesResult
   ] = await Promise.all([
     supabase.from("users").select("*").eq("id", userId).maybeSingle(),
+    findSquadForUser(userId),
     countRows(supabase.from("todo_logs").select("*", { count: "exact", head: true }).eq("user_id", userId).eq("is_completed", false)),
     countRows(supabase.from("payment_events").select("*", { count: "exact", head: true }).eq("user_id", userId)),
     countRows(supabase.from("weekly_reports").select("*", { count: "exact", head: true }).eq("user_id", userId)),
@@ -332,6 +354,7 @@ export async function getAdminUserProfile(userId: string): Promise<{
 
   return {
     user: userResult.data ? mapUser(userResult.data as Record<string, unknown>) : null,
+    squad,
     stats: {
       pendingTodos: pendingTodoCount,
       totalPaymentEvents: paymentEventCount,
@@ -608,4 +631,148 @@ export async function adminUpdateUser(input: {
   }
 
   return updateUserState(input.userId, patch);
+}
+
+export async function listAdminSquads(input: {
+  limit: number;
+  offset: number;
+  search?: string | undefined;
+  memberUserId?: string | undefined;
+}): Promise<{
+  squads: Array<SquadRecord & { memberCount: number; paidMemberCount: number }>;
+  total: number;
+}> {
+  let query = supabase.from("squads").select("*", { count: "exact" }).order("created_at", { ascending: false });
+
+  if (input.memberUserId) {
+    query = query.contains("member_ids", [input.memberUserId]);
+  }
+
+  if (input.search?.trim()) {
+    const search = input.search.trim();
+    query = query.or(`squad_name.ilike.%${search}%,squad_code.ilike.%${search}%`);
+  }
+
+  const { data, error, count } = await query.range(input.offset, input.offset + input.limit - 1);
+  if (error) {
+    throw new Error(`Failed to list squads: ${error.message}`);
+  }
+
+  const squads = await Promise.all(
+    (data ?? []).map(async (row) => {
+      const squad = mapSquad(row as Record<string, unknown>);
+      const paidMemberIds = await listPaidMemberIds(squad.member_ids);
+      return {
+        ...squad,
+        memberCount: squad.member_ids.length,
+        paidMemberCount: paidMemberIds.length
+      };
+    })
+  );
+
+  return {
+    squads,
+    total: count ?? 0
+  };
+}
+
+export async function getAdminSquadProfile(squadId: string): Promise<{
+  squad: SquadRecord | null;
+  stats: {
+    memberCount: number;
+    paidMemberCount: number;
+    nudgeEligible: boolean;
+  };
+  members: Array<{
+    user: MauriUser;
+    isPaidActive: boolean;
+  }>;
+  recentAuditEvents: AuditEventRecord[];
+}> {
+  const [squad, auditResult] = await Promise.all([
+    getSquadById(squadId),
+    supabase
+      .from("audit_events")
+      .select("*")
+      .eq("entity_type", "squad")
+      .eq("entity_id", squadId)
+      .order("created_at", { ascending: false })
+      .limit(15)
+  ]);
+
+  if (auditResult.error) {
+    throw new Error(`Failed to load squad audit events: ${auditResult.error.message}`);
+  }
+
+  if (!squad) {
+    return {
+      squad: null,
+      stats: {
+        memberCount: 0,
+        paidMemberCount: 0,
+        nudgeEligible: false
+      },
+      members: [],
+      recentAuditEvents: []
+    };
+  }
+
+  const paidMemberIds = await listPaidMemberIds(squad.member_ids);
+  const paidMemberIdSet = new Set(paidMemberIds);
+  const members: Array<{ user: MauriUser; isPaidActive: boolean }> = [];
+
+  if (squad.member_ids.length > 0) {
+    const { data: usersData, error: usersError } = await supabase.from("users").select("*").in("id", squad.member_ids);
+    if (usersError) {
+      throw new Error(`Failed to load squad members: ${usersError.message}`);
+    }
+
+    const usersById = new Map(
+      (usersData ?? []).map((row) => [String(row.id), mapUser(row as Record<string, unknown>)])
+    );
+
+    for (const memberId of squad.member_ids) {
+      const user = usersById.get(memberId);
+      if (user) {
+        members.push({
+          user,
+          isPaidActive: paidMemberIdSet.has(memberId)
+        });
+      }
+    }
+  }
+
+  return {
+    squad,
+    stats: {
+      memberCount: squad.member_ids.length,
+      paidMemberCount: paidMemberIds.length,
+      nudgeEligible: paidMemberIds.length >= 2
+    },
+    members,
+    recentAuditEvents: (auditResult.data ?? []).map((row) => mapAuditEvent(row as Record<string, unknown>))
+  };
+}
+
+export async function adminUpdateSquad(input: {
+  squadId: string;
+  squadName: string;
+  requestId?: string | undefined;
+}): Promise<SquadRecord> {
+  return updateSquadName(input.squadId, input.squadName, input.requestId);
+}
+
+export async function adminRemoveSquadMember(input: {
+  squadId: string;
+  userId: string;
+  requestId?: string | undefined;
+}): Promise<SquadRecord | null> {
+  return removeSquadMemberById(input);
+}
+
+export async function adminDissolveSquad(input: {
+  squadId: string;
+  requestId?: string | undefined;
+}): Promise<void> {
+  return dissolveSquadById(input.squadId, input.requestId);
 }

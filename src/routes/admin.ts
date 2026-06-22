@@ -7,14 +7,19 @@ import { getSecurityPostureSummary } from "../lib/network-security.js";
 import { evaluateAndPersistOperationalAlerts, listOperationalAlerts } from "../services/alerting.service.js";
 import {
   adminUpdateUser,
+  adminDissolveSquad,
+  adminRemoveSquadMember,
+  adminUpdateSquad,
   getAdminDashboardData,
   getAdminOverview,
+  getAdminSquadProfile,
   getAdminUserProfile,
   listAdminAuditEvents,
   listAdminDeadLetters,
   listAdminOutboundMessages,
   listAdminPaymentSessions,
   listAdminReports,
+  listAdminSquads,
   listAdminUsers
 } from "../services/admin.service.js";
 import { getRequestId } from "../lib/request-tracing.js";
@@ -66,6 +71,24 @@ const listDeadLettersQuerySchema = paginationSchema.extend({
   userId: z.string().uuid().optional(),
   status: z.string().trim().min(1).optional(),
   category: z.string().trim().min(1).optional()
+});
+
+const listSquadsQuerySchema = paginationSchema.extend({
+  search: z.string().trim().min(1).optional(),
+  memberUserId: z.string().uuid().optional()
+});
+
+const squadParamsSchema = z.object({
+  squadId: z.string().uuid()
+});
+
+const squadMemberParamsSchema = z.object({
+  squadId: z.string().uuid(),
+  userId: z.string().uuid()
+});
+
+const updateSquadBodySchema = z.object({
+  squad_name: z.string().trim().min(1)
 });
 
 const userParamsSchema = z.object({
@@ -340,6 +363,28 @@ function renderAdminPanelHtml(): string {
           <div class="panel">
             <div class="panel-header">
               <div>
+                <h2>Squads</h2>
+                <div class="panel-note">Inspect accountability squads, members, and lifecycle actions.</div>
+              </div>
+              <button id="reloadSquadsButton" class="secondary small">Reload squads</button>
+            </div>
+            <div class="filters">
+              <input id="squadSearch" placeholder="Search name or code" />
+              <input id="squadMemberUserIdFilter" placeholder="Filter by member UUID" />
+              <input id="squadLimit" type="number" min="1" max="100" value="20" placeholder="Limit" />
+              <button id="applySquadFiltersButton" class="secondary">Apply filters</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Name</th><th>Code</th><th>Members</th><th>Paid</th><th>Created</th><th></th></tr></thead>
+                <tbody id="squadsTableBody"><tr><td colspan="6">No data loaded yet.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
                 <h2>Outbound queue</h2>
                 <div class="panel-note">Retry, requeue, or discard failed sends.</div>
               </div>
@@ -393,6 +438,13 @@ function renderAdminPanelHtml(): string {
             <div id="userDetailEmpty" class="status">Select a user from the left table.</div>
             <div id="userDetailContent" class="hidden">
               <div id="userDetailStats" class="stats-grid"></div>
+              <div id="userSquadSummary" class="ops-box hidden" style="margin-top:12px;">
+                <h3 style="margin:0 0 8px;">Squad membership</h3>
+                <div id="userSquadSummaryText" class="panel-note"></div>
+                <div class="actions" style="margin-top:10px;">
+                  <button id="viewUserSquadButton" class="secondary small">View squad</button>
+                </div>
+              </div>
               <div class="two-col">
                 <div><label class="label">First name</label><input id="editFirstName" /></div>
                 <div><label class="label">Archetype</label><input id="editArchetype" /></div>
@@ -455,6 +507,38 @@ function renderAdminPanelHtml(): string {
           <div class="panel">
             <div class="panel-header">
               <div>
+                <h2>Squad detail</h2>
+                <div class="panel-note">Click a squad row to inspect members and run admin actions.</div>
+              </div>
+            </div>
+            <div id="squadDetailEmpty" class="status">Select a squad from the left table.</div>
+            <div id="squadDetailContent" class="hidden">
+              <div id="squadDetailStats" class="stats-grid"></div>
+              <div class="two-col" style="margin-top:12px;">
+                <div><label class="label">Squad name</label><input id="editSquadName" /></div>
+                <div><label class="label">Invite code</label><input id="editSquadCode" readonly /></div>
+              </div>
+              <div class="actions" style="margin-top:12px;">
+                <button id="saveSquadButton" class="success">Save squad name</button>
+                <button id="reloadSquadProfileButton" class="secondary">Reload squad</button>
+                <button id="dissolveSquadButton" class="warning">Dissolve squad</button>
+                <button id="clearSelectedSquadButton" class="secondary">Clear selection</button>
+              </div>
+              <div id="squadNudgeNote" class="panel-note" style="margin-top:10px;"></div>
+              <h3 style="margin:16px 0 8px;">Members</h3>
+              <div class="table-wrap" style="max-height:220px;">
+                <table><thead><tr><th>Name</th><th>Phone</th><th>Subscription</th><th>Paid nudge</th><th></th></tr></thead><tbody id="squadMembersBody"><tr><td colspan="5">No squad selected.</td></tr></tbody></table>
+              </div>
+              <h3 style="margin:16px 0 8px;">Recent squad audit</h3>
+              <div class="table-wrap" style="max-height:180px;">
+                <table><thead><tr><th>Event</th><th>Severity</th><th>User</th><th>Created</th></tr></thead><tbody id="squadAuditBody"><tr><td colspan="4">No squad selected.</td></tr></tbody></table>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
                 <h2>Security posture</h2>
                 <div class="panel-note">Live hardening summary for deployment posture.</div>
               </div>
@@ -509,7 +593,8 @@ function renderAdminPanelHtml(): string {
       <script>
         const state = {
           adminKey: localStorage.getItem('mauri-admin-key') || '',
-          selectedUserId: null
+          selectedUserId: null,
+          selectedSquadId: null
         };
 
         const el = {
@@ -518,6 +603,7 @@ function renderAdminPanelHtml(): string {
           overviewCards: document.getElementById('overviewCards'),
           metricsCards: document.getElementById('metricsCards'),
           usersTableBody: document.getElementById('usersTableBody'),
+          squadsTableBody: document.getElementById('squadsTableBody'),
           outboundTableBody: document.getElementById('outboundTableBody'),
           deadLettersTableBody: document.getElementById('deadLettersTableBody'),
           sessionsTableBody: document.getElementById('sessionsTableBody'),
@@ -528,6 +614,8 @@ function renderAdminPanelHtml(): string {
           userDetailEmpty: document.getElementById('userDetailEmpty'),
           userDetailContent: document.getElementById('userDetailContent'),
           userDetailStats: document.getElementById('userDetailStats'),
+          userSquadSummary: document.getElementById('userSquadSummary'),
+          userSquadSummaryText: document.getElementById('userSquadSummaryText'),
           userProfileMeta: document.getElementById('userProfileMeta'),
           editFirstName: document.getElementById('editFirstName'),
           editArchetype: document.getElementById('editArchetype'),
@@ -539,6 +627,17 @@ function renderAdminPanelHtml(): string {
           userSubscriptionFilter: document.getElementById('userSubscriptionFilter'),
           userOnboardingFilter: document.getElementById('userOnboardingFilter'),
           userLimit: document.getElementById('userLimit'),
+          squadSearch: document.getElementById('squadSearch'),
+          squadMemberUserIdFilter: document.getElementById('squadMemberUserIdFilter'),
+          squadLimit: document.getElementById('squadLimit'),
+          squadDetailEmpty: document.getElementById('squadDetailEmpty'),
+          squadDetailContent: document.getElementById('squadDetailContent'),
+          squadDetailStats: document.getElementById('squadDetailStats'),
+          editSquadName: document.getElementById('editSquadName'),
+          editSquadCode: document.getElementById('editSquadCode'),
+          squadNudgeNote: document.getElementById('squadNudgeNote'),
+          squadMembersBody: document.getElementById('squadMembersBody'),
+          squadAuditBody: document.getElementById('squadAuditBody'),
           outboundUserIdFilter: document.getElementById('outboundUserIdFilter'),
           outboundStatusFilter: document.getElementById('outboundStatusFilter'),
           outboundLimit: document.getElementById('outboundLimit'),
@@ -672,6 +771,129 @@ function renderAdminPanelHtml(): string {
           });
         }
 
+        async function loadSquads() {
+          const params = new URLSearchParams();
+          if (el.squadSearch.value.trim()) params.set('search', el.squadSearch.value.trim());
+          if (el.squadMemberUserIdFilter.value.trim()) params.set('memberUserId', el.squadMemberUserIdFilter.value.trim());
+          if (el.squadLimit.value.trim()) params.set('limit', el.squadLimit.value.trim());
+          const data = await api('/internal/admin/squads?' + params.toString());
+          renderTable(el.squadsTableBody, data.squads, 6, (squad) =>
+            '<tr>' +
+              '<td>' + escapeHtml(squad.squad_name) + '</td>' +
+              '<td class="mono">' + escapeHtml(squad.squad_code) + '</td>' +
+              '<td>' + escapeHtml(squad.memberCount) + '</td>' +
+              '<td>' + escapeHtml(squad.paidMemberCount) + '</td>' +
+              '<td>' + escapeHtml(squad.created_at) + '</td>' +
+              '<td><button class="small secondary" data-squad-id="' + escapeHtml(squad.id) + '">Inspect</button></td>' +
+            '</tr>'
+          );
+          el.squadsTableBody.querySelectorAll('button[data-squad-id]').forEach((button) => {
+            button.addEventListener('click', () => {
+              state.selectedSquadId = button.getAttribute('data-squad-id');
+              loadSquadProfile();
+            });
+          });
+        }
+
+        async function loadSquadProfile() {
+          if (!state.selectedSquadId) return;
+          const data = await api('/internal/admin/squads/' + state.selectedSquadId);
+          const profile = data.profile;
+          const squad = profile.squad;
+
+          if (!squad) {
+            setStatus('Squad not found.', 'error');
+            state.selectedSquadId = null;
+            el.squadDetailEmpty.classList.remove('hidden');
+            el.squadDetailContent.classList.add('hidden');
+            return;
+          }
+
+          el.squadDetailEmpty.classList.add('hidden');
+          el.squadDetailContent.classList.remove('hidden');
+          el.editSquadName.value = squad.squad_name || '';
+          el.editSquadCode.value = squad.squad_code || '';
+
+          const stats = [
+            ['Squad ID', squad.id],
+            ['Members', profile.stats.memberCount],
+            ['Paid members', profile.stats.paidMemberCount],
+            ['Nudge eligible', profile.stats.nudgeEligible ? 'yes' : 'no'],
+            ['Created', squad.created_at]
+          ];
+          el.squadDetailStats.innerHTML = stats.map(([label, value]) =>
+            '<div class="kv"><div class="label">' + escapeHtml(label) + '</div><div>' + escapeHtml(value) + '</div></div>'
+          ).join('');
+
+          el.squadNudgeNote.textContent = profile.stats.nudgeEligible
+            ? 'This squad has enough paid members for cross-private nudges and Sunday showdowns.'
+            : 'Nudges need at least 2 paid active members. This squad currently does not qualify.';
+
+          renderTable(el.squadMembersBody, profile.members, 5, (item) =>
+            '<tr>' +
+              '<td>' + escapeHtml(item.user.first_name || '-') + '</td>' +
+              '<td class="mono">' + escapeHtml(item.user.phone_number) + '</td>' +
+              '<td><span class="pill">' + escapeHtml(item.user.subscription_status) + '</span></td>' +
+              '<td>' + escapeHtml(item.isPaidActive ? 'yes' : 'no') + '</td>' +
+              '<td class="actions">' +
+                '<button class="small warning" data-action="remove-member" data-user-id="' + escapeHtml(item.user.id) + '">Remove</button>' +
+                '<button class="small secondary" data-action="inspect-user" data-user-id="' + escapeHtml(item.user.id) + '">Inspect user</button>' +
+              '</td>' +
+            '</tr>'
+          );
+
+          el.squadMembersBody.querySelectorAll('button[data-action="remove-member"]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              const userId = button.getAttribute('data-user-id');
+              if (!userId || !window.confirm('Remove this member from the squad?')) return;
+              try {
+                await api('/internal/admin/squads/' + state.selectedSquadId + '/members/' + userId, { method: 'DELETE' });
+                setStatus('Squad member removed.', 'success');
+                await Promise.all([loadSquads(), loadSquadProfile(), loadAuditEvents()]);
+              } catch (error) {
+                setStatus(error.message || 'Failed to remove squad member.', 'error');
+              }
+            });
+          });
+
+          el.squadMembersBody.querySelectorAll('button[data-action="inspect-user"]').forEach((button) => {
+            button.addEventListener('click', () => {
+              state.selectedUserId = button.getAttribute('data-user-id');
+              loadUserProfile();
+            });
+          });
+
+          renderTable(el.squadAuditBody, profile.recentAuditEvents, 4, (item) =>
+            '<tr><td>' + escapeHtml(item.event_type) + '</td><td><span class="pill">' + escapeHtml(item.severity) + '</span></td><td class="mono">' + escapeHtml(item.user_id || '-') + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'
+          );
+        }
+
+        async function saveSquadChanges() {
+          if (!state.selectedSquadId) return;
+          const squadName = el.editSquadName.value.trim();
+          if (!squadName) {
+            setStatus('Squad name is required.', 'error');
+            return;
+          }
+          await api('/internal/admin/squads/' + state.selectedSquadId, {
+            method: 'PATCH',
+            body: JSON.stringify({ squad_name: squadName })
+          });
+          setStatus('Squad name saved.', 'success');
+          await Promise.all([loadSquads(), loadSquadProfile(), loadAuditEvents()]);
+        }
+
+        async function dissolveSelectedSquad() {
+          if (!state.selectedSquadId) return;
+          if (!window.confirm('Dissolve this squad for all members?')) return;
+          await api('/internal/admin/squads/' + state.selectedSquadId, { method: 'DELETE' });
+          state.selectedSquadId = null;
+          el.squadDetailEmpty.classList.remove('hidden');
+          el.squadDetailContent.classList.add('hidden');
+          setStatus('Squad dissolved.', 'success');
+          await Promise.all([loadSquads(), loadAuditEvents(), state.selectedUserId ? loadUserProfile() : Promise.resolve()]);
+        }
+
         async function loadUserProfile() {
           if (!state.selectedUserId) return;
           const data = await api('/internal/admin/users/' + state.selectedUserId);
@@ -700,6 +922,15 @@ function renderAdminPanelHtml(): string {
           el.userDetailStats.innerHTML = stats.map(([label, value]) =>
             '<div class="kv"><div class="label">' + escapeHtml(label) + '</div><div>' + escapeHtml(value) + '</div></div>'
           ).join('');
+
+          if (profile.squad) {
+            el.userSquadSummary.classList.remove('hidden');
+            el.userSquadSummaryText.textContent =
+              profile.squad.squad_name + ' (' + profile.squad.squad_code + ') · ' + profile.squad.member_ids.length + ' members';
+          } else {
+            el.userSquadSummary.classList.add('hidden');
+            el.userSquadSummaryText.textContent = '';
+          }
 
           el.userProfileMeta.innerHTML =
             '<strong>Recent:</strong> payments ' + escapeHtml(profile.recentPaymentEvents.length) +
@@ -939,6 +1170,7 @@ function renderAdminPanelHtml(): string {
               loadOverview(),
               loadMetrics(),
               loadUsers(),
+              loadSquads(),
               loadOutboundMessages(),
               loadDeadLetters(),
               loadSecurityPosture(),
@@ -946,7 +1178,8 @@ function renderAdminPanelHtml(): string {
               loadSessions(),
               loadReports(),
               loadAuditEvents(),
-              state.selectedUserId ? loadUserProfile() : Promise.resolve()
+              state.selectedUserId ? loadUserProfile() : Promise.resolve(),
+              state.selectedSquadId ? loadSquadProfile() : Promise.resolve()
             ]);
             setStatus('Panel refreshed successfully.', 'success');
           } catch (error) {
@@ -962,6 +1195,8 @@ function renderAdminPanelHtml(): string {
         document.getElementById('refreshAllButton').addEventListener('click', refreshAll);
         document.getElementById('reloadUsersButton').addEventListener('click', loadUsers);
         document.getElementById('applyUserFiltersButton').addEventListener('click', loadUsers);
+        document.getElementById('reloadSquadsButton').addEventListener('click', loadSquads);
+        document.getElementById('applySquadFiltersButton').addEventListener('click', loadSquads);
         document.getElementById('reloadOutboundButton').addEventListener('click', loadOutboundMessages);
         document.getElementById('reloadDeadLettersButton').addEventListener('click', loadDeadLetters);
         document.getElementById('reloadSecurityButton').addEventListener('click', loadSecurityPosture);
@@ -973,6 +1208,17 @@ function renderAdminPanelHtml(): string {
           setStatus('Operational alerts evaluated.', 'success');
         });
         document.getElementById('reloadUserProfileButton').addEventListener('click', loadUserProfile);
+        document.getElementById('viewUserSquadButton').addEventListener('click', async () => {
+          if (!state.selectedUserId) return;
+          const data = await api('/internal/admin/users/' + state.selectedUserId);
+          if (!data.profile.squad) {
+            setStatus('This user is not in a squad.', 'error');
+            return;
+          }
+          state.selectedSquadId = data.profile.squad.id;
+          await loadSquadProfile();
+          setStatus('Loaded squad for selected user.', 'success');
+        });
         document.getElementById('saveUserButton').addEventListener('click', saveUserChanges);
         document.getElementById('focusOutboundForUserButton').addEventListener('click', async () => {
           if (!state.selectedUserId) return;
@@ -990,8 +1236,30 @@ function renderAdminPanelHtml(): string {
           state.selectedUserId = null;
           el.userDetailEmpty.classList.remove('hidden');
           el.userDetailContent.classList.add('hidden');
+          el.userSquadSummary.classList.add('hidden');
           renderUserOpsResult(['Run an ops action for the selected user.']);
           setStatus('Selected user cleared.', 'success');
+        });
+        document.getElementById('saveSquadButton').addEventListener('click', async () => {
+          try {
+            await saveSquadChanges();
+          } catch (error) {
+            setStatus(error.message || 'Failed to save squad.', 'error');
+          }
+        });
+        document.getElementById('reloadSquadProfileButton').addEventListener('click', loadSquadProfile);
+        document.getElementById('dissolveSquadButton').addEventListener('click', async () => {
+          try {
+            await dissolveSelectedSquad();
+          } catch (error) {
+            setStatus(error.message || 'Failed to dissolve squad.', 'error');
+          }
+        });
+        document.getElementById('clearSelectedSquadButton').addEventListener('click', () => {
+          state.selectedSquadId = null;
+          el.squadDetailEmpty.classList.remove('hidden');
+          el.squadDetailContent.classList.add('hidden');
+          setStatus('Selected squad cleared.', 'success');
         });
         document.getElementById('generatePaymentLinkButton').addEventListener('click', async () => {
           try {
@@ -1169,6 +1437,101 @@ adminRouter.patch("/users/:userId", async (request, response, next) => {
     response.status(200).json({
       ok: true,
       user
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/squads", async (request, response, next) => {
+  try {
+    const query = listSquadsQuerySchema.parse(request.query);
+    const result = await listAdminSquads(query);
+
+    response.status(200).json({
+      ok: true,
+      total: result.total,
+      limit: query.limit,
+      offset: query.offset,
+      squads: result.squads
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/squads/:squadId", async (request, response, next) => {
+  try {
+    const params = squadParamsSchema.parse(request.params);
+    const profile = await getAdminSquadProfile(params.squadId);
+
+    if (!profile.squad) {
+      response.status(404).json({
+        ok: false,
+        error: "Squad not found."
+      });
+      return;
+    }
+
+    response.status(200).json({
+      ok: true,
+      profile
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.patch("/squads/:squadId", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const params = squadParamsSchema.parse(request.params);
+    const body = updateSquadBodySchema.parse(request.body);
+    const squad = await adminUpdateSquad({
+      squadId: params.squadId,
+      squadName: body.squad_name,
+      requestId
+    });
+
+    response.status(200).json({
+      ok: true,
+      squad
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.delete("/squads/:squadId", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const params = squadParamsSchema.parse(request.params);
+    await adminDissolveSquad({
+      squadId: params.squadId,
+      requestId
+    });
+
+    response.status(200).json({
+      ok: true
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.delete("/squads/:squadId/members/:userId", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const params = squadMemberParamsSchema.parse(request.params);
+    const squad = await adminRemoveSquadMember({
+      squadId: params.squadId,
+      userId: params.userId,
+      requestId
+    });
+
+    response.status(200).json({
+      ok: true,
+      squad
     });
   } catch (error) {
     next(error);
