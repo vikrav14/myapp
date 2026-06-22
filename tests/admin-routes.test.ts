@@ -120,6 +120,26 @@ describe("Admin routes", () => {
     expect(mockListAdminDeadLetters).toHaveBeenCalled();
   });
 
+  it("returns deploy preflight guidance", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .get("/internal/admin/deploy-preflight")
+      .set("x-mauri-admin-key", "test-admin-key");
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(response.body.deployPreflight).toEqual(
+      expect.objectContaining({
+        ready: expect.any(Boolean),
+        webhookUrls: expect.objectContaining({
+          whatsapp: expect.anything(),
+          juiceCallback: expect.anything(),
+          blinkCallback: expect.anything()
+        })
+      })
+    );
+  });
+
   it("returns the live security posture summary", async () => {
     const app = createApp();
     const response = await request(app)

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { hasAdminAccess } from "../lib/internal-auth.js";
+import { getDeployPreflightReport } from "../lib/deploy-preflight.js";
 import { escapeHtml } from "../lib/html-escape.js";
 import { getSecurityPostureSummary } from "../lib/network-security.js";
 import { evaluateAndPersistOperationalAlerts, listOperationalAlerts } from "../services/alerting.service.js";
@@ -551,6 +552,18 @@ function renderAdminPanelHtml(): string {
                 <div class="panel-note">Live hardening summary for deployment posture.</div>
               </div>
               <button id="reloadSecurityButton" class="secondary small">Reload security</button>
+              <button id="reloadDeployPreflightButton" class="secondary small">Reload deploy checks</button>
+            </div>
+            <div id="deployPreflightSummary" class="panel-note" style="margin-bottom:12px;">Deploy readiness not loaded yet.</div>
+            <div class="table-wrap" style="max-height:220px;margin-bottom:16px;">
+              <table><thead><tr><th>Check</th><th>Status</th><th>Details</th></tr></thead><tbody id="deployPreflightTableBody"><tr><td colspan="3">No deploy checks loaded yet.</td></tr></tbody></table>
+            </div>
+            <div id="deployWebhookUrls" class="ops-box" style="margin-bottom:16px;">
+              <h3 style="margin:0 0 8px;">Provider webhook URLs</h3>
+              <div class="panel-note" style="margin-bottom:10px;">Register these exact URLs in Meta, Peach, and Blink dashboards.</div>
+              <div class="kv"><div class="label">WhatsApp</div><div id="deployWebhookWhatsapp" class="mono">-</div></div>
+              <div class="kv" style="margin-top:8px;"><div class="label">MCB Juice</div><div id="deployWebhookJuice" class="mono">-</div></div>
+              <div class="kv" style="margin-top:8px;"><div class="label">Blink</div><div id="deployWebhookBlink" class="mono">-</div></div>
             </div>
             <div id="securityPostureContent" class="stats-grid"></div>
           </div>
@@ -619,6 +632,11 @@ function renderAdminPanelHtml(): string {
           auditTableBody: document.getElementById('auditTableBody'),
           alertsTableBody: document.getElementById('alertsTableBody'),
           securityPostureContent: document.getElementById('securityPostureContent'),
+          deployPreflightSummary: document.getElementById('deployPreflightSummary'),
+          deployPreflightTableBody: document.getElementById('deployPreflightTableBody'),
+          deployWebhookWhatsapp: document.getElementById('deployWebhookWhatsapp'),
+          deployWebhookJuice: document.getElementById('deployWebhookJuice'),
+          deployWebhookBlink: document.getElementById('deployWebhookBlink'),
           userDetailEmpty: document.getElementById('userDetailEmpty'),
           userDetailContent: document.getElementById('userDetailContent'),
           userDetailStats: document.getElementById('userDetailStats'),
@@ -1114,23 +1132,41 @@ function renderAdminPanelHtml(): string {
           });
         }
 
+        async function loadDeployPreflight() {
+          const data = await api('/internal/admin/deploy-preflight');
+          const report = data.deployPreflight;
+          el.deployPreflightSummary.textContent = report.ready
+            ? 'Deploy preflight passed. Core production settings look ready.'
+            : 'Deploy preflight found blocking issues. Fix error checks before opening production traffic.';
+          el.deployWebhookWhatsapp.textContent = report.webhookUrls.whatsapp || 'Set PAYMENT_CALLBACK_BASE_URL';
+          el.deployWebhookJuice.textContent = report.webhookUrls.juiceCallback || 'Set PAYMENT_CALLBACK_BASE_URL';
+          el.deployWebhookBlink.textContent = report.webhookUrls.blinkCallback || 'Set PAYMENT_CALLBACK_BASE_URL';
+          renderTable(el.deployPreflightTableBody, report.checks, 3, (item) =>
+            '<tr><td>' + escapeHtml(item.label) + '</td><td><span class="pill">' + escapeHtml(item.status) + '</span></td><td>' + escapeHtml(item.message) + '</td></tr>'
+          );
+        }
+
         async function loadSecurityPosture() {
-          const data = await api('/internal/admin/security-posture');
-          const posture = data.securityPosture;
-          const rows = [
-            ['Trust proxy configured', posture.trustProxyConfigured],
-            ['Security headers enabled', posture.securityHeadersEnabled],
-            ['Admin allowlist configured', posture.adminAllowlistConfigured],
-            ['Payment webhook allowlist configured', posture.paymentWebhookAllowlistConfigured],
-            ['WhatsApp allowlist configured', posture.whatsappWebhookAllowlistConfigured],
-            ['Metrics allowlist configured', posture.metricsAllowlistConfigured],
-            ['Peach signature enabled', posture.peachSignatureEnabled],
-            ['Outbound retry enabled', posture.outboundRetryEnabled],
-            ['Warnings', posture.warnings.length ? posture.warnings.join(' | ') : 'None']
-          ];
-          document.getElementById('securityPostureContent').innerHTML = rows.map(([label, value]) =>
-            '<div class="kv"><div class="label">' + escapeHtml(label) + '</div><div>' + escapeHtml(value) + '</div></div>'
-          ).join('');
+          await Promise.all([
+            api('/internal/admin/security-posture').then((data) => {
+              const posture = data.securityPosture;
+              const rows = [
+                ['Trust proxy configured', posture.trustProxyConfigured],
+                ['Security headers enabled', posture.securityHeadersEnabled],
+                ['Admin allowlist configured', posture.adminAllowlistConfigured],
+                ['Payment webhook allowlist configured', posture.paymentWebhookAllowlistConfigured],
+                ['WhatsApp allowlist configured', posture.whatsappWebhookAllowlistConfigured],
+                ['Metrics allowlist configured', posture.metricsAllowlistConfigured],
+                ['Peach signature enabled', posture.peachSignatureEnabled],
+                ['Outbound retry enabled', posture.outboundRetryEnabled],
+                ['Warnings', posture.warnings.length ? posture.warnings.join(' | ') : 'None']
+              ];
+              el.securityPostureContent.innerHTML = rows.map(([label, value]) =>
+                '<div class="kv"><div class="label">' + escapeHtml(label) + '</div><div>' + escapeHtml(value) + '</div></div>'
+              ).join('');
+            }),
+            loadDeployPreflight()
+          ]);
         }
 
         async function loadSessions() {
@@ -1210,6 +1246,7 @@ function renderAdminPanelHtml(): string {
         document.getElementById('reloadOutboundButton').addEventListener('click', loadOutboundMessages);
         document.getElementById('reloadDeadLettersButton').addEventListener('click', loadDeadLetters);
         document.getElementById('reloadSecurityButton').addEventListener('click', loadSecurityPosture);
+        document.getElementById('reloadDeployPreflightButton').addEventListener('click', loadDeployPreflight);
         document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadAlerts(), loadSessions(), loadReports(), loadAuditEvents()]));
         document.getElementById('applyAuditFiltersButton').addEventListener('click', loadAuditEvents);
         document.getElementById('evaluateAlertsButton').addEventListener('click', async () => {
@@ -1354,6 +1391,13 @@ adminRouter.get("/security-posture", (_request, response) => {
   response.status(200).json({
     ok: true,
     securityPosture: getSecurityPostureSummary()
+  });
+});
+
+adminRouter.get("/deploy-preflight", (_request, response) => {
+  response.status(200).json({
+    ok: true,
+    deployPreflight: getDeployPreflightReport()
   });
 });
 

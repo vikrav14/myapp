@@ -159,11 +159,12 @@ This repository now includes:
 
 Recommended next step for production deployment:
 
-- read `DEPLOYMENT.md`
+- read `DEPLOYMENT.md` and copy `.env.production.example`
 - apply all Supabase migrations
-- configure the required environment variables
+- configure Render secrets (Blink, Peach, WhatsApp, Supabase)
+- run `npm run deploy:preflight` until it exits 0
 - deploy the container service
-- validate `/ready` and `/internal/admin/security-posture`
+- validate `/ready`, `/internal/admin/deploy-preflight`, and provider webhooks
 
 ## Health and readiness
 
@@ -230,6 +231,7 @@ There is also a secured internal admin route surface:
 - `PATCH /internal/admin/users/:userId`
 - `GET /internal/admin/dashboard`
 - `GET /internal/admin/security-posture`
+- `GET /internal/admin/deploy-preflight`
 - `GET /internal/admin/metrics`
 - `GET /internal/admin/alerts`
 - `POST /internal/admin/alerts/evaluate`

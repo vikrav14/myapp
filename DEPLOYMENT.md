@@ -1,17 +1,10 @@
 # Mauri deployment guide
 
-This project is ready for container deployment.
+This project is ready for container deployment on Render (or any Docker host) with Supabase, Meta WhatsApp, Gemini, Peach Payments (MCB Juice), and Blink.
 
-## Recommended runtime
+## 1. Run Supabase migrations
 
-- Render web service with the included `render.yaml`
-- Supabase for PostgreSQL and pgvector
-- Meta WhatsApp Business API
-- Google Gemini API
-
-## Before deploy
-
-Run all SQL migrations in Supabase SQL Editor:
+Run every file in order inside the Supabase SQL Editor:
 
 ```text
 supabase/migrations/001_init_mauri.sql
@@ -28,107 +21,142 @@ supabase/migrations/011_processed_inbound_events.sql
 supabase/migrations/012_operational_alert_states.sql
 ```
 
-## Critical environment variables
+## 2. Deploy the web service (Render)
 
-Must be configured before production traffic:
+1. Connect the GitHub repo to Render.
+2. Use the included `render.yaml` Blueprint, or create a **Web Service** with:
+   - Runtime: **Docker**
+   - Dockerfile path: `./Dockerfile`
+   - Health check path: `/ready`
+3. After the first deploy, copy the public service URL (or attach a custom domain).
+4. Set `PAYMENT_CALLBACK_BASE_URL` to that public HTTPS URL **without a trailing slash**.
 
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `GOOGLE_AI_API_KEY`
-- `WHATSAPP_VERIFY_TOKEN`
+Example:
+
+```text
+PAYMENT_CALLBACK_BASE_URL=https://mauri-backend.onrender.com
+PAYMENT_RETURN_URL=https://mauri-backend.onrender.com/payments/return
+```
+
+Use `.env.production.example` as the full secret checklist.
+
+## 3. Configure Blink (auto paylinks)
+
+Set in Render env:
+
+| Variable | Purpose |
+|----------|---------|
+| `BLINK_API_KEY` | Blink API key |
+| `BLINK_SECRET_KEY` | Blink secret key |
+| `BLINK_CALLBACK_TOKEN` | Shared token appended to callback URL |
+| `BLINK_TOKEN_API_URL` | Default UK token endpoint (change only if Blink instructs) |
+| `BLINK_PAYLINK_API_URL` | Default paylink endpoint |
+
+Register this callback URL in the Blink dashboard:
+
+```text
+https://<your-service>/webhooks/payments/blink?token=<BLINK_CALLBACK_TOKEN>
+```
+
+`BLINK_PAYMENT_LINK` is only needed as a manual fallback when API credentials are absent.
+
+## 4. Configure MCB Juice via Peach Payments
+
+Set in Render env:
+
+| Variable | Purpose |
+|----------|---------|
+| `PEACH_ENTITY_ID` | Peach entity / merchant ID |
+| `PEACH_CHECKOUT_SECRET` | Checkout signing secret for `/checkout/initiate` |
+| `PEACH_WEBHOOK_SECRET` | HMAC secret for signed payment webhooks |
+| `MCB_JUICE_CALLBACK_TOKEN` | Shared token for the Juice callback route |
+
+Register this callback URL in Peach / Juice settings:
+
+```text
+https://<your-service>/webhooks/payments/juice?token=<MCB_JUICE_CALLBACK_TOKEN>
+```
+
+`MCB_JUICE_PAYMENT_LINK` is only needed as a manual fallback when Peach checkout automation is not configured.
+
+## 5. Configure Meta WhatsApp
+
+Set:
+
+- `WHATSAPP_VERIFY_TOKEN` — must match Meta webhook verification
 - `WHATSAPP_ACCESS_TOKEN`
 - `WHATSAPP_PHONE_NUMBER_ID`
-- `INTERNAL_ADMIN_API_KEY`
-- `PAYMENT_CALLBACK_BASE_URL`
-- `PAYMENT_RETURN_URL`
-- `METRICS_IP_ALLOWLIST`
 
-Strongly recommended in production:
+Register webhook URL:
 
-- `PEACH_ENTITY_ID`
-- `PEACH_CHECKOUT_SECRET`
-- `PEACH_WEBHOOK_SECRET`
-- `ADMIN_IP_ALLOWLIST`
-- `PAYMENT_WEBHOOK_IP_ALLOWLIST`
-- `WHATSAPP_WEBHOOK_IP_ALLOWLIST`
-- `TRUST_PROXY=true`
-- `ENABLE_SECURITY_HEADERS=true`
-- alert thresholds tuned for expected volume
-- `ALERT_WEBHOOK_URL` if you want external paging for operational alerts
+```text
+https://<your-service>/webhooks/whatsapp
+```
 
-Provider-specific if enabled:
+Subscribe to `messages` (and any other fields you need).
 
-- `MCB_JUICE_CALLBACK_TOKEN`
-- `BLINK_CALLBACK_TOKEN`
-- `MCB_JUICE_PAYMENT_LINK`
-- `BLINK_API_KEY`
-- `BLINK_SECRET_KEY`
+## 6. Security hardening (required for production)
 
-## Container deployment
+Set all of these before opening traffic:
 
-The repository includes:
+| Variable | Notes |
+|----------|-------|
+| `INTERNAL_ADMIN_API_KEY` | Strong random value; never use the example default |
+| `TRUST_PROXY` | `true` on Render |
+| `ENABLE_SECURITY_HEADERS` | `true` |
+| `ADMIN_IP_ALLOWLIST` | CIDRs allowed to reach `/internal/*` |
+| `PAYMENT_WEBHOOK_IP_ALLOWLIST` | Peach/Blink source IPs if known |
+| `WHATSAPP_WEBHOOK_IP_ALLOWLIST` | Meta webhook source ranges |
+| `METRICS_IP_ALLOWLIST` | Monitoring scraper IPs |
 
-- `Dockerfile`
-- `.dockerignore`
-- `render.yaml`
+Rotate `SUPABASE_SERVICE_ROLE_KEY` access to server-side only.
 
-Local container smoke test:
+## 7. Preflight before go-live
+
+### CLI (local or CI)
+
+```bash
+cp .env.production.example .env
+# fill secrets, then:
+npm run deploy:preflight
+```
+
+Exit code `0` means no blocking checks failed.
+
+### Admin API / panel
+
+- `GET /internal/admin/deploy-preflight` (requires `x-mauri-admin-key`)
+- Admin panel → **Security posture** → deploy readiness table + provider webhook URLs
+
+Blocking checks include missing public callback URL, default admin key, missing WhatsApp send credentials, and missing payment automation/fallback configuration.
+
+## 8. Post-deploy verification
+
+Confirm:
+
+- `GET /health` → 200
+- `GET /ready` → 200
+- `npm run deploy:preflight` → exit 0 with production env
+- `GET /internal/admin/deploy-preflight` → `ready: true`
+- `GET /metrics` → Prometheus text (from allowlisted IP), including HTTP request counters
+- Meta webhook verification succeeds
+- Test checkout:
+  - Admin panel → user → **Generate payment link** (MCB_JUICE and BLINK)
+  - Or trigger paywall from a locked test user in WhatsApp
+- Payment webhook hits `/webhooks/payments/juice` or `/blink` and activates subscription
+- `GET /internal/admin/panel` loads and shows deploy checks green
+
+## 9. Local container smoke test
 
 ```bash
 docker build -t mauri-backend .
 docker run --rm -p 3000:3000 --env-file .env mauri-backend
 ```
 
+## 10. CI
+
+GitHub Actions runs `npm ci`, `npm run build`, `npm run typecheck`, and `npm run test` on pushes and pull requests.
+
 ## Render notes
 
-The included `render.yaml` uses:
-
-- Docker runtime
-- `/ready` as the health check
-- environment variable placeholders for all required production settings
-
-If you deploy on Render:
-
-1. create the service from the repository
-2. review every env var in `render.yaml`
-3. set all secrets in Render dashboard
-4. confirm `/ready` returns 200 after deploy
-
-## Verification checklist
-
-After deploy, confirm:
-
-- `GET /health` returns 200
-- `GET /ready` returns 200
-- `GET /metrics` returns Prometheus-formatted output from an allowed IP
-- `GET /internal/admin/security-posture` shows expected production settings
-- `GET /internal/admin/alerts` returns current alert state
-- `GET /internal/admin/panel` loads in browser
-- `POST /internal/admin/alerts/evaluate` opens alerts when thresholds are exceeded
-- alert webhook receives payloads when `ALERT_WEBHOOK_URL` is configured
-- WhatsApp webhook verification succeeds
-- a test outbound message lands in `outbound_messages`
-- retry loop cron runs as expected
-
-## Security checklist
-
-Before opening production traffic:
-
-- configure `ADMIN_IP_ALLOWLIST`
-- configure `PAYMENT_WEBHOOK_IP_ALLOWLIST`
-- configure `WHATSAPP_WEBHOOK_IP_ALLOWLIST`
-- configure `METRICS_IP_ALLOWLIST`
-- configure `PEACH_WEBHOOK_SECRET`
-- rotate `INTERNAL_ADMIN_API_KEY` away from defaults
-- keep the Supabase service role key server-side only
-
-## CI
-
-GitHub Actions runs:
-
-- `npm ci`
-- `npm run build`
-- `npm run typecheck`
-- `npm run test`
-
-on pushes and pull requests.
+The included `render.yaml` already declares Docker runtime, `/ready` health checks, Peach/Blink defaults, alert cron settings, and `sync: false` placeholders for secrets. Review every env var in the Render dashboard before enabling production traffic.
