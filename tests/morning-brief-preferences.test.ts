@@ -51,6 +51,48 @@ describe("handleTopicPreferenceMessage", () => {
     expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 
+  it("turns the morning digest off without clearing topic tags", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...activeUser,
+      morning_digest_enabled: false
+    });
+
+    const result = await handleTopicPreferenceMessage({
+      user: activeUser,
+      message: "digest off"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Morning digest is off");
+    expect(result.reply).toContain("#Traffic");
+    expect(mockUpdateUserState).toHaveBeenCalledWith(activeUser.id, {
+      morning_digest_enabled: false
+    });
+    expect(mockRecordAuditEventBestEffort).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "morning_brief_digest_toggled"
+      })
+    );
+  });
+
+  it("turns the morning digest back on", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...activeUser,
+      morning_digest_enabled: true
+    });
+
+    const result = await handleTopicPreferenceMessage({
+      user: { ...activeUser, morning_digest_enabled: false },
+      message: "digest on"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Morning digest is on");
+    expect(mockUpdateUserState).toHaveBeenCalledWith(activeUser.id, {
+      morning_digest_enabled: true
+    });
+  });
+
   it("updates morning brief tags from WhatsApp", async () => {
     mockUpdateUserState.mockResolvedValue({
       ...activeUser,

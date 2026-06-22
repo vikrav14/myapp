@@ -1,6 +1,7 @@
 import type { MauriUser, MorningBriefTopicKey } from "../types.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import {
+  buildDigestToggleReply,
   buildTopicStatusReply,
   buildTopicUpdatePrompt,
   formatTopicList,
@@ -42,6 +43,45 @@ export async function handleTopicPreferenceMessage(input: {
         input.user.topic_preferences as MorningBriefTopicKey[],
         input.user.morning_digest_enabled
       )
+    };
+  }
+
+  if (command.type === "digest") {
+    if (command.enabled === input.user.morning_digest_enabled) {
+      return {
+        handled: true,
+        user: input.user,
+        reply: buildDigestToggleReply({
+          enabled: input.user.morning_digest_enabled,
+          topics: input.user.topic_preferences as MorningBriefTopicKey[]
+        })
+      };
+    }
+
+    const updatedUser = await updateUserState(input.user.id, {
+      morning_digest_enabled: command.enabled
+    });
+
+    await recordAuditEventBestEffort({
+      requestId: input.requestId,
+      eventType: "morning_brief_digest_toggled",
+      userId: updatedUser.id,
+      entityType: "user",
+      entityId: updatedUser.id,
+      message: command.enabled ? "User enabled morning digest." : "User disabled morning digest.",
+      metadata: {
+        morning_digest_enabled: command.enabled,
+        topic_preferences: updatedUser.topic_preferences
+      }
+    });
+
+    return {
+      handled: true,
+      user: updatedUser,
+      reply: buildDigestToggleReply({
+        enabled: command.enabled,
+        topics: updatedUser.topic_preferences as MorningBriefTopicKey[]
+      })
     };
   }
 

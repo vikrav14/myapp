@@ -23,6 +23,8 @@ describe("morning brief topics", () => {
   it("parses my topics and update topics commands", () => {
     expect(parseTopicPreferenceCommand("my topics")?.type).toBe("show");
     expect(parseTopicPreferenceCommand("update topics Traffic Money Tech")?.type).toBe("update");
+    expect(parseTopicPreferenceCommand("digest off")?.type).toBe("digest");
+    expect(parseTopicPreferenceCommand("digest on")).toEqual({ type: "digest", enabled: true });
     expect(parseTopicPreferenceCommand("I spent 150 on food")).toBeNull();
   });
 

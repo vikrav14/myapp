@@ -88,7 +88,7 @@ export function isValidTopicSelection(topics: MorningBriefTopicKey[]): boolean {
 
 export function parseTopicPreferenceCommand(
   message: string
-): { type: "show" } | { type: "update"; selection: string } | null {
+): { type: "show" } | { type: "update"; selection: string } | { type: "digest"; enabled: boolean } | null {
   const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
 
   if (
@@ -99,6 +99,26 @@ export function parseTopicPreferenceCommand(
     normalized === "show topics"
   ) {
     return { type: "show" };
+  }
+
+  if (
+    normalized === "digest on" ||
+    normalized === "morning digest on" ||
+    normalized === "vibe check on" ||
+    normalized === "enable digest" ||
+    normalized === "turn on digest"
+  ) {
+    return { type: "digest", enabled: true };
+  }
+
+  if (
+    normalized === "digest off" ||
+    normalized === "morning digest off" ||
+    normalized === "vibe check off" ||
+    normalized === "disable digest" ||
+    normalized === "turn off digest"
+  ) {
+    return { type: "digest", enabled: false };
   }
 
   const updateMatch = normalized.match(/^(?:update topics|set topics|change topics)\s+(.+)$/);
@@ -141,6 +161,46 @@ I'll use those tags for your 7:00 vibe check.`;
 Digest: ${digestEnabled ? "on" : "off"}
 I'll match stories to those tags at 7:00.
 
-To change them:
-update topics Traffic Money Tech`;
+To change tags:
+update topics Traffic Money Tech
+
+To pause or resume the 7:00 brief:
+digest off
+digest on`;
+}
+
+export function buildDigestToggleReply(input: {
+  enabled: boolean;
+  topics: MorningBriefTopicKey[];
+}): string {
+  if (input.enabled) {
+    if (input.topics.length < 3) {
+      return `Morning digest is on.
+
+You still need 3 to 5 topic tags before the 7:00 brief can send.
+
+Reply like this:
+update topics Traffic Money LocalBuzz`;
+    }
+
+    return `Morning digest is on.
+
+Your 7:00 vibe check will keep sending with: ${formatTopicList(input.topics)}.
+
+To pause it:
+digest off`;
+  }
+
+  const tagsLine =
+    input.topics.length > 0
+      ? `Your tags stay saved: ${formatTopicList(input.topics)}.`
+      : "Set topic tags anytime with update topics Traffic Money LocalBuzz.";
+
+  return `Morning digest is off.
+
+You won't get the 7:00 vibe check anymore.
+${tagsLine}
+
+To turn it back on:
+digest on`;
 }

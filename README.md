@@ -399,6 +399,7 @@ Premium users can manage Mauri Squads directly in WhatsApp:
 - `share squad` (copy-paste WhatsApp invite message)
 - `my topics` (show your 7:00 morning brief tags)
 - `update topics Traffic Money Tech` (change morning brief tags)
+- `digest on` / `digest off` (pause or resume the 7:00 morning brief)
 - `leave squad`
 
 Squad nudges and Sunday showdowns only include members with an active paid subscription.
@@ -429,7 +430,7 @@ Onboarding now includes topic selection (`awaiting_topics`) after archetype pick
 
 Archetype selection auto-suggests morning brief tags (for example Student Grind → Traffic, Money, LocalBuzz). Users can reply `OK` to confirm or send 3–5 custom tags. On activation, Mauri sends an instant preview of the 7:00 vibe check as a follow-up WhatsApp message.
 
-After onboarding, users can manage tags in chat with `my topics` or `update topics ...`.
+After onboarding, users can manage tags in chat with `my topics`, `update topics ...`, or pause/resume delivery with `digest off` / `digest on`.
 
 Admin ops:
 
