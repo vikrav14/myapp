@@ -11,6 +11,7 @@ import type {
 } from "../types.js";
 import { mapUser, updateUserState } from "./user.service.js";
 import {
+  buildSquadInviteMessage,
   dissolveSquadById,
   findSquadForUser,
   getSquadById,
@@ -678,6 +679,7 @@ export async function listAdminSquads(input: {
 
 export async function getAdminSquadProfile(squadId: string): Promise<{
   squad: SquadRecord | null;
+  inviteMessage: string | null;
   stats: {
     memberCount: number;
     paidMemberCount: number;
@@ -707,6 +709,7 @@ export async function getAdminSquadProfile(squadId: string): Promise<{
   if (!squad) {
     return {
       squad: null,
+      inviteMessage: null,
       stats: {
         memberCount: 0,
         paidMemberCount: 0,
@@ -744,6 +747,7 @@ export async function getAdminSquadProfile(squadId: string): Promise<{
 
   return {
     squad,
+    inviteMessage: buildSquadInviteMessage(squad),
     stats: {
       memberCount: squad.member_ids.length,
       paidMemberCount: paidMemberIds.length,

@@ -56,7 +56,7 @@ function premiumRequiredReply(): string {
 }
 
 export function parseSquadCommand(message: string): {
-  type: "create" | "join" | "status" | "leave";
+  type: "create" | "join" | "status" | "leave" | "share";
   squadName?: string | undefined;
   squadCode?: string | undefined;
 } | null {
@@ -87,7 +87,38 @@ export function parseSquadCommand(message: string): {
     return { type: "leave" };
   }
 
+  if (
+    compact === "share squad" ||
+    compact === "squad share" ||
+    compact === "invite squad" ||
+    compact === "squad invite" ||
+    compact === "squad invite message"
+  ) {
+    return { type: "share" };
+  }
+
   return null;
+}
+
+export function buildSquadInviteMessage(squad: Pick<SquadRecord, "squad_name" | "squad_code">): string {
+  return `Join my Mauri squad "${squad.squad_name}".
+
+Open WhatsApp, message Mauri, and reply:
+join ${squad.squad_code}
+
+Private accountability only — no group chat. Mauri nudges us when someone drifts.`;
+}
+
+function buildSquadCreatedReply(squad: SquadRecord): string {
+  return `Squad live: ${squad.squad_name}
+
+Code: ${squad.squad_code}
+
+Copy and forward this invite:
+
+${buildSquadInviteMessage(squad)}
+
+Reply "share squad" anytime to get this invite again.`;
 }
 
 export async function findSquadForUser(userId: string): Promise<SquadRecord | null> {
@@ -410,13 +441,7 @@ export async function handleSquadMessage(input: {
     const squad = await createSquadForUser(input.user, command.squadName, input.requestId);
     return {
       handled: true,
-      reply: `Squad live: ${squad.squad_name}.
-
-Code: ${squad.squad_code}
-
-Send that code to anyone you want in. They reply with "join ${squad.squad_code}".
-
-Private chats only. I’ll nudge the squad when someone drifts.`
+      reply: buildSquadCreatedReply(squad)
     };
   }
 
@@ -427,7 +452,9 @@ Private chats only. I’ll nudge the squad when someone drifts.`
         handled: true,
         reply: `You’re in ${squad.squad_name}.
 
-Code ${squad.squad_code} is locked in. Drop your first win when you’re ready.`
+Code ${squad.squad_code} is locked in.
+
+Want to invite someone? Reply "share squad" for a copy-paste invite message.`
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not join that squad.";
@@ -459,7 +486,26 @@ Reply "create squad" to start one, or "join CODE" if someone already sent you a 
 Code: ${squad.squad_code}
 Members: ${squad.member_ids.length}
 
-Reply "leave squad" if you want out.`
+Reply "share squad" for an invite message, or "leave squad" if you want out.`
+    };
+  }
+
+  if (command.type === "share") {
+    const squad = await findSquadForUser(input.user.id);
+    if (!squad) {
+      return {
+        handled: true,
+        reply: `You’re not in a squad yet.
+
+Reply "create squad" to start one, or "join CODE" if someone already sent you a code.`
+      };
+    }
+
+    return {
+      handled: true,
+      reply: `Share this invite with anyone you want in ${squad.squad_name}:
+
+${buildSquadInviteMessage(squad)}`
     };
   }
 

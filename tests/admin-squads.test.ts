@@ -40,7 +40,8 @@ describe("Admin squad routes", () => {
     expect(response.text).toContain('id="squadsTableBody"');
     expect(response.text).toContain('id="squadDetailContent"');
     expect(response.text).toContain("/internal/admin/squads");
-    expect(response.text).toContain('id="viewUserSquadButton"');
+    expect(response.text).toContain('id="copySquadInviteButton"');
+    expect(response.text).toContain('id="squadInviteMessage"');
   });
 
   it("lists squads through the admin API", async () => {
@@ -79,6 +80,7 @@ describe("Admin squad routes", () => {
         member_ids: [userId],
         created_at: "2026-01-01T00:00:00.000Z"
       },
+      inviteMessage: 'Join my Mauri squad "Study Crew".\n\nOpen WhatsApp, message Mauri, and reply:\njoin ABC123',
       stats: {
         memberCount: 1,
         paidMemberCount: 1,
@@ -105,6 +107,7 @@ describe("Admin squad routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.profile.stats.memberCount).toBe(1);
+    expect(response.body.profile.inviteMessage).toContain("join ABC123");
     expect(response.body.profile.members[0].user.first_name).toBe("Ava");
   });
 

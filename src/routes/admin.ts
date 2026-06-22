@@ -525,6 +525,14 @@ function renderAdminPanelHtml(): string {
                 <button id="clearSelectedSquadButton" class="secondary">Clear selection</button>
               </div>
               <div id="squadNudgeNote" class="panel-note" style="margin-top:10px;"></div>
+              <div class="ops-box" style="margin-top:12px;">
+                <h3 style="margin:0 0 8px;">WhatsApp invite message</h3>
+                <div class="panel-note" style="margin-bottom:10px;">Copy-paste message members can forward to friends.</div>
+                <textarea id="squadInviteMessage" readonly></textarea>
+                <div class="actions" style="margin-top:10px;">
+                  <button id="copySquadInviteButton" class="secondary small">Copy invite</button>
+                </div>
+              </div>
               <h3 style="margin:16px 0 8px;">Members</h3>
               <div class="table-wrap" style="max-height:220px;">
                 <table><thead><tr><th>Name</th><th>Phone</th><th>Subscription</th><th>Paid nudge</th><th></th></tr></thead><tbody id="squadMembersBody"><tr><td colspan="5">No squad selected.</td></tr></tbody></table>
@@ -636,6 +644,7 @@ function renderAdminPanelHtml(): string {
           editSquadName: document.getElementById('editSquadName'),
           editSquadCode: document.getElementById('editSquadCode'),
           squadNudgeNote: document.getElementById('squadNudgeNote'),
+          squadInviteMessage: document.getElementById('squadInviteMessage'),
           squadMembersBody: document.getElementById('squadMembersBody'),
           squadAuditBody: document.getElementById('squadAuditBody'),
           outboundUserIdFilter: document.getElementById('outboundUserIdFilter'),
@@ -828,6 +837,7 @@ function renderAdminPanelHtml(): string {
           el.squadNudgeNote.textContent = profile.stats.nudgeEligible
             ? 'This squad has enough paid members for cross-private nudges and Sunday showdowns.'
             : 'Nudges need at least 2 paid active members. This squad currently does not qualify.';
+          el.squadInviteMessage.value = profile.inviteMessage || '';
 
           renderTable(el.squadMembersBody, profile.members, 5, (item) =>
             '<tr>' +
@@ -1248,6 +1258,21 @@ function renderAdminPanelHtml(): string {
           }
         });
         document.getElementById('reloadSquadProfileButton').addEventListener('click', loadSquadProfile);
+        document.getElementById('copySquadInviteButton').addEventListener('click', async () => {
+          const invite = el.squadInviteMessage.value.trim();
+          if (!invite) {
+            setStatus('No invite message loaded.', 'error');
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(invite);
+            setStatus('Squad invite copied to clipboard.', 'success');
+          } catch (_error) {
+            el.squadInviteMessage.focus();
+            el.squadInviteMessage.select();
+            setStatus('Select the invite text and copy it manually.', 'warning');
+          }
+        });
         document.getElementById('dissolveSquadButton').addEventListener('click', async () => {
           try {
             await dissolveSelectedSquad();

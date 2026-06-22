@@ -169,7 +169,7 @@ Recommended next step for production deployment:
 
 - `GET /health` checks whether the process is alive
 - `GET /ready` checks whether the process can still reach Supabase
-- `GET /metrics` exposes Prometheus-style metrics output
+- `GET /metrics` exposes Prometheus-style metrics output, including in-process HTTP request counters and duration sums by method, route, and status code
 
 ## Supabase setup
 
@@ -274,7 +274,7 @@ The dashboard route returns a lightweight HTML operations view showing overview 
 
 The security posture route returns the live hardening summary, including whether IP allowlists, trust proxy, security headers, and Peach webhook signature verification are configured.
 
-The metrics route returns a live JSON snapshot for the same core operational counters exposed via `/metrics`.
+The metrics route returns a live JSON snapshot for the same core operational counters exposed via `/metrics`. Prometheus output also includes `mauri_http_requests_total` and `mauri_http_request_duration_ms_*` for requests handled by the running process.
 
 The alerts routes let you inspect persisted operational alerts and force an immediate alert evaluation cycle.
 
@@ -392,6 +392,7 @@ Premium users can manage Mauri Squads directly in WhatsApp:
 - `create squad` or `create squad Study Crew`
 - `join CODE`
 - `squad status` or `my squad`
+- `share squad` (copy-paste WhatsApp invite message)
 - `leave squad`
 
 Squad nudges and Sunday showdowns only include members with an active paid subscription.

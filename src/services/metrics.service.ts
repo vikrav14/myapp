@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase.js";
+import { renderHttpPrometheusMetrics } from "../lib/http-metrics.js";
 import type { MetricsSnapshot } from "../types.js";
 
 function startOfWindow(hoursBack: number): string {
@@ -142,5 +143,7 @@ export function renderPrometheusMetrics(snapshot: MetricsSnapshot): string {
     `mauri_inbound_duplicate_deliveries_24h ${snapshot.inbound_duplicate_deliveries_24h}`
   ];
 
-  return lines.join("\n") + "\n";
+  const businessMetrics = lines.join("\n") + "\n";
+  const httpMetrics = renderHttpPrometheusMetrics();
+  return httpMetrics ? `${businessMetrics}${httpMetrics}` : businessMetrics;
 }

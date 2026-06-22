@@ -13,7 +13,7 @@ vi.mock("../src/services/audit.service.js", () => ({
   recordAuditEventBestEffort: mockRecordAuditEventBestEffort
 }));
 
-const { parseSquadCommand, handleSquadMessage } = await import("../src/services/squad.service.js");
+const { parseSquadCommand, buildSquadInviteMessage, handleSquadMessage } = await import("../src/services/squad.service.js");
 
 const paidUser = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -34,12 +34,26 @@ const paidUser = {
 };
 
 describe("parseSquadCommand", () => {
-  it("detects create and join commands", () => {
+  it("detects create, join, status, leave, and share commands", () => {
     expect(parseSquadCommand("create squad Study Crew")?.type).toBe("create");
     expect(parseSquadCommand("join ABC123")?.squadCode).toBe("ABC123");
     expect(parseSquadCommand("squad status")?.type).toBe("status");
     expect(parseSquadCommand("leave squad")?.type).toBe("leave");
+    expect(parseSquadCommand("share squad")?.type).toBe("share");
     expect(parseSquadCommand("I spent 150 on food")).toBeNull();
+  });
+});
+
+describe("buildSquadInviteMessage", () => {
+  it("builds a copy-paste WhatsApp invite", () => {
+    const message = buildSquadInviteMessage({
+      squad_name: "Study Crew",
+      squad_code: "A1B2C3"
+    });
+
+    expect(message).toContain('Join my Mauri squad "Study Crew"');
+    expect(message).toContain("join A1B2C3");
+    expect(message).toContain("no group chat");
   });
 });
 
@@ -101,10 +115,48 @@ describe("handleSquadMessage", () => {
 
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("A1B2C3");
+    expect(result.reply).toContain("Copy and forward this invite");
+    expect(result.reply).toContain('Join my Mauri squad "Study Crew"');
     expect(mockRecordAuditEventBestEffort).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: "squad_created"
       })
     );
+  });
+
+  it("returns a shareable invite for squad members", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        squad_code: "A1B2C3",
+        squad_name: "Study Crew",
+        member_ids: [paidUser.id],
+        created_at: "2026-06-22T00:00:00.000Z"
+      },
+      error: null
+    });
+
+    mockSupabaseFrom.mockImplementation((table: string) => {
+      if (table === "squads") {
+        return {
+          select: () => ({
+            contains: () => ({
+              maybeSingle
+            })
+          })
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await handleSquadMessage({
+      user: paidUser,
+      message: "share squad"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Share this invite");
+    expect(result.reply).toContain("join A1B2C3");
   });
 });

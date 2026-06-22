@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 
 import { logger } from "./logger.js";
+import { recordHttpRequest, resolveHttpRoute } from "./http-metrics.js";
 
 export function getRequestId(response: Response): string | undefined {
   const requestId = response.locals.requestId;
@@ -26,13 +27,21 @@ export function requestTracingMiddleware(request: Request, response: Response, n
   );
 
   response.on("finish", () => {
+    const durationMs = Date.now() - startedAt;
+    recordHttpRequest({
+      method: request.method,
+      route: resolveHttpRoute(request),
+      statusCode: response.statusCode,
+      durationMs
+    });
+
     logger.info(
       {
         requestId,
         method: request.method,
         path: request.originalUrl,
         statusCode: response.statusCode,
-        durationMs: Date.now() - startedAt
+        durationMs
       },
       "Request completed."
     );
