@@ -5,6 +5,7 @@ import { buildPersonalizedMorningBriefMessage } from "../src/services/morning-br
 import {
   buildTopicSelectionPrompt,
   isValidTopicSelection,
+  parseTopicPreferenceCommand,
   parseTopicSelection
 } from "../src/services/morning-brief-topics.service.js";
 import type { CuratedMorningBrief } from "../src/types.js";
@@ -14,6 +15,12 @@ describe("morning brief topics", () => {
     expect(parseTopicSelection("Traffic, Money, #LocalBuzz")).toEqual(["Traffic", "Money", "LocalBuzz"]);
     expect(isValidTopicSelection(parseTopicSelection("1 2 3 4"))).toBe(true);
     expect(buildTopicSelectionPrompt()).toContain("7:00");
+  });
+
+  it("parses my topics and update topics commands", () => {
+    expect(parseTopicPreferenceCommand("my topics")?.type).toBe("show");
+    expect(parseTopicPreferenceCommand("update topics Traffic Money Tech")?.type).toBe("update");
+    expect(parseTopicPreferenceCommand("I spent 150 on food")).toBeNull();
   });
 });
 

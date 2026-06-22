@@ -53,3 +53,62 @@ export function formatTopicList(topics: MorningBriefTopicKey[]): string {
 export function isValidTopicSelection(topics: MorningBriefTopicKey[]): boolean {
   return topics.length >= 3 && topics.length <= 5;
 }
+
+export function parseTopicPreferenceCommand(
+  message: string
+): { type: "show" } | { type: "update"; selection: string } | null {
+  const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
+
+  if (
+    normalized === "my topics" ||
+    normalized === "topics" ||
+    normalized === "morning topics" ||
+    normalized === "topic status" ||
+    normalized === "show topics"
+  ) {
+    return { type: "show" };
+  }
+
+  const updateMatch = normalized.match(/^(?:update topics|set topics|change topics)\s+(.+)$/);
+  if (updateMatch?.[1]) {
+    return { type: "update", selection: updateMatch[1] };
+  }
+
+  if (normalized === "update topics" || normalized === "set topics" || normalized === "change topics") {
+    return { type: "update", selection: "" };
+  }
+
+  return null;
+}
+
+export function buildTopicUpdatePrompt(): string {
+  const lines = MORNING_BRIEF_TOPIC_CATALOG.map(
+    (entry, index) => `${index + 1}. ${entry.label} (#${entry.key})`
+  );
+
+  return `Send your new morning brief tags in one message.
+
+Pick 3 to 5:
+${lines.join("\n")}
+
+Example: update topics Traffic Money Tech`;
+}
+
+export function buildTopicStatusReply(topics: MorningBriefTopicKey[], digestEnabled: boolean): string {
+  if (!topics.length) {
+    return `You don't have morning brief topics set yet.
+
+Reply like this:
+update topics Traffic Money LocalBuzz
+
+I'll use those tags for your 7:00 vibe check.`;
+  }
+
+  return `Your morning brief tags: ${formatTopicList(topics)}
+
+Digest: ${digestEnabled ? "on" : "off"}
+I'll match stories to those tags at 7:00.
+
+To change them:
+update topics Traffic Money Tech`;
+}

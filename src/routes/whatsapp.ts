@@ -10,6 +10,7 @@ import { registerInboundEvent } from "../services/inbound-event.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
+import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
@@ -162,8 +163,36 @@ whatsappRouter.post("/", async (request, response, next) => {
 
     const user = onboardingResult.user;
 
-    const squadResult = await handleSquadMessage({
+    const topicPreferenceResult = await handleTopicPreferenceMessage({
       user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (topicPreferenceResult.handled && topicPreferenceResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, topicPreferenceResult.reply, {
+        userId: topicPreferenceResult.user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "morning_brief_topics"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: topicPreferenceResult.user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: topicPreferenceResult.user.onboarding_state,
+        subscriptionStatus: topicPreferenceResult.user.subscription_status,
+        transcriptPreview,
+        replyPreview: topicPreferenceResult.reply
+      });
+      return;
+    }
+
+    const squadResult = await handleSquadMessage({
+      user: topicPreferenceResult.user,
       message: normalizedMessageText,
       requestId
     });

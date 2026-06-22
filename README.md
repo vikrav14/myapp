@@ -397,6 +397,8 @@ Premium users can manage Mauri Squads directly in WhatsApp:
 - `join CODE`
 - `squad status` or `my squad`
 - `share squad` (copy-paste WhatsApp invite message)
+- `my topics` (show your 7:00 morning brief tags)
+- `update topics Traffic Money Tech` (change morning brief tags)
 - `leave squad`
 
 Squad nudges and Sunday showdowns only include members with an active paid subscription.
@@ -424,6 +426,8 @@ Pipeline:
 3. **7:00** — backend personalizes and delivers per user topic preferences
 
 Onboarding now includes topic selection (`awaiting_topics`) after archetype pick.
+
+After onboarding, users can manage tags in chat with `my topics` or `update topics ...`.
 
 Admin ops:
 
