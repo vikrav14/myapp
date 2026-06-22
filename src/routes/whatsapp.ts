@@ -149,6 +149,17 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
+      if (onboardingResult.followUpReply) {
+        await sendWhatsAppMessage(inboundMessage.from, onboardingResult.followUpReply, {
+          userId: onboardingResult.user.id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "onboarding_preview"
+          }
+        });
+      }
+
       response.status(200).json({
         ok: true,
         userId: onboardingResult.user.id,

@@ -1,3 +1,4 @@
+import type { MauriArchetype } from "../types.js";
 import {
   ARCHETYPE_DEFAULT_TOPICS,
   MORNING_BRIEF_TOPIC_CATALOG,
@@ -30,6 +31,37 @@ export function parseTopicSelection(message: string): MorningBriefTopicKey[] {
 
 export function defaultTopicsForArchetype(archetype: string): MorningBriefTopicKey[] {
   return ARCHETYPE_DEFAULT_TOPICS[archetype] ?? ["Traffic", "LocalBuzz", "Money"];
+}
+
+const TOPIC_CONFIRMATION_PHRASES = new Set([
+  "ok",
+  "okay",
+  "yes",
+  "yep",
+  "yup",
+  "confirm",
+  "confirmed",
+  "sounds good",
+  "looks good",
+  "perfect",
+  "👍",
+  "✅"
+]);
+
+export function isTopicConfirmation(message: string): boolean {
+  const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
+  return TOPIC_CONFIRMATION_PHRASES.has(normalized);
+}
+
+export function buildSuggestedTopicsPrompt(archetype: MauriArchetype | string): string {
+  const suggested = defaultTopicsForArchetype(archetype);
+
+  return `Locked in: ${archetype}.
+
+Your 7:00 brief will focus on: ${formatTopicList(suggested)}
+
+Reply OK to confirm.
+Or send 3 to 5 different tags: Traffic, Tech, Money, LocalBuzz, Entertainment.`;
 }
 
 export function buildTopicSelectionPrompt(): string {

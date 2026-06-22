@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { parseRssItems } from "../src/services/morning-brief-scraper.service.js";
 import { buildPersonalizedMorningBriefMessage } from "../src/services/morning-brief-curation.service.js";
 import {
+  buildSuggestedTopicsPrompt,
   buildTopicSelectionPrompt,
+  defaultTopicsForArchetype,
+  isTopicConfirmation,
   isValidTopicSelection,
   parseTopicPreferenceCommand,
   parseTopicSelection
@@ -21,6 +24,15 @@ describe("morning brief topics", () => {
     expect(parseTopicPreferenceCommand("my topics")?.type).toBe("show");
     expect(parseTopicPreferenceCommand("update topics Traffic Money Tech")?.type).toBe("update");
     expect(parseTopicPreferenceCommand("I spent 150 on food")).toBeNull();
+  });
+
+  it("maps archetypes to default topic suggestions", () => {
+    expect(defaultTopicsForArchetype("Student Grind")).toEqual(["Traffic", "Money", "LocalBuzz"]);
+    expect(defaultTopicsForArchetype("Corporate / Career")).toEqual(["Traffic", "Tech", "Money"]);
+    expect(isTopicConfirmation("OK")).toBe(true);
+    expect(isTopicConfirmation("Traffic Money Tech")).toBe(false);
+    expect(buildSuggestedTopicsPrompt("Student Grind")).toContain("#Traffic #Money #LocalBuzz");
+    expect(buildTopicSelectionPrompt()).toContain("7:00");
   });
 });
 

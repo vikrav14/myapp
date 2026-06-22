@@ -1,9 +1,12 @@
 import type { MauriArchetype, MauriUser, MorningBriefTopicKey } from "../types.js";
 
 import { buildLockedReplyForUser } from "./paywall.service.js";
+import { buildOnboardingPreviewBrief } from "./morning-brief-preview.service.js";
 import {
-  buildTopicSelectionPrompt,
+  buildSuggestedTopicsPrompt,
+  defaultTopicsForArchetype,
   formatTopicList,
+  isTopicConfirmation,
   isValidTopicSelection,
   parseTopicSelection
 } from "./morning-brief-topics.service.js";
@@ -34,8 +37,16 @@ const archetypeCatalog: Array<{
 export interface OnboardingResult {
   handled: boolean;
   reply?: string | undefined;
+  followUpReply?: string | undefined;
   user: MauriUser;
 }
+
+const archetypeActivationHooks: Record<MauriArchetype, string> = {
+  "Student Grind": "I'll track exam pressure, commute chaos, and student spending with you.",
+  "Corporate / Career": "I'll watch work wins, commute grind, and where your salary actually goes.",
+  "Entrepreneur Mode": "I'll keep an eye on cashflow, focus blocks, and the messy founder week.",
+  "Life & Habit Tracking": "I'll help you spot patterns in habits, mood, and daily balance."
+};
 
 function normalize(text: string): string {
   return text.trim().toLowerCase();
@@ -80,7 +91,11 @@ Reply with the exact one. Or just send 1, 2, 3, or 4.`;
 }
 
 function buildActivationReply(archetype: MauriArchetype, topics: MorningBriefTopicKey[]): string {
+  const hook = archetypeActivationHooks[archetype] ?? archetypeActivationHooks["Life & Habit Tracking"];
+
   return `Perfect. You're in on ${archetype}.
+
+${hook}
 
 Your 7-day trial starts now.
 Morning vibe check tags: ${formatTopicList(topics)}.
@@ -89,6 +104,39 @@ I'll send your Mauritian brief at 7:00 with weather, traffic, and stories matche
 Send me your messy brain dump exactly as it is. Spending. Tasks. Wins. Stress. Random thoughts. I'll sort the signal from the chaos.
 
 When you unlock premium later, you can reply "create squad" or "join CODE" for private accountability with friends.`;
+}
+
+async function activateUserWithTopics(
+  user: MauriUser,
+  topics: MorningBriefTopicKey[]
+): Promise<OnboardingResult> {
+  const trialStartedAt = new Date();
+  const trialEndsAt = new Date(trialStartedAt);
+  trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + 7);
+
+  const updatedUser = await updateUserState(user.id, {
+    onboarding_state: "active",
+    onboarding_completed_at: trialStartedAt.toISOString(),
+    trial_started_at: trialStartedAt.toISOString(),
+    trial_ends_at: trialEndsAt.toISOString(),
+    topic_preferences: topics,
+    morning_digest_enabled: true,
+    locked_at: null
+  });
+
+  const archetype = updatedUser.archetype as MauriArchetype;
+  const preview = await buildOnboardingPreviewBrief({
+    firstName: updatedUser.first_name,
+    archetype,
+    topics
+  });
+
+  return {
+    handled: true,
+    user: updatedUser,
+    reply: buildActivationReply(archetype, topics),
+    followUpReply: preview
+  };
 }
 
 export async function enforceAccessPolicy(
@@ -173,36 +221,24 @@ export async function handleOnboardingMessage(input: {
   }
 
   if (user.onboarding_state === "awaiting_topics") {
-    const topics = parseTopicSelection(message);
-    if (!isValidTopicSelection(topics)) {
+    const parsedTopics = parseTopicSelection(message);
+    const topics = isValidTopicSelection(parsedTopics)
+      ? parsedTopics
+      : isTopicConfirmation(message)
+        ? defaultTopicsForArchetype(user.archetype)
+        : null;
+
+    if (!topics || !isValidTopicSelection(topics)) {
       return {
         handled: true,
         user,
-        reply: `${buildTopicSelectionPrompt()}
+        reply: `${buildSuggestedTopicsPrompt(user.archetype)}
 
-Pick at least 3 and at most 5.`
+Pick at least 3 and at most 5, or reply OK to keep the suggested tags.`
       };
     }
 
-    const trialStartedAt = new Date();
-    const trialEndsAt = new Date(trialStartedAt);
-    trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + 7);
-
-    const updatedUser = await updateUserState(user.id, {
-      onboarding_state: "active",
-      onboarding_completed_at: trialStartedAt.toISOString(),
-      trial_started_at: trialStartedAt.toISOString(),
-      trial_ends_at: trialEndsAt.toISOString(),
-      topic_preferences: topics,
-      morning_digest_enabled: true,
-      locked_at: null
-    });
-
-    return {
-      handled: true,
-      user: updatedUser,
-      reply: buildActivationReply(updatedUser.archetype as MauriArchetype, topics)
-    };
+    return activateUserWithTopics(user, topics);
   }
 
   const archetype = inferArchetype(message);
@@ -222,6 +258,6 @@ Pick at least 3 and at most 5.`
   return {
     handled: true,
     user: updatedUser,
-    reply: `Locked in: ${archetype}.\n\n${buildTopicSelectionPrompt()}`
+    reply: buildSuggestedTopicsPrompt(archetype)
   };
 }
