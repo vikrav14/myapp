@@ -63,6 +63,7 @@ const envSchema = z.object({
   PAYMENT_CALLBACK_BASE_URL: optionalSecret,
   PAYMENT_RETURN_URL: optionalSecret,
   PEACH_ENTITY_ID: optionalSecret,
+  PEACH_CHECKOUT_SECRET: optionalSecret,
   PEACH_CHECKOUT_URL: z.string().url().default("https://secure.peachpayments.com/checkout/initiate"),
   BLINK_PAYLINK_API_URL: z.string().url().default("https://api.blinkpayment.co.uk/api/paylink/v1/paylinks"),
   PEACH_WEBHOOK_SECRET: optionalSecret,

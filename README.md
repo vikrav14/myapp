@@ -98,6 +98,7 @@ Copy `.env.example` to `.env` and fill in:
 - `PAYMENT_CALLBACK_BASE_URL`
 - `PAYMENT_RETURN_URL`
 - `PEACH_ENTITY_ID`
+- `PEACH_CHECKOUT_SECRET`
 - `PEACH_CHECKOUT_URL`
 - `BLINK_PAYLINK_API_URL`
 - `PEACH_WEBHOOK_SECRET`
@@ -306,6 +307,8 @@ Reference format supported for user resolution:
 For Blink, the generated `transaction_unique` is parseable by Mauri and unique per session.
 
 When `BLINK_API_KEY` and `BLINK_SECRET_KEY` are configured, Mauri automatically calls the Blink Paylink API, stores `checkout_url` on the session, and uses that URL in locked paywall replies.
+
+When `PEACH_ENTITY_ID` and `PEACH_CHECKOUT_SECRET` are configured, Mauri automatically signs and posts to Peach `/checkout/initiate`, stores the redirect URL on the session, and uses that URL in locked paywall replies.
 
 For MCB Juice, the generated `merchantTransactionId` stays short for Peach constraints, while the full Mauri user reference is stored in `customParameters`.
 

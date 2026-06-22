@@ -46,6 +46,7 @@ Must be configured before production traffic:
 Strongly recommended in production:
 
 - `PEACH_ENTITY_ID`
+- `PEACH_CHECKOUT_SECRET`
 - `PEACH_WEBHOOK_SECRET`
 - `ADMIN_IP_ALLOWLIST`
 - `PAYMENT_WEBHOOK_IP_ALLOWLIST`

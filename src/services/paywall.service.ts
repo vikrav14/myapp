@@ -3,6 +3,7 @@ import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser, PaymentCheckoutSessionRecord, PaymentProvider } from "../types.js";
 import { isBlinkPaylinkAutomationEnabled } from "./blink-paylink.service.js";
+import { isPeachJuiceCheckoutAutomationEnabled } from "./peach-checkout.service.js";
 import { createPaymentCheckoutSession } from "./payment-link.service.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,7 +80,7 @@ export async function preparePaywallPaymentOptions(
 ): Promise<PaywallPaymentOptions> {
   const providers: Array<Extract<PaymentProvider, "MCB_JUICE" | "BLINK">> = [];
 
-  if (env.MCB_JUICE_PAYMENT_LINK || env.PEACH_ENTITY_ID) {
+  if (env.MCB_JUICE_PAYMENT_LINK || isPeachJuiceCheckoutAutomationEnabled()) {
     providers.push("MCB_JUICE");
   }
 

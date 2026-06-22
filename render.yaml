@@ -55,6 +55,8 @@ services:
         sync: false
       - key: PEACH_ENTITY_ID
         sync: false
+      - key: PEACH_CHECKOUT_SECRET
+        sync: false
       - key: PEACH_CHECKOUT_URL
         value: https://secure.peachpayments.com/checkout/initiate
       - key: BLINK_PAYLINK_API_URL
