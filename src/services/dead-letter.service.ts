@@ -123,6 +123,16 @@ export async function updateDeadLetterStatus(input: {
   return record;
 }
 
+export async function getDeadLetterById(deadLetterId: string): Promise<DeadLetterEventRecord | null> {
+  const { data, error } = await supabase.from("dead_letter_events").select("*").eq("id", deadLetterId).maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load dead letter event: ${error.message}`);
+  }
+
+  return data ? mapDeadLetter(data as Record<string, unknown>) : null;
+}
+
 export async function listDeadLetters(input: {
   limit: number;
   offset: number;

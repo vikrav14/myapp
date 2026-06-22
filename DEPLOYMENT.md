@@ -53,6 +53,7 @@ Strongly recommended in production:
 - `TRUST_PROXY=true`
 - `ENABLE_SECURITY_HEADERS=true`
 - alert thresholds tuned for expected volume
+- `ALERT_WEBHOOK_URL` if you want external paging for operational alerts
 
 Provider-specific if enabled:
 
@@ -101,6 +102,8 @@ After deploy, confirm:
 - `GET /internal/admin/security-posture` shows expected production settings
 - `GET /internal/admin/alerts` returns current alert state
 - `GET /internal/admin/panel` loads in browser
+- `POST /internal/admin/alerts/evaluate` opens alerts when thresholds are exceeded
+- alert webhook receives payloads when `ALERT_WEBHOOK_URL` is configured
 - WhatsApp webhook verification succeeds
 - a test outbound message lands in `outbound_messages`
 - retry loop cron runs as expected
@@ -124,5 +127,6 @@ GitHub Actions runs:
 - `npm ci`
 - `npm run build`
 - `npm run typecheck`
+- `npm run test`
 
 on pushes and pull requests.

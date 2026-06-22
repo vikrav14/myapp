@@ -77,7 +77,17 @@ const envSchema = z.object({
   ALERT_OUTBOUND_FAILED_THRESHOLD: z.coerce.number().int().nonnegative().default(10),
   ALERT_OPEN_DEAD_LETTER_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
   ALERT_SECURITY_WARNINGS_THRESHOLD: z.coerce.number().int().nonnegative().default(1),
-  ALERT_EVALUATION_CRON: z.string().default("*/5 * * * *")
+  ALERT_AUDIT_ERRORS_THRESHOLD: z.coerce.number().int().nonnegative().default(5),
+  ALERT_INBOUND_DUPLICATE_DELIVERIES_THRESHOLD: z.coerce.number().int().nonnegative().default(10),
+  ALERT_EVALUATION_CRON: z.string().default("*/5 * * * *"),
+  ALERT_WEBHOOK_URL: z.preprocess((value) => {
+    if (typeof value === "string" && value.trim() === "") {
+      return undefined;
+    }
+
+    return value;
+  }, z.string().url().optional()),
+  ALERT_WEBHOOK_NOTIFY_ON_RESOLVE: envBoolean.default(false)
 });
 
 export const env = envSchema.parse(process.env);

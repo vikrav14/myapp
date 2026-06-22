@@ -71,8 +71,16 @@ services:
         value: "5"
       - key: ALERT_SECURITY_WARNINGS_THRESHOLD
         value: "1"
+      - key: ALERT_AUDIT_ERRORS_THRESHOLD
+        value: "5"
+      - key: ALERT_INBOUND_DUPLICATE_DELIVERIES_THRESHOLD
+        value: "10"
       - key: ALERT_EVALUATION_CRON
         value: "*/5 * * * *"
+      - key: ALERT_WEBHOOK_URL
+        sync: false
+      - key: ALERT_WEBHOOK_NOTIFY_ON_RESOLVE
+        value: "false"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS

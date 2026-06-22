@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { hasAdminAccess } from "../lib/internal-auth.js";
+import { escapeHtml } from "../lib/html-escape.js";
 import { getSecurityPostureSummary } from "../lib/network-security.js";
 import { evaluateAndPersistOperationalAlerts, listOperationalAlerts } from "../services/alerting.service.js";
 import {
@@ -20,7 +21,7 @@ import { getRequestId } from "../lib/request-tracing.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { getMetricsSnapshot } from "../services/metrics.service.js";
 import { retryOutboundMessageById } from "../services/outbound-retry.service.js";
-import { updateDeadLetterStatus } from "../services/dead-letter.service.js";
+import { getDeadLetterById, updateDeadLetterStatus } from "../services/dead-letter.service.js";
 import {
   discardOutboundMessage,
   getOutboundMessageById,
@@ -94,21 +95,21 @@ function renderDashboardHtml(input: Awaited<ReturnType<typeof getAdminDashboardD
   const deadLetterRows = input.recentDeadLetters
     .map(
       (item) =>
-        `<tr><td>${item.category}</td><td>${item.status}</td><td>${item.source_id}</td><td>${item.last_error ?? ""}</td><td>${item.created_at}</td></tr>`
+        `<tr><td>${escapeHtml(item.category)}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(item.source_id)}</td><td>${escapeHtml(item.last_error ?? "")}</td><td>${escapeHtml(item.created_at)}</td></tr>`
     )
     .join("");
 
   const outboundRows = input.recentOutboundFailures
     .map(
       (item) =>
-        `<tr><td>${item.status}</td><td>${item.phone_number}</td><td>${item.attempt_count}</td><td>${item.last_error ?? ""}</td><td>${item.updated_at}</td></tr>`
+        `<tr><td>${escapeHtml(item.status)}</td><td>${escapeHtml(item.phone_number)}</td><td>${escapeHtml(item.attempt_count)}</td><td>${escapeHtml(item.last_error ?? "")}</td><td>${escapeHtml(item.updated_at)}</td></tr>`
     )
     .join("");
 
   const auditRows = input.recentAuditEvents
     .map(
       (item) =>
-        `<tr><td>${item.event_type}</td><td>${item.severity}</td><td>${item.user_id ?? ""}</td><td>${item.created_at}</td></tr>`
+        `<tr><td>${escapeHtml(item.event_type)}</td><td>${escapeHtml(item.severity)}</td><td>${escapeHtml(item.user_id ?? "")}</td><td>${escapeHtml(item.created_at)}</td></tr>`
     )
     .join("");
 
@@ -290,6 +291,14 @@ function renderAdminPanelHtml(): string {
         <div class="card"><div class="label">Reports This Week</div><div class="value">-</div></div>
       </div>
 
+      <div id="metricsCards" class="cards">
+        <div class="card"><div class="label">Outbound Failed</div><div class="value">-</div></div>
+        <div class="card"><div class="label">Payment Events</div><div class="value">-</div></div>
+        <div class="card"><div class="label">Voice Notes</div><div class="value">-</div></div>
+        <div class="card"><div class="label">Audit Errors (24h)</div><div class="value">-</div></div>
+        <div class="card"><div class="label">Duplicate Inbound (24h)</div><div class="value">-</div></div>
+      </div>
+
       <div class="layout">
         <div class="stack">
           <div class="panel">
@@ -362,8 +371,8 @@ function renderAdminPanelHtml(): string {
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Category</th><th>Status</th><th>Source</th><th>Error</th><th>Created</th></tr></thead>
-                <tbody id="deadLettersTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody>
+                <thead><tr><th>Category</th><th>Status</th><th>Source</th><th>Error</th><th>Created</th><th>Actions</th></tr></thead>
+                <tbody id="deadLettersTableBody"><tr><td colspan="6">No data loaded yet.</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -445,7 +454,7 @@ function renderAdminPanelHtml(): string {
             </div>
             <h3 style="margin:8px 0;">Operational alerts</h3>
             <div class="table-wrap" style="max-height:180px;">
-              <table><thead><tr><th>Alert</th><th>Severity</th><th>Status</th><th>Value</th></tr></thead><tbody id="alertsTableBody"><tr><td colspan="4">No data loaded yet.</td></tr></tbody></table>
+              <table><thead><tr><th>Alert</th><th>Severity</th><th>Status</th><th>Value</th><th>Details</th></tr></thead><tbody id="alertsTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody></table>
             </div>
             <h3 style="margin:8px 0;">Payment sessions</h3>
             <div class="table-wrap" style="max-height:180px;">
@@ -456,6 +465,18 @@ function renderAdminPanelHtml(): string {
               <table><thead><tr><th>User</th><th>Status</th><th>Week start</th><th>Created</th></tr></thead><tbody id="reportsTableBody"><tr><td colspan="4">No data loaded yet.</td></tr></tbody></table>
             </div>
             <h3 style="margin:18px 0 8px;">Audit events</h3>
+            <div class="filters">
+              <input id="auditUserIdFilter" placeholder="Filter by user UUID" />
+              <input id="auditEventTypeFilter" placeholder="Filter by event type" />
+              <select id="auditSeverityFilter">
+                <option value="">All severities</option>
+                <option value="info">info</option>
+                <option value="warning">warning</option>
+                <option value="error">error</option>
+              </select>
+              <input id="auditRequestIdFilter" placeholder="Filter by request ID" />
+              <button id="applyAuditFiltersButton" class="secondary">Apply audit filters</button>
+            </div>
             <div class="table-wrap" style="max-height:220px;">
               <table><thead><tr><th>Event</th><th>Severity</th><th>User</th><th>Created</th></tr></thead><tbody id="auditTableBody"><tr><td colspan="4">No data loaded yet.</td></tr></tbody></table>
             </div>
@@ -473,6 +494,7 @@ function renderAdminPanelHtml(): string {
           adminKey: document.getElementById('adminKey'),
           globalStatus: document.getElementById('globalStatus'),
           overviewCards: document.getElementById('overviewCards'),
+          metricsCards: document.getElementById('metricsCards'),
           usersTableBody: document.getElementById('usersTableBody'),
           outboundTableBody: document.getElementById('outboundTableBody'),
           deadLettersTableBody: document.getElementById('deadLettersTableBody'),
@@ -502,6 +524,10 @@ function renderAdminPanelHtml(): string {
           deadLetterStatusFilter: document.getElementById('deadLetterStatusFilter'),
           deadLetterCategoryFilter: document.getElementById('deadLetterCategoryFilter'),
           deadLetterLimit: document.getElementById('deadLetterLimit'),
+          auditUserIdFilter: document.getElementById('auditUserIdFilter'),
+          auditEventTypeFilter: document.getElementById('auditEventTypeFilter'),
+          auditSeverityFilter: document.getElementById('auditSeverityFilter'),
+          auditRequestIdFilter: document.getElementById('auditRequestIdFilter'),
           userRecentPaymentsBody: document.getElementById('userRecentPaymentsBody'),
           userRecentSessionsBody: document.getElementById('userRecentSessionsBody'),
           userRecentReportsBody: document.getElementById('userRecentReportsBody'),
@@ -510,6 +536,15 @@ function renderAdminPanelHtml(): string {
         };
 
         el.adminKey.value = state.adminKey;
+
+        function escapeHtml(value) {
+          return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        }
 
         function setStatus(message, kind = '') {
           el.globalStatus.textContent = message;
@@ -551,10 +586,31 @@ function renderAdminPanelHtml(): string {
             ['Paid Active', overview.users.paidActive],
             ['Open Dead Letters', overview.operations.openDeadLetters],
             ['Outbound Pending', overview.operations.outboundPending],
-            ['Reports This Week', overview.operations.reportsThisWeek]
+            ['Reports This Week', overview.operations.reportsThisWeek],
+            ['Outbound Failed', overview.operations.outboundFailed],
+            ['Payment Events', overview.operations.paymentEvents],
+            ['Voice Notes', overview.operations.voiceNotes]
           ];
-          el.overviewCards.innerHTML = cards.map(([label, value]) =>
-            '<div class="card"><div class="label">' + label + '</div><div class="value">' + value + '</div></div>'
+          el.overviewCards.innerHTML = cards.slice(0, 5).map(([label, value]) =>
+            '<div class="card"><div class="label">' + escapeHtml(label) + '</div><div class="value">' + escapeHtml(value) + '</div></div>'
+          ).join('');
+          el.metricsCards.innerHTML = cards.slice(5).map(([label, value]) =>
+            '<div class="card"><div class="label">' + escapeHtml(label) + '</div><div class="value">' + escapeHtml(value) + '</div></div>'
+          ).join('');
+        }
+
+        async function loadMetrics() {
+          const data = await api('/internal/admin/metrics');
+          const metrics = data.metrics;
+          const cards = [
+            ['Outbound Failed', metrics.outbound_failed + metrics.outbound_permanent_failed],
+            ['Payment Events (24h)', metrics.payments_24h],
+            ['Voice Notes (24h)', metrics.voice_notes_24h],
+            ['Audit Errors (24h)', metrics.audit_errors_24h],
+            ['Duplicate Inbound (24h)', metrics.inbound_duplicate_deliveries_24h]
+          ];
+          el.metricsCards.innerHTML = cards.map(([label, value]) =>
+            '<div class="card"><div class="label">' + escapeHtml(label) + '</div><div class="value">' + escapeHtml(value) + '</div></div>'
           ).join('');
         }
 
@@ -572,12 +628,12 @@ function renderAdminPanelHtml(): string {
           const data = await api('/internal/admin/users?' + params.toString());
           renderTable(el.usersTableBody, data.users, 6, (user) =>
             '<tr>' +
-              '<td>' + (user.first_name || '-') + '</td>' +
-              '<td class="mono">' + user.phone_number + '</td>' +
-              '<td><span class="pill">' + user.subscription_status + '</span></td>' +
-              '<td><span class="pill">' + user.onboarding_state + '</span></td>' +
-              '<td>' + user.updated_at + '</td>' +
-              '<td><button class="small secondary" data-user-id="' + user.id + '">Inspect</button></td>' +
+              '<td>' + escapeHtml(user.first_name || '-') + '</td>' +
+              '<td class="mono">' + escapeHtml(user.phone_number) + '</td>' +
+              '<td><span class="pill">' + escapeHtml(user.subscription_status) + '</span></td>' +
+              '<td><span class="pill">' + escapeHtml(user.onboarding_state) + '</span></td>' +
+              '<td>' + escapeHtml(user.updated_at) + '</td>' +
+              '<td><button class="small secondary" data-user-id="' + escapeHtml(user.id) + '">Inspect</button></td>' +
             '</tr>'
           );
           el.usersTableBody.querySelectorAll('button[data-user-id]').forEach((button) => {
@@ -614,30 +670,30 @@ function renderAdminPanelHtml(): string {
             ['Latest report', profile.stats.latestWeeklyReportAt || '-']
           ];
           el.userDetailStats.innerHTML = stats.map(([label, value]) =>
-            '<div class="kv"><div class="label">' + label + '</div><div>' + value + '</div></div>'
+            '<div class="kv"><div class="label">' + escapeHtml(label) + '</div><div>' + escapeHtml(value) + '</div></div>'
           ).join('');
 
           el.userProfileMeta.innerHTML =
-            '<strong>Recent:</strong> payments ' + profile.recentPaymentEvents.length +
-            ', sessions ' + profile.recentCheckoutSessions.length +
-            ', reports ' + profile.recentReports.length +
-            ', voice notes ' + profile.recentVoiceNotes.length +
-            ', memories ' + profile.recentMemories.length + '.';
+            '<strong>Recent:</strong> payments ' + escapeHtml(profile.recentPaymentEvents.length) +
+            ', sessions ' + escapeHtml(profile.recentCheckoutSessions.length) +
+            ', reports ' + escapeHtml(profile.recentReports.length) +
+            ', voice notes ' + escapeHtml(profile.recentVoiceNotes.length) +
+            ', memories ' + escapeHtml(profile.recentMemories.length) + '.';
 
           renderTable(el.userRecentPaymentsBody, profile.recentPaymentEvents, 4, (item) =>
-            '<tr><td>' + item.provider + '</td><td>' + item.amount + ' ' + item.currency + '</td><td class="mono">' + item.transaction_reference + '</td><td>' + item.paid_at + '</td></tr>'
+            '<tr><td>' + escapeHtml(item.provider) + '</td><td>' + escapeHtml(item.amount) + ' ' + escapeHtml(item.currency) + '</td><td class="mono">' + escapeHtml(item.transaction_reference) + '</td><td>' + escapeHtml(item.paid_at) + '</td></tr>'
           );
           renderTable(el.userRecentSessionsBody, profile.recentCheckoutSessions, 4, (item) =>
-            '<tr><td>' + item.provider + '</td><td><span class="pill">' + item.status + '</span></td><td class="mono">' + item.provider_reference + '</td><td>' + item.created_at + '</td></tr>'
+            '<tr><td>' + escapeHtml(item.provider) + '</td><td><span class="pill">' + escapeHtml(item.status) + '</span></td><td class="mono">' + escapeHtml(item.provider_reference) + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'
           );
           renderTable(el.userRecentReportsBody, profile.recentReports, 3, (item) =>
-            '<tr><td><span class="pill">' + item.delivery_status + '</span></td><td>' + item.week_start + '</td><td>' + item.created_at + '</td></tr>'
+            '<tr><td><span class="pill">' + escapeHtml(item.delivery_status) + '</span></td><td>' + escapeHtml(item.week_start) + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'
           );
           renderTable(el.userRecentVoiceNotesBody, profile.recentVoiceNotes, 2, (item) =>
-            '<tr><td>' + (item.transcript_text || '').slice(0, 120) + '</td><td>' + item.created_at + '</td></tr>'
+            '<tr><td>' + escapeHtml((item.transcript_text || '').slice(0, 120)) + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'
           );
           renderTable(el.userRecentMemoriesBody, profile.recentMemories, 3, (item) =>
-            '<tr><td>' + item.memory_type + '</td><td>' + (item.content_text || '').slice(0, 120) + '</td><td>' + item.created_at + '</td></tr>'
+            '<tr><td>' + escapeHtml(item.memory_type) + '</td><td>' + escapeHtml((item.content_text || '').slice(0, 120)) + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'
           );
         }
 
@@ -663,14 +719,14 @@ function renderAdminPanelHtml(): string {
           const data = await api('/internal/admin/outbound-messages?' + params.toString());
           renderTable(el.outboundTableBody, data.messages, 5, (item) =>
             '<tr>' +
-              '<td><span class="pill">' + item.status + '</span></td>' +
-              '<td class="mono">' + item.phone_number + '</td>' +
-              '<td>' + item.attempt_count + '</td>' +
-              '<td>' + (item.last_error || '-') + '</td>' +
+              '<td><span class="pill">' + escapeHtml(item.status) + '</span></td>' +
+              '<td class="mono">' + escapeHtml(item.phone_number) + '</td>' +
+              '<td>' + escapeHtml(item.attempt_count) + '</td>' +
+              '<td>' + escapeHtml(item.last_error || '-') + '</td>' +
               '<td class="actions">' +
-                '<button class="small secondary" data-action="retry" data-id="' + item.id + '">Retry</button>' +
-                '<button class="small warning" data-action="requeue" data-id="' + item.id + '">Requeue</button>' +
-                '<button class="small danger" data-action="discard" data-id="' + item.id + '">Discard</button>' +
+                '<button class="small secondary" data-action="retry" data-id="' + escapeHtml(item.id) + '">Retry</button>' +
+                '<button class="small warning" data-action="requeue" data-id="' + escapeHtml(item.id) + '">Requeue</button>' +
+                '<button class="small danger" data-action="discard" data-id="' + escapeHtml(item.id) + '">Discard</button>' +
               '</td>' +
             '</tr>'
           );
@@ -697,15 +753,33 @@ function renderAdminPanelHtml(): string {
           if (el.deadLetterCategoryFilter.value.trim()) params.set('category', el.deadLetterCategoryFilter.value.trim());
           if (el.deadLetterLimit.value.trim()) params.set('limit', el.deadLetterLimit.value.trim());
           const data = await api('/internal/admin/dead-letters?' + params.toString());
-          renderTable(el.deadLettersTableBody, data.deadLetters, 5, (item) =>
+          renderTable(el.deadLettersTableBody, data.deadLetters, 6, (item) =>
             '<tr>' +
-              '<td>' + item.category + '</td>' +
-              '<td><span class="pill">' + item.status + '</span></td>' +
-              '<td class="mono">' + item.source_id + '</td>' +
-              '<td>' + (item.last_error || '-') + '</td>' +
-              '<td>' + item.created_at + '</td>' +
+              '<td>' + escapeHtml(item.category) + '</td>' +
+              '<td><span class="pill">' + escapeHtml(item.status) + '</span></td>' +
+              '<td class="mono">' + escapeHtml(item.source_id) + '</td>' +
+              '<td>' + escapeHtml(item.last_error || '-') + '</td>' +
+              '<td>' + escapeHtml(item.created_at) + '</td>' +
+              '<td class="actions">' +
+                (item.source_table === 'outbound_messages'
+                  ? '<button class="small warning" data-action="requeue" data-id="' + escapeHtml(item.id) + '">Requeue source</button>'
+                  : '') +
+                '<button class="small danger" data-action="discard" data-id="' + escapeHtml(item.id) + '">Discard</button>' +
+              '</td>' +
             '</tr>'
           );
+          el.deadLettersTableBody.querySelectorAll('button[data-action]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              const id = button.getAttribute('data-id');
+              const action = button.getAttribute('data-action');
+              const path = action === 'requeue'
+                ? '/internal/admin/dead-letters/' + id + '/requeue'
+                : '/internal/admin/dead-letters/' + id + '/discard';
+              await api(path, { method: 'POST' });
+              setStatus('Dead-letter action completed: ' + action + '.', 'success');
+              await Promise.all([loadOverview(), loadMetrics(), loadOutboundMessages(), loadDeadLetters(), loadAuditEvents()]);
+            });
+          });
         }
 
         async function loadSecurityPosture() {
@@ -717,40 +791,49 @@ function renderAdminPanelHtml(): string {
             ['Admin allowlist configured', posture.adminAllowlistConfigured],
             ['Payment webhook allowlist configured', posture.paymentWebhookAllowlistConfigured],
             ['WhatsApp allowlist configured', posture.whatsappWebhookAllowlistConfigured],
+            ['Metrics allowlist configured', posture.metricsAllowlistConfigured],
             ['Peach signature enabled', posture.peachSignatureEnabled],
             ['Outbound retry enabled', posture.outboundRetryEnabled],
             ['Warnings', posture.warnings.length ? posture.warnings.join(' | ') : 'None']
           ];
           document.getElementById('securityPostureContent').innerHTML = rows.map(([label, value]) =>
-            '<div class="kv"><div class="label">' + label + '</div><div>' + value + '</div></div>'
+            '<div class="kv"><div class="label">' + escapeHtml(label) + '</div><div>' + escapeHtml(value) + '</div></div>'
           ).join('');
         }
 
         async function loadSessions() {
           const data = await api('/internal/admin/payment-sessions');
           renderTable(el.sessionsTableBody, data.sessions, 5, (item) =>
-            '<tr><td>' + item.provider + '</td><td><span class="pill">' + item.status + '</span></td><td class="mono">' + item.user_id + '</td><td>' + item.amount + ' ' + item.currency + '</td><td>' + item.created_at + '</td></tr>'
+            '<tr><td>' + escapeHtml(item.provider) + '</td><td><span class="pill">' + escapeHtml(item.status) + '</span></td><td class="mono">' + escapeHtml(item.user_id) + '</td><td>' + escapeHtml(item.amount) + ' ' + escapeHtml(item.currency) + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'
           );
         }
 
         async function loadAlerts() {
           const data = await api('/internal/admin/alerts');
-          renderTable(el.alertsTableBody, data.alerts, 4, (item) =>
-            '<tr><td>' + item.alert_key + '</td><td><span class="pill">' + item.severity + '</span></td><td><span class="pill">' + item.status + '</span></td><td>' + (item.current_value ?? '-') + ' / ' + (item.threshold_value ?? '-') + '</td></tr>'
-          );
+          renderTable(el.alertsTableBody, data.alerts, 5, (item) => {
+            const metadata = item.metadata && item.metadata.warnings
+              ? ' | ' + item.metadata.warnings.join(' | ')
+              : '';
+            return '<tr><td>' + escapeHtml(item.alert_key) + '</td><td><span class="pill">' + escapeHtml(item.severity) + '</span></td><td><span class="pill">' + escapeHtml(item.status) + '</span></td><td>' + escapeHtml((item.current_value ?? '-') + ' / ' + (item.threshold_value ?? '-')) + '</td><td>' + escapeHtml(metadata || '-') + '</td></tr>';
+          });
         }
 
         async function loadReports() {
           const data = await api('/internal/admin/reports');
           renderTable(el.reportsTableBody, data.reports, 4, (item) =>
-            '<tr><td class="mono">' + item.user_id + '</td><td><span class="pill">' + item.delivery_status + '</span></td><td>' + item.week_start + '</td><td>' + item.created_at + '</td></tr>'
+            '<tr><td class="mono">' + escapeHtml(item.user_id) + '</td><td><span class="pill">' + escapeHtml(item.delivery_status) + '</span></td><td>' + escapeHtml(item.week_start) + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'
           );
         }
 
         async function loadAuditEvents() {
-          const data = await api('/internal/admin/audit-events');
+          const params = new URLSearchParams();
+          if (el.auditUserIdFilter.value.trim()) params.set('userId', el.auditUserIdFilter.value.trim());
+          if (el.auditEventTypeFilter.value.trim()) params.set('eventType', el.auditEventTypeFilter.value.trim());
+          if (el.auditSeverityFilter.value) params.set('severity', el.auditSeverityFilter.value);
+          if (el.auditRequestIdFilter.value.trim()) params.set('requestId', el.auditRequestIdFilter.value.trim());
+          const data = await api('/internal/admin/audit-events?' + params.toString());
           renderTable(el.auditTableBody, data.events, 4, (item) =>
-            '<tr><td>' + item.event_type + '</td><td><span class="pill">' + item.severity + '</span></td><td class="mono">' + (item.user_id || '-') + '</td><td>' + item.created_at + '</td></tr>'
+            '<tr><td>' + escapeHtml(item.event_type) + '</td><td><span class="pill">' + escapeHtml(item.severity) + '</span></td><td class="mono">' + escapeHtml(item.user_id || '-') + '</td><td>' + escapeHtml(item.created_at) + '</td></tr>'
           );
         }
 
@@ -763,6 +846,7 @@ function renderAdminPanelHtml(): string {
           try {
             await Promise.all([
               loadOverview(),
+              loadMetrics(),
               loadUsers(),
               loadOutboundMessages(),
               loadDeadLetters(),
@@ -791,9 +875,10 @@ function renderAdminPanelHtml(): string {
         document.getElementById('reloadDeadLettersButton').addEventListener('click', loadDeadLetters);
         document.getElementById('reloadSecurityButton').addEventListener('click', loadSecurityPosture);
         document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadAlerts(), loadSessions(), loadReports(), loadAuditEvents()]));
+        document.getElementById('applyAuditFiltersButton').addEventListener('click', loadAuditEvents);
         document.getElementById('evaluateAlertsButton').addEventListener('click', async () => {
           await api('/internal/admin/alerts/evaluate', { method: 'POST' });
-          await Promise.all([loadOverview(), loadAlerts(), loadAuditEvents()]);
+          await Promise.all([loadOverview(), loadMetrics(), loadAlerts(), loadAuditEvents()]);
           setStatus('Operational alerts evaluated.', 'success');
         });
         document.getElementById('reloadUserProfileButton').addEventListener('click', loadUserProfile);
@@ -1012,6 +1097,135 @@ adminRouter.get("/dead-letters", async (request, response, next) => {
       limit: query.limit,
       offset: query.offset,
       deadLetters: result.deadLetters
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/dead-letters/:deadLetterId/requeue", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const deadLetterId = z.string().uuid().parse(request.params.deadLetterId);
+    const deadLetter = await getDeadLetterById(deadLetterId);
+
+    if (!deadLetter) {
+      response.status(404).json({
+        ok: false,
+        error: "Dead letter not found."
+      });
+      return;
+    }
+
+    if (deadLetter.source_table === "outbound_messages") {
+      const message = await getOutboundMessageById(deadLetter.source_id);
+
+      if (!message) {
+        response.status(404).json({
+          ok: false,
+          error: "Source outbound message not found."
+        });
+        return;
+      }
+
+      const result = await requeueOutboundMessage(deadLetter.source_id);
+
+      await updateDeadLetterStatus({
+        sourceTable: deadLetter.source_table,
+        sourceId: deadLetter.source_id,
+        status: "requeued",
+        requestId,
+        message: "Admin requeued dead letter via outbound source."
+      });
+
+      await recordAuditEventBestEffort({
+        requestId,
+        eventType: "admin_dead_letter_requeued",
+        actorType: "admin_api",
+        entityType: "dead_letter",
+        entityId: deadLetter.id,
+        message: "Admin requeued dead letter from outbound source.",
+        metadata: {
+          outboundMessageId: result.id,
+          status: result.status
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        result
+      });
+      return;
+    }
+
+    const result = await updateDeadLetterStatus({
+      sourceTable: deadLetter.source_table,
+      sourceId: deadLetter.source_id,
+      status: "resolved",
+      requestId,
+      message: "Admin resolved dead letter without outbound source."
+    });
+
+    await recordAuditEventBestEffort({
+      requestId,
+      eventType: "admin_dead_letter_resolved",
+      actorType: "admin_api",
+      entityType: "dead_letter",
+      entityId: deadLetter.id,
+      message: "Admin resolved dead letter without outbound source."
+    });
+
+    response.status(200).json({
+      ok: true,
+      result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/dead-letters/:deadLetterId/discard", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const deadLetterId = z.string().uuid().parse(request.params.deadLetterId);
+    const deadLetter = await getDeadLetterById(deadLetterId);
+
+    if (!deadLetter) {
+      response.status(404).json({
+        ok: false,
+        error: "Dead letter not found."
+      });
+      return;
+    }
+
+    if (deadLetter.source_table === "outbound_messages") {
+      const message = await getOutboundMessageById(deadLetter.source_id);
+
+      if (message) {
+        await discardOutboundMessage(deadLetter.source_id);
+      }
+    }
+
+    const result = await updateDeadLetterStatus({
+      sourceTable: deadLetter.source_table,
+      sourceId: deadLetter.source_id,
+      status: "discarded",
+      requestId,
+      message: "Admin discarded dead letter."
+    });
+
+    await recordAuditEventBestEffort({
+      requestId,
+      eventType: "admin_dead_letter_discarded",
+      actorType: "admin_api",
+      entityType: "dead_letter",
+      entityId: deadLetter.id,
+      message: "Admin discarded dead letter."
+    });
+
+    response.status(200).json({
+      ok: true,
+      result
     });
   } catch (error) {
     next(error);

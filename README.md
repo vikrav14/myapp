@@ -111,7 +111,11 @@ Copy `.env.example` to `.env` and fill in:
 - `ALERT_OUTBOUND_FAILED_THRESHOLD`
 - `ALERT_OPEN_DEAD_LETTER_THRESHOLD`
 - `ALERT_SECURITY_WARNINGS_THRESHOLD`
+- `ALERT_AUDIT_ERRORS_THRESHOLD`
+- `ALERT_INBOUND_DUPLICATE_DELIVERIES_THRESHOLD`
 - `ALERT_EVALUATION_CRON`
+- `ALERT_WEBHOOK_URL`
+- `ALERT_WEBHOOK_NOTIFY_ON_RESOLVE`
 
 If the WhatsApp send credentials are absent, the service will still process inbound payloads and log the reply instead of attempting delivery.
 
@@ -135,6 +139,7 @@ GitHub Actions is configured to run:
 - `npm ci`
 - `npm run build`
 - `npm run typecheck`
+- `npm run test`
 
 on pushes and pull requests.
 
@@ -245,6 +250,8 @@ Additional admin ops route:
 
 - `GET /internal/admin/audit-events`
 - `GET /internal/admin/dead-letters`
+- `POST /internal/admin/dead-letters/:deadLetterId/requeue`
+- `POST /internal/admin/dead-letters/:deadLetterId/discard`
 
 This supports filtering by:
 
@@ -329,6 +336,13 @@ Permanently failed outbound messages are also surfaced as `dead_letter_events`, 
 
 Operational thresholds are evaluated on the schedule defined by `ALERT_EVALUATION_CRON` and persisted in `operational_alert_states`.
 
+When `ALERT_WEBHOOK_URL` is configured, newly opened alerts post a JSON payload to that webhook. Set `ALERT_WEBHOOK_NOTIFY_ON_RESOLVE=true` to also notify when alerts close.
+
+Additional alert rules cover:
+
+- `audit_errors_24h`
+- `inbound_duplicate_deliveries_24h`
+
 ## Hardening
 
 The server can enforce route-level IP allowlisting with separate configuration for:
@@ -365,4 +379,4 @@ Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active us
 
 This is the backend foundation, not the final production system.
 
-The next major integration layers are admin tooling hardening and operational observability.
+The admin panel now supports metrics snapshots, audit-event filtering, dead-letter recovery actions, and safer HTML rendering. Operational alerts can also fan out to an external webhook when configured.

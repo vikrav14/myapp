@@ -12,6 +12,7 @@ const mockListAdminReports = vi.fn();
 const mockListAdminUsers = vi.fn();
 const mockAdminUpdateUser = vi.fn();
 const mockRetryOutboundMessageById = vi.fn();
+const mockGetDeadLetterById = vi.fn();
 const mockUpdateDeadLetterStatus = vi.fn();
 const mockGetOutboundMessageById = vi.fn();
 const mockRequeueOutboundMessage = vi.fn();
@@ -36,6 +37,7 @@ vi.mock("../src/services/outbound-retry.service.js", () => ({
 }));
 
 vi.mock("../src/services/dead-letter.service.js", () => ({
+  getDeadLetterById: mockGetDeadLetterById,
   updateDeadLetterStatus: mockUpdateDeadLetterStatus
 }));
 
@@ -64,6 +66,8 @@ describe("Admin routes", () => {
     expect(response.headers["content-type"]).toContain("text/html");
     expect(response.text).toContain("Mauri Admin Panel");
     expect(response.text).toContain("Outbound queue");
+    expect(response.text).toContain("metricsCards");
+    expect(response.text).toContain("applyAuditFiltersButton");
   });
 
   it("rejects protected admin endpoints without the admin key", async () => {
@@ -193,6 +197,47 @@ describe("Admin routes", () => {
         sourceTable: "outbound_messages",
         sourceId: messageId,
         status: "requeued"
+      })
+    );
+  });
+
+  it("requeues a dead letter through the outbound source", async () => {
+    const deadLetterId = "11111111-1111-4111-8111-111111111111";
+    const messageId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+
+    mockGetDeadLetterById.mockResolvedValue({
+      id: deadLetterId,
+      source_table: "outbound_messages",
+      source_id: messageId,
+      category: "outbound_message",
+      status: "open"
+    });
+    mockGetOutboundMessageById.mockResolvedValue({
+      id: messageId,
+      status: "permanent_failed",
+      phone_number: "23058888888"
+    });
+    mockRequeueOutboundMessage.mockResolvedValue({
+      id: messageId,
+      status: "failed"
+    });
+    mockUpdateDeadLetterStatus.mockResolvedValue({
+      id: deadLetterId,
+      status: "requeued"
+    });
+
+    const app = createApp();
+    const response = await request(app)
+      .post(`/internal/admin/dead-letters/${deadLetterId}/requeue`)
+      .set("x-mauri-admin-key", "test-admin-key");
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(mockRequeueOutboundMessage).toHaveBeenCalledWith(messageId);
+    expect(mockRecordAuditEventBestEffort).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "admin_dead_letter_requeued",
+        entityId: deadLetterId
       })
     );
   });

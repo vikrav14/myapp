@@ -1,4 +1,5 @@
 import { env } from "../lib/env.js";
+import { logger } from "../lib/logger.js";
 import { getSecurityPostureSummary } from "../lib/network-security.js";
 import { supabase } from "../lib/supabase.js";
 import type { MetricsSnapshot, OperationalAlertStateRecord } from "../types.js";
@@ -37,7 +38,7 @@ function mapOperationalAlert(record: Record<string, unknown>): OperationalAlertS
   };
 }
 
-function buildAlertEvaluations(snapshot: MetricsSnapshot): AlertEvaluation[] {
+export function buildAlertEvaluations(snapshot: MetricsSnapshot): AlertEvaluation[] {
   const security = getSecurityPostureSummary();
 
   return [
@@ -78,8 +79,91 @@ function buildAlertEvaluations(snapshot: MetricsSnapshot): AlertEvaluation[] {
       metadata: {
         warnings: security.warnings
       }
+    },
+    {
+      alertKey: "audit_errors_24h",
+      severity: "error",
+      status: snapshot.audit_errors_24h >= env.ALERT_AUDIT_ERRORS_THRESHOLD ? "open" : "closed",
+      message: "Error-severity audit events in the last 24 hours exceeded threshold.",
+      currentValue: snapshot.audit_errors_24h,
+      thresholdValue: env.ALERT_AUDIT_ERRORS_THRESHOLD
+    },
+    {
+      alertKey: "inbound_duplicate_deliveries_24h",
+      severity: "warning",
+      status:
+        snapshot.inbound_duplicate_deliveries_24h >= env.ALERT_INBOUND_DUPLICATE_DELIVERIES_THRESHOLD
+          ? "open"
+          : "closed",
+      message: "Duplicate inbound webhook deliveries in the last 24 hours exceeded threshold.",
+      currentValue: snapshot.inbound_duplicate_deliveries_24h,
+      thresholdValue: env.ALERT_INBOUND_DUPLICATE_DELIVERIES_THRESHOLD
     }
   ];
+}
+
+async function notifyAlertWebhook(input: {
+  event: "opened" | "resolved";
+  evaluation: AlertEvaluation;
+  record: OperationalAlertStateRecord;
+  requestId?: string | undefined;
+}): Promise<void> {
+  if (!env.ALERT_WEBHOOK_URL) {
+    return;
+  }
+
+  if (input.event === "resolved" && !env.ALERT_WEBHOOK_NOTIFY_ON_RESOLVE) {
+    return;
+  }
+
+  const payload = {
+    event: input.event,
+    service: "mauri-backend",
+    requestId: input.requestId ?? null,
+    alert: {
+      id: input.record.id,
+      key: input.evaluation.alertKey,
+      severity: input.evaluation.severity,
+      status: input.record.status,
+      message: input.evaluation.message,
+      currentValue: input.evaluation.currentValue,
+      thresholdValue: input.evaluation.thresholdValue,
+      metadata: input.evaluation.metadata ?? input.record.metadata ?? null,
+      triggeredAt: input.record.triggered_at,
+      resolvedAt: input.record.resolved_at,
+      evaluatedAt: input.record.last_evaluated_at
+    }
+  };
+
+  try {
+    const response = await fetch(env.ALERT_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      logger.warn(
+        {
+          alertKey: input.evaluation.alertKey,
+          event: input.event,
+          statusCode: response.status
+        },
+        "Operational alert webhook notification failed."
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      {
+        alertKey: input.evaluation.alertKey,
+        event: input.event,
+        error
+      },
+      "Operational alert webhook notification failed."
+    );
+  }
 }
 
 export async function listOperationalAlerts(status?: string): Promise<OperationalAlertStateRecord[]> {
@@ -163,6 +247,12 @@ export async function evaluateAndPersistOperationalAlerts(input?: {
           thresholdValue: evaluation.thresholdValue
         }
       });
+      await notifyAlertWebhook({
+        event: "opened",
+        evaluation,
+        record,
+        requestId: input?.requestId
+      });
     }
 
     if (resolving) {
@@ -178,6 +268,12 @@ export async function evaluateAndPersistOperationalAlerts(input?: {
           currentValue: evaluation.currentValue,
           thresholdValue: evaluation.thresholdValue
         }
+      });
+      await notifyAlertWebhook({
+        event: "resolved",
+        evaluation,
+        record,
+        requestId: input?.requestId
       });
     }
   }
