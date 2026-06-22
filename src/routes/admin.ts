@@ -23,6 +23,12 @@ import {
   listAdminSquads,
   listAdminUsers
 } from "../services/admin.service.js";
+import { listDailyBriefRuns } from "../services/morning-brief-run.service.js";
+import {
+  runMorningBriefCuration,
+  runMorningBriefDelivery,
+  runMorningBriefScrape
+} from "../jobs/morning-brief-jobs.js";
 import { getRequestId } from "../lib/request-tracing.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { getMetricsSnapshot } from "../services/metrics.service.js";
@@ -41,7 +47,7 @@ const paginationSchema = z.object({
 
 const listUsersQuerySchema = paginationSchema.extend({
   subscriptionStatus: z.enum(["Trial_Active", "Paid_Active", "Locked"]).optional(),
-  onboardingState: z.enum(["awaiting_archetype", "active"]).optional(),
+  onboardingState: z.enum(["awaiting_archetype", "awaiting_topics", "active"]).optional(),
   search: z.string().trim().min(1).optional()
 });
 
@@ -100,7 +106,7 @@ const updateUserBodySchema = z
   .object({
     first_name: z.string().trim().min(1).nullable().optional(),
     archetype: z.string().trim().min(1).optional(),
-    onboarding_state: z.enum(["awaiting_archetype", "active"]).optional(),
+    onboarding_state: z.enum(["awaiting_archetype", "awaiting_topics", "active"]).optional(),
     subscription_status: z.enum(["Trial_Active", "Paid_Active", "Locked"]).optional(),
     trial_ends_at: z.iso.datetime().nullable().optional(),
     subscription_ends_at: z.iso.datetime().nullable().optional()
@@ -348,6 +354,7 @@ function renderAdminPanelHtml(): string {
               <select id="userOnboardingFilter">
                 <option value="">All onboarding states</option>
                 <option value="awaiting_archetype">awaiting_archetype</option>
+                <option value="awaiting_topics">awaiting_topics</option>
                 <option value="active">active</option>
               </select>
               <input id="userLimit" type="number" min="1" max="100" value="20" placeholder="Limit" />
@@ -449,7 +456,7 @@ function renderAdminPanelHtml(): string {
               <div class="two-col">
                 <div><label class="label">First name</label><input id="editFirstName" /></div>
                 <div><label class="label">Archetype</label><input id="editArchetype" /></div>
-                <div><label class="label">Onboarding state</label><select id="editOnboardingState"><option value="">No change</option><option value="awaiting_archetype">awaiting_archetype</option><option value="active">active</option></select></div>
+                <div><label class="label">Onboarding state</label><select id="editOnboardingState"><option value="">No change</option><option value="awaiting_archetype">awaiting_archetype</option><option value="awaiting_topics">awaiting_topics</option><option value="active">active</option></select></div>
                 <div><label class="label">Subscription status</label><select id="editSubscriptionStatus"><option value="">No change</option><option value="Trial_Active">Trial_Active</option><option value="Paid_Active">Paid_Active</option><option value="Locked">Locked</option></select></div>
                 <div><label class="label">Trial ends at (ISO)</label><input id="editTrialEndsAt" placeholder="2026-06-30T23:59:59.000Z" /></div>
                 <div><label class="label">Subscription ends at (ISO)</label><input id="editSubscriptionEndsAt" placeholder="2026-07-30T23:59:59.000Z" /></div>
@@ -587,6 +594,14 @@ function renderAdminPanelHtml(): string {
             <div class="table-wrap" style="max-height:180px;">
               <table><thead><tr><th>Provider</th><th>Status</th><th>User</th><th>Amount</th><th>Created</th></tr></thead><tbody id="sessionsTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody></table>
             </div>
+            <h3 style="margin:18px 0 8px;">Morning brief runs</h3>
+            <div class="actions" style="margin-bottom:8px;">
+              <button id="runMorningBriefButton" class="warning small">Run morning brief now</button>
+              <button id="reloadMorningBriefButton" class="secondary small">Reload morning brief</button>
+            </div>
+            <div class="table-wrap" style="max-height:180px;">
+              <table><thead><tr><th>Date</th><th>Status</th><th>Scraped</th><th>Curated</th><th>Delivered</th></tr></thead><tbody id="morningBriefTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody></table>
+            </div>
             <h3 style="margin:18px 0 8px;">Weekly reports</h3>
             <div class="table-wrap" style="max-height:180px;">
               <table><thead><tr><th>User</th><th>Status</th><th>Week start</th><th>Created</th></tr></thead><tbody id="reportsTableBody"><tr><td colspan="4">No data loaded yet.</td></tr></tbody></table>
@@ -629,6 +644,7 @@ function renderAdminPanelHtml(): string {
           deadLettersTableBody: document.getElementById('deadLettersTableBody'),
           sessionsTableBody: document.getElementById('sessionsTableBody'),
           reportsTableBody: document.getElementById('reportsTableBody'),
+          morningBriefTableBody: document.getElementById('morningBriefTableBody'),
           auditTableBody: document.getElementById('auditTableBody'),
           alertsTableBody: document.getElementById('alertsTableBody'),
           securityPostureContent: document.getElementById('securityPostureContent'),
@@ -1186,6 +1202,13 @@ function renderAdminPanelHtml(): string {
           });
         }
 
+        async function loadMorningBriefRuns() {
+          const data = await api('/internal/admin/morning-brief/runs?limit=10');
+          renderTable(el.morningBriefTableBody, data.runs, 5, (item) =>
+            '<tr><td>' + escapeHtml(item.brief_date) + '</td><td><span class="pill">' + escapeHtml(item.status) + '</span></td><td>' + escapeHtml(item.scraped_at || '-') + '</td><td>' + escapeHtml(item.curated_at || '-') + '</td><td>' + escapeHtml(item.delivered_at || '-') + '</td></tr>'
+          );
+        }
+
         async function loadReports() {
           const data = await api('/internal/admin/reports');
           renderTable(el.reportsTableBody, data.reports, 4, (item) =>
@@ -1223,6 +1246,7 @@ function renderAdminPanelHtml(): string {
               loadAlerts(),
               loadSessions(),
               loadReports(),
+              loadMorningBriefRuns(),
               loadAuditEvents(),
               state.selectedUserId ? loadUserProfile() : Promise.resolve(),
               state.selectedSquadId ? loadSquadProfile() : Promise.resolve()
@@ -1247,7 +1271,13 @@ function renderAdminPanelHtml(): string {
         document.getElementById('reloadDeadLettersButton').addEventListener('click', loadDeadLetters);
         document.getElementById('reloadSecurityButton').addEventListener('click', loadSecurityPosture);
         document.getElementById('reloadDeployPreflightButton').addEventListener('click', loadDeployPreflight);
-        document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadAlerts(), loadSessions(), loadReports(), loadAuditEvents()]));
+        document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadAlerts(), loadSessions(), loadReports(), loadMorningBriefRuns(), loadAuditEvents()]));
+        document.getElementById('reloadMorningBriefButton').addEventListener('click', loadMorningBriefRuns);
+        document.getElementById('runMorningBriefButton').addEventListener('click', async () => {
+          await api('/internal/admin/morning-brief/run', { method: 'POST', body: JSON.stringify({ step: 'all' }) });
+          await Promise.all([loadMorningBriefRuns(), loadAuditEvents()]);
+          setStatus('Morning brief pipeline executed.', 'success');
+        });
         document.getElementById('applyAuditFiltersButton').addEventListener('click', loadAuditEvents);
         document.getElementById('evaluateAlertsButton').addEventListener('click', async () => {
           await api('/internal/admin/alerts/evaluate', { method: 'POST' });
@@ -1506,6 +1536,42 @@ adminRouter.patch("/users/:userId", async (request, response, next) => {
     response.status(200).json({
       ok: true,
       user
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/morning-brief/runs", async (request, response, next) => {
+  try {
+    const limit = z.coerce.number().int().positive().max(30).default(10).parse(request.query.limit ?? 10);
+    const runs = await listDailyBriefRuns(limit);
+    response.status(200).json({
+      ok: true,
+      runs
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/morning-brief/run", async (request, response, next) => {
+  try {
+    const step = z.enum(["scrape", "curate", "deliver", "all"]).parse(request.body?.step ?? "all");
+    if (step === "scrape" || step === "all") {
+      await runMorningBriefScrape();
+    }
+    if (step === "curate" || step === "all") {
+      await runMorningBriefCuration();
+    }
+    if (step === "deliver" || step === "all") {
+      await runMorningBriefDelivery();
+    }
+
+    const runs = await listDailyBriefRuns(1);
+    response.status(200).json({
+      ok: true,
+      latestRun: runs[0] ?? null
     });
   } catch (error) {
     next(error);

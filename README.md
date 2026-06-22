@@ -12,6 +12,7 @@ This repository now contains the first backend foundation for the product spec i
 - Trial expiry enforcement with locked-state paywall response
 - Payment confirmation endpoint with subscription activation and payment event logging
 - Sunday diagnostic report generation with weekly storage and delivery
+- Morning Mauritian vibe check pipeline (4:30 scrape, 5:00 curate, 7:00 deliver) with topic-tagged personalization
 - Voice note transcription for WhatsApp audio messages
 - Embedding-backed semantic memory storage and retrieval
 - Provider-specific payment callback adapters for MCB Juice and Blink
@@ -69,6 +70,7 @@ supabase/migrations/
   010_dead_letter_events.sql
   011_processed_inbound_events.sql
   012_operational_alert_states.sql
+  013_morning_brief_engine.sql
 ```
 
 ## Environment variables
@@ -410,6 +412,31 @@ The admin panel also exposes squad operations:
 From the panel you can list squads, inspect members, rename squads, remove members, dissolve squads, and jump from a user profile to their squad.
 
 Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active users and stores the report payload in `weekly_reports`.
+
+## Morning Mauritian vibe check
+
+Active users with 3–5 topic tags receive a personalized WhatsApp digest at **7:00** (`Indian/Mauritius` by default).
+
+Pipeline:
+
+1. **4:30** — scrape Mauritian RSS feeds plus weather (Open-Meteo) and optional Google Maps traffic corridors
+2. **5:00** — Gemini curates a shared daily brief JSON (weather line, traffic line, tagged stories)
+3. **7:00** — backend personalizes and delivers per user topic preferences
+
+Onboarding now includes topic selection (`awaiting_topics`) after archetype pick.
+
+Admin ops:
+
+- `GET /internal/admin/morning-brief/runs`
+- `POST /internal/admin/morning-brief/run` with `{ "step": "scrape" | "curate" | "deliver" | "all" }`
+
+Environment:
+
+- `MORNING_BRIEF_ENABLED`
+- `MORNING_BRIEF_TIMEZONE`
+- `MORNING_BRIEF_SCRAPE_CRON` / `MORNING_BRIEF_CURATE_CRON` / `MORNING_BRIEF_DELIVER_CRON`
+- `MORNING_BRIEF_RSS_FEEDS` (optional comma-separated override)
+- `GOOGLE_MAPS_API_KEY` (optional, for live traffic lines)
 
 ## Current constraints
 

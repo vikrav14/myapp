@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase.js";
-import type { MauriUser } from "../types.js";
+import type { MauriUser, MorningBriefTopicKey } from "../types.js";
 
 export function mapUser(record: Record<string, unknown>): MauriUser {
   return {
@@ -16,6 +16,12 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
     subscription_started_at: record.subscription_started_at ? String(record.subscription_started_at) : null,
     subscription_ends_at: record.subscription_ends_at ? String(record.subscription_ends_at) : null,
     last_payment_at: record.last_payment_at ? String(record.last_payment_at) : null,
+    topic_preferences: Array.isArray(record.topic_preferences)
+      ? record.topic_preferences.map(String).filter((topic): topic is MorningBriefTopicKey =>
+          ["Traffic", "Tech", "Money", "LocalBuzz", "Entertainment"].includes(topic)
+        )
+      : [],
+    morning_digest_enabled: record.morning_digest_enabled !== false,
     created_at: String(record.created_at),
     updated_at: String(record.updated_at)
   };

@@ -1,5 +1,6 @@
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
-export type OnboardingState = "awaiting_archetype" | "active";
+export type OnboardingState = "awaiting_archetype" | "awaiting_topics" | "active";
+export type MorningBriefTopicKey = "Traffic" | "Tech" | "Money" | "LocalBuzz" | "Entertainment";
 export type PaymentProvider = "MCB_JUICE" | "BLINK" | "MANUAL";
 export type MemoryType = "user_message" | "assistant_reply" | "emotion_signal" | "weekly_report";
 export type AuditSeverity = "info" | "warning" | "error";
@@ -23,6 +24,8 @@ export interface MauriUser {
   subscription_started_at: string | null;
   subscription_ends_at: string | null;
   last_payment_at: string | null;
+  topic_preferences: MorningBriefTopicKey[];
+  morning_digest_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -200,6 +203,57 @@ export interface MetricsSnapshot {
   voice_notes_24h: number;
   audit_errors_24h: number;
   inbound_duplicate_deliveries_24h: number;
+}
+
+export type DailyBriefRunStatus =
+  | "pending_scrape"
+  | "scraped"
+  | "curating"
+  | "curated"
+  | "delivering"
+  | "delivered"
+  | "failed";
+
+export interface DailyBriefRunRecord {
+  id: string;
+  brief_date: string;
+  status: DailyBriefRunStatus | string;
+  scrape_payload: Record<string, unknown> | null;
+  traffic_snapshot: Record<string, unknown> | null;
+  weather_snapshot: Record<string, unknown> | null;
+  curated_payload: Record<string, unknown> | null;
+  error_message: string | null;
+  scraped_at: string | null;
+  curated_at: string | null;
+  delivered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailyBriefDeliveryRecord {
+  id: string;
+  run_id: string;
+  user_id: string;
+  delivery_status: string;
+  message_text: string | null;
+  error_message: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface CuratedMorningStory {
+  topic: MorningBriefTopicKey | string;
+  headline: string;
+  summary: string;
+  source: string;
+  url?: string | undefined;
+}
+
+export interface CuratedMorningBrief {
+  brief_date: string;
+  weather_line: string;
+  traffic_line: string;
+  stories: CuratedMorningStory[];
 }
 
 export interface SemanticMemoryMatch {

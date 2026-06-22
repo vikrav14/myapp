@@ -4,6 +4,7 @@ import type { MauriUser, WeeklyDiagnosticSummary, WeeklyReportRecord } from "../
 import { generateWeeklyDiagnosticCopy } from "./ai.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
+import { mapUser } from "./user.service.js";
 
 interface ReportWindow {
   weekStart: string;
@@ -386,23 +387,7 @@ export async function runSundayDiagnosticReports(referenceDate: Date = new Date(
     const user = rawUser as Record<string, unknown>;
 
     await generateWeeklyDiagnosticReport({
-      user: {
-        id: String(user.id),
-        phone_number: String(user.phone_number),
-        first_name: user.first_name ? String(user.first_name) : null,
-        archetype: String(user.archetype ?? "Life & Habit Tracking"),
-        onboarding_state: String(user.onboarding_state ?? "active") as MauriUser["onboarding_state"],
-        subscription_status: String(user.subscription_status ?? "Trial_Active") as MauriUser["subscription_status"],
-        onboarding_completed_at: user.onboarding_completed_at ? String(user.onboarding_completed_at) : null,
-        trial_started_at: user.trial_started_at ? String(user.trial_started_at) : null,
-        trial_ends_at: user.trial_ends_at ? String(user.trial_ends_at) : null,
-        locked_at: user.locked_at ? String(user.locked_at) : null,
-        subscription_started_at: user.subscription_started_at ? String(user.subscription_started_at) : null,
-        subscription_ends_at: user.subscription_ends_at ? String(user.subscription_ends_at) : null,
-        last_payment_at: user.last_payment_at ? String(user.last_payment_at) : null,
-        created_at: String(user.created_at),
-        updated_at: String(user.updated_at)
-      },
+      user: mapUser(user),
       referenceDate,
       sendMessage: true,
       forceRegenerate: false

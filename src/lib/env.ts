@@ -91,7 +91,14 @@ const envSchema = z.object({
 
     return value;
   }, z.string().url().optional()),
-  ALERT_WEBHOOK_NOTIFY_ON_RESOLVE: envBoolean.default(false)
+  ALERT_WEBHOOK_NOTIFY_ON_RESOLVE: envBoolean.default(false),
+  MORNING_BRIEF_ENABLED: envBoolean.default(true),
+  MORNING_BRIEF_TIMEZONE: z.string().default("Indian/Mauritius"),
+  MORNING_BRIEF_SCRAPE_CRON: z.string().default("30 4 * * *"),
+  MORNING_BRIEF_CURATE_CRON: z.string().default("0 5 * * *"),
+  MORNING_BRIEF_DELIVER_CRON: z.string().default("0 7 * * *"),
+  MORNING_BRIEF_RSS_FEEDS: optionalCsv,
+  GOOGLE_MAPS_API_KEY: optionalSecret
 });
 
 export const env = envSchema.parse(process.env);
