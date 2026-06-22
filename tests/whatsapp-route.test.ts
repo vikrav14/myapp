@@ -44,6 +44,12 @@ vi.mock("../src/services/onboarding.service.js", () => ({
   handleOnboardingMessage: mockHandleOnboardingMessage
 }));
 
+const mockHandleSquadMessage = vi.fn();
+
+vi.mock("../src/services/squad.service.js", () => ({
+  handleSquadMessage: mockHandleSquadMessage
+}));
+
 vi.mock("../src/services/user.service.js", () => ({
   getOrCreateUser: mockGetOrCreateUser
 }));
@@ -87,6 +93,7 @@ describe("WhatsApp webhook route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRegisterInboundEvent.mockResolvedValue({ duplicate: false });
+    mockHandleSquadMessage.mockResolvedValue({ handled: false });
   });
 
   it("returns the onboarding reply for a new user awaiting archetype", async () => {
@@ -204,6 +211,54 @@ describe("WhatsApp webhook route", () => {
       expect.objectContaining({
         eventType: "inbound_message_processed",
         userId: activeUser.id
+      })
+    );
+  });
+
+  it("routes squad commands before conversational processing", async () => {
+    const paidUser = {
+      ...baseUser,
+      onboarding_state: "active" as const,
+      subscription_status: "Paid_Active" as const,
+      subscription_ends_at: "2026-12-31T00:00:00.000Z"
+    };
+
+    mockGetOrCreateUser.mockResolvedValue({
+      user: paidUser,
+      isNewUser: false
+    });
+    mockEnforceAccessPolicy.mockResolvedValue({
+      handled: false,
+      user: paidUser
+    });
+    mockResolveInboundMessageText.mockResolvedValue({
+      messageText: "create squad Study Crew"
+    });
+    mockHandleOnboardingMessage.mockResolvedValue({
+      handled: false,
+      user: paidUser
+    });
+    mockHandleSquadMessage.mockResolvedValue({
+      handled: true,
+      reply: "Squad live: Study Crew."
+    });
+
+    const app = createApp();
+    const response = await request(app)
+      .post("/webhooks/whatsapp")
+      .send({ from: paidUser.phone_number, text: "create squad Study Crew", messageId: "wamid-squad-1" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.replyPreview).toContain("Squad live");
+    expect(mockHandleSquadMessage).toHaveBeenCalled();
+    expect(mockExtractStructuredContext).not.toHaveBeenCalled();
+    expect(mockSendWhatsAppMessage).toHaveBeenCalledWith(
+      paidUser.phone_number,
+      "Squad live: Study Crew.",
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          flow: "squad_command"
+        })
       })
     );
   });

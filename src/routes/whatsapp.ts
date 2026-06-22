@@ -10,6 +10,7 @@ import { registerInboundEvent } from "../services/inbound-event.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
+import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
 import { parseInboundMessage, sendWhatsAppMessage } from "../services/whatsapp.service.js";
@@ -61,7 +62,7 @@ whatsappRouter.post("/", async (request, response, next) => {
     }
 
     const { user: initialUser, isNewUser } = await getOrCreateUser(inboundMessage.from, inboundMessage.profileName);
-    const accessPolicyResult = await enforceAccessPolicy(initialUser);
+    const accessPolicyResult = await enforceAccessPolicy(initialUser, requestId);
 
     if (accessPolicyResult.handled && accessPolicyResult.reply) {
       await sendWhatsAppMessage(inboundMessage.from, accessPolicyResult.reply, {
@@ -160,6 +161,35 @@ whatsappRouter.post("/", async (request, response, next) => {
     }
 
     const user = onboardingResult.user;
+
+    const squadResult = await handleSquadMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (squadResult.handled && squadResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, squadResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "squad_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: squadResult.reply
+      });
+      return;
+    }
+
     const context = await loadUserContext(user.id, normalizedMessageText);
 
     try {

@@ -1,6 +1,6 @@
 import type { MauriArchetype, MauriUser } from "../types.js";
 
-import { env } from "../lib/env.js";
+import { buildLockedReplyForUser } from "./paywall.service.js";
 import { updateUserState } from "./user.service.js";
 
 const archetypeCatalog: Array<{
@@ -78,25 +78,76 @@ function buildActivationReply(archetype: MauriArchetype): string {
 
 Your 7-day trial starts now.
 
-Send me your messy brain dump exactly as it is. Spending. Tasks. Wins. Stress. Random thoughts. I’ll sort the signal from the chaos.`;
+Send me your messy brain dump exactly as it is. Spending. Tasks. Wins. Stress. Random thoughts. I’ll sort the signal from the chaos.
+
+When you unlock premium later, you can reply "create squad" or "join CODE" for private accountability with friends.`;
 }
 
-function buildLockedReply(user: MauriUser): string {
-  const name = user.first_name?.trim() || "Hey";
-  const paymentTail =
-    env.MCB_JUICE_PAYMENT_LINK || env.BLINK_PAYMENT_LINK
-      ? `Unlock it here. Juice: ${env.MCB_JUICE_PAYMENT_LINK ?? "not set yet"}. Blink: ${
-          env.BLINK_PAYMENT_LINK ?? "not set yet"
-        }. Once payment lands and gets confirmed, Mauri opens back up automatically.`
-      : "Payment links are not wired yet, so confirm the payment through the internal activation route after payment for now.";
+export async function enforceAccessPolicy(
+  user: MauriUser,
+  requestId?: string | undefined
+): Promise<OnboardingResult> {
+  if (user.subscription_status === "Paid_Active") {
+    if (!user.subscription_ends_at) {
+      return {
+        handled: false,
+        user
+      };
+    }
 
-  return `${name}, your Mauri vault is locked right now.
+    const subscriptionExpired = new Date(user.subscription_ends_at).getTime() <= Date.now();
+    if (!subscriptionExpired) {
+      return {
+        handled: false,
+        user
+      };
+    }
 
-Your trial window ended, so I’m holding the deeper memory and tracking layer until premium is active.
+    const updatedPaidUser = await updateUserState(user.id, {
+      subscription_status: "Locked",
+      locked_at: new Date().toISOString()
+    });
 
-Premium is Rs ${env.SUBSCRIPTION_MONTHLY_PRICE_RS} per month.
+    return {
+      handled: true,
+      user: updatedPaidUser,
+      reply: await buildLockedReplyForUser(updatedPaidUser, requestId)
+    };
+  }
 
-${paymentTail}`;
+  if (user.subscription_status === "Locked") {
+    return {
+      handled: true,
+      user,
+      reply: await buildLockedReplyForUser(user, requestId)
+    };
+  }
+
+  if (!user.trial_ends_at) {
+    return {
+      handled: false,
+      user
+    };
+  }
+
+  const expired = new Date(user.trial_ends_at).getTime() <= Date.now();
+  if (!expired) {
+    return {
+      handled: false,
+      user
+    };
+  }
+
+  const updatedUser = await updateUserState(user.id, {
+    subscription_status: "Locked",
+    locked_at: new Date().toISOString()
+  });
+
+  return {
+    handled: true,
+    user: updatedUser,
+    reply: await buildLockedReplyForUser(updatedUser, requestId)
+  };
 }
 
 export async function handleOnboardingMessage(input: {
@@ -139,69 +190,5 @@ export async function handleOnboardingMessage(input: {
     handled: true,
     user: updatedUser,
     reply: buildActivationReply(archetype)
-  };
-}
-
-export async function enforceAccessPolicy(user: MauriUser): Promise<OnboardingResult> {
-  if (user.subscription_status === "Paid_Active") {
-    if (!user.subscription_ends_at) {
-      return {
-        handled: false,
-        user
-      };
-    }
-
-    const subscriptionExpired = new Date(user.subscription_ends_at).getTime() <= Date.now();
-    if (!subscriptionExpired) {
-      return {
-        handled: false,
-        user
-      };
-    }
-
-    const updatedPaidUser = await updateUserState(user.id, {
-      subscription_status: "Locked",
-      locked_at: new Date().toISOString()
-    });
-
-    return {
-      handled: true,
-      user: updatedPaidUser,
-      reply: buildLockedReply(updatedPaidUser)
-    };
-  }
-
-  if (user.subscription_status === "Locked") {
-    return {
-      handled: true,
-      user,
-      reply: buildLockedReply(user)
-    };
-  }
-
-  if (!user.trial_ends_at) {
-    return {
-      handled: false,
-      user
-    };
-  }
-
-  const expired = new Date(user.trial_ends_at).getTime() <= Date.now();
-  if (!expired) {
-    return {
-      handled: false,
-      user
-    };
-  }
-
-  const updatedUser = await updateUserState(user.id, {
-    subscription_status: "Locked",
-    locked_at: new Date().toISOString()
-  });
-
-  return {
-    handled: true,
-    user: updatedUser,
-    reply: buildLockedReply(updatedUser)
   };
 }

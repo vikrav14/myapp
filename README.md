@@ -371,7 +371,16 @@ When `trial_ends_at` is in the past and the user is still `Trial_Active`, the we
 
 When a payment confirmation is posted to the internal payment route, the user is unlocked into `Paid_Active` and receives a premium expiry window.
 
-When a paid subscription window expires, the webhook auto-locks the account again on the next inbound message.
+When a paid subscription window expires, the webhook auto-locks the account again on the next inbound message. Locked users now receive per-user checkout session references alongside the configured Juice and Blink payment links.
+
+Premium users can manage Mauri Squads directly in WhatsApp:
+
+- `create squad` or `create squad Study Crew`
+- `join CODE`
+- `squad status` or `my squad`
+- `leave squad`
+
+Squad nudges and Sunday showdowns only include members with an active paid subscription.
 
 Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active users and stores the report payload in `weekly_reports`.
 
