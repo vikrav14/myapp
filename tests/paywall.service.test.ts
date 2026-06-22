@@ -14,6 +14,10 @@ vi.mock("../src/lib/env.js", () => ({
   }
 }));
 
+vi.mock("../src/services/blink-paylink.service.js", () => ({
+  isBlinkPaylinkAutomationEnabled: () => true
+}));
+
 vi.mock("../src/services/payment-link.service.js", () => ({
   createPaymentCheckoutSession: mockCreatePaymentCheckoutSession
 }));
@@ -48,25 +52,50 @@ describe("buildLockedReplyForUser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockCreatePaymentCheckoutSession.mockResolvedValue({
-      id: "session-1",
-      user_id: user.id,
-      provider: "MCB_JUICE",
-      status: "prepared",
-      user_reference: "mauri:user:11111111-1111-4111-8111-111111111111",
-      provider_reference: "MJABCDEF",
-      amount: 200,
-      currency: "MUR",
-      duration_days: 30,
-      provider_payload: {},
-      provider_endpoint: "https://secure.peachpayments.com/checkout/initiate",
-      checkout_url: null,
-      provider_session_id: null,
-      provider_response: null,
-      activated_payment_event_id: null,
-      activated_at: null,
-      created_at: "2026-06-22T00:00:00.000Z",
-      updated_at: "2026-06-22T00:00:00.000Z"
+    mockCreatePaymentCheckoutSession.mockImplementation(async (input: { provider: string }) => {
+      if (input.provider === "BLINK") {
+        return {
+          id: "session-blink-1",
+          user_id: user.id,
+          provider: "BLINK",
+          status: "prepared",
+          user_reference: `mauri:user:${user.id}`,
+          provider_reference: "blink-ref",
+          amount: 200,
+          currency: "MUR",
+          duration_days: 30,
+          provider_payload: {},
+          provider_endpoint: "https://api.blinkpayment.co.uk/api/paylink/v1/paylinks",
+          checkout_url: "https://pay.blinkpayment.co.uk/paylink-99",
+          provider_session_id: "paylink-99",
+          provider_response: null,
+          activated_payment_event_id: null,
+          activated_at: null,
+          created_at: "2026-06-22T00:00:00.000Z",
+          updated_at: "2026-06-22T00:00:00.000Z"
+        };
+      }
+
+      return {
+        id: "session-1",
+        user_id: user.id,
+        provider: "MCB_JUICE",
+        status: "prepared",
+        user_reference: "mauri:user:11111111-1111-4111-8111-111111111111",
+        provider_reference: "MJABCDEF",
+        amount: 200,
+        currency: "MUR",
+        duration_days: 30,
+        provider_payload: {},
+        provider_endpoint: "https://secure.peachpayments.com/checkout/initiate",
+        checkout_url: null,
+        provider_session_id: null,
+        provider_response: null,
+        activated_payment_event_id: null,
+        activated_at: null,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      };
     });
 
     mockSupabaseFrom.mockReturnValue({
@@ -94,5 +123,12 @@ describe("buildLockedReplyForUser", () => {
     expect(reply).toContain("Juice: https://pay.example.com/juice");
     expect(reply).toContain("MJABCDEF");
     expect(mockCreatePaymentCheckoutSession).toHaveBeenCalled();
+  });
+
+  it("prefers the generated Blink checkout URL over the static fallback", async () => {
+    const reply = await buildLockedReplyForUser(user, "req-pay-1");
+
+    expect(reply).toContain("Blink: https://pay.blinkpayment.co.uk/paylink-99");
+    expect(reply).not.toContain("https://pay.example.com/blink");
   });
 });

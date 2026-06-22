@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { env } from "../lib/env.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser, PaymentCheckoutSessionRecord, PaymentProvider } from "../types.js";
+import { createBlinkPaylink, isBlinkPaylinkAutomationEnabled } from "./blink-paylink.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -163,6 +164,17 @@ export async function createPaymentCheckoutSession(input: {
           durationDays
         });
 
+  let checkoutUrl: string | null = null;
+  let providerSessionId: string | null = null;
+  let providerResponse: Record<string, unknown> | null = null;
+
+  if (input.provider === "BLINK" && isBlinkPaylinkAutomationEnabled()) {
+    const blinkPaylink = await createBlinkPaylink(providerConfig.payload);
+    checkoutUrl = blinkPaylink.paylinkUrl;
+    providerSessionId = blinkPaylink.id;
+    providerResponse = blinkPaylink.rawResponse;
+  }
+
   const { data, error } = await supabase
     .from("payment_checkout_sessions")
     .insert({
@@ -176,7 +188,9 @@ export async function createPaymentCheckoutSession(input: {
       duration_days: durationDays,
       provider_payload: providerConfig.payload,
       provider_endpoint: providerConfig.endpoint,
-      checkout_url: null
+      checkout_url: checkoutUrl,
+      provider_session_id: providerSessionId,
+      provider_response: providerResponse
     })
     .select("*")
     .single();

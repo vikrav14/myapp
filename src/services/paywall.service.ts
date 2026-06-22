@@ -2,6 +2,7 @@ import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser, PaymentCheckoutSessionRecord, PaymentProvider } from "../types.js";
+import { isBlinkPaylinkAutomationEnabled } from "./blink-paylink.service.js";
 import { createPaymentCheckoutSession } from "./payment-link.service.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -82,7 +83,7 @@ export async function preparePaywallPaymentOptions(
     providers.push("MCB_JUICE");
   }
 
-  if (env.BLINK_PAYMENT_LINK || env.BLINK_PAYLINK_API_URL) {
+  if (env.BLINK_PAYMENT_LINK || isBlinkPaylinkAutomationEnabled()) {
     providers.push("BLINK");
   }
 
@@ -112,16 +113,19 @@ export async function preparePaywallPaymentOptions(
 
 function formatProviderLine(
   label: string,
-  url: string | undefined,
+  fallbackUrl: string | undefined,
   session: PaymentCheckoutSessionRecord | null
 ): string | null {
-  if (!url && !session) {
+  const checkoutUrl = session?.checkout_url ?? fallbackUrl ?? null;
+
+  if (!checkoutUrl && !session) {
     return null;
   }
 
   const reference = session?.provider_reference ? ` Ref ${session.provider_reference}.` : "";
-  if (url) {
-    return `${label}: ${url}.${reference}`;
+
+  if (checkoutUrl) {
+    return `${label}: ${checkoutUrl}.${reference}`;
   }
 
   return `${label} reference:${reference.trim()}`;

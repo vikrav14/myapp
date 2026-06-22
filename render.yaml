@@ -29,6 +29,12 @@ services:
         sync: false
       - key: BLINK_PAYMENT_LINK
         sync: false
+      - key: BLINK_API_KEY
+        sync: false
+      - key: BLINK_SECRET_KEY
+        sync: false
+      - key: BLINK_TOKEN_API_URL
+        value: https://api.blinkpayment.co.uk/api/pay/v1/tokens
       - key: SUBSCRIPTION_MONTHLY_PRICE_RS
         value: "200"
       - key: DEFAULT_SUBSCRIPTION_DAYS

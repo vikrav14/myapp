@@ -478,7 +478,9 @@ paymentsRouter.post("/links", async (request, response, next) => {
       notes:
         session.provider === "MCB_JUICE"
           ? "Submit the payload to the Peach/MCB Juice checkout initiate endpoint after adding your merchant signature."
-          : "Submit the payload to the Blink paylink creation endpoint to generate the customer-facing payment link."
+          : session.checkout_url
+            ? "Blink paylink created automatically."
+            : "Submit the payload to the Blink paylink creation endpoint to generate the customer-facing payment link."
     });
   } catch (error) {
     next(error);

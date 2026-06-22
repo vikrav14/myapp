@@ -60,7 +60,8 @@ Provider-specific if enabled:
 - `MCB_JUICE_CALLBACK_TOKEN`
 - `BLINK_CALLBACK_TOKEN`
 - `MCB_JUICE_PAYMENT_LINK`
-- `BLINK_PAYMENT_LINK`
+- `BLINK_API_KEY`
+- `BLINK_SECRET_KEY`
 
 ## Container deployment
 

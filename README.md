@@ -84,6 +84,10 @@ Copy `.env.example` to `.env` and fill in:
 - `WHATSAPP_PHONE_NUMBER_ID`
 - `MCB_JUICE_PAYMENT_LINK`
 - `BLINK_PAYMENT_LINK`
+- `BLINK_API_KEY`
+- `BLINK_SECRET_KEY`
+- `BLINK_TOKEN_API_URL`
+- `BLINK_PAYLINK_API_URL`
 - `SUBSCRIPTION_MONTHLY_PRICE_RS`
 - `DEFAULT_SUBSCRIPTION_DAYS`
 - `INTERNAL_ADMIN_API_KEY`
@@ -300,6 +304,8 @@ Reference format supported for user resolution:
 - plain phone number
 
 For Blink, the generated `transaction_unique` is parseable by Mauri and unique per session.
+
+When `BLINK_API_KEY` and `BLINK_SECRET_KEY` are configured, Mauri automatically calls the Blink Paylink API, stores `checkout_url` on the session, and uses that URL in locked paywall replies.
 
 For MCB Juice, the generated `merchantTransactionId` stays short for Peach constraints, while the full Mauri user reference is stored in `customParameters`.
 
