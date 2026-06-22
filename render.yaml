@@ -103,6 +103,14 @@ services:
         sync: false
       - key: GOOGLE_MAPS_API_KEY
         sync: false
+      - key: QUANTUM_PICK_ENABLED
+        value: "true"
+      - key: ANU_QUANTUM_API_KEY
+        sync: false
+      - key: ANU_QUANTUM_API_URL
+        value: https://api.quantumnumbers.anu.edu.au
+      - key: QUANTUM_REQUEST_TIMEOUT_MS
+        value: "2500"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS
