@@ -397,4 +397,6 @@ Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active us
 
 This is the backend foundation, not the final production system.
 
-The admin panel now supports metrics snapshots, audit-event filtering, dead-letter recovery actions, and safer HTML rendering. Operational alerts can also fan out to an external webhook when configured.
+The admin panel now supports metrics snapshots, audit-event filtering, dead-letter recovery actions, per-user ops actions, and safer HTML rendering. Operational alerts can also fan out to an external webhook when configured.
+
+From the user detail panel you can generate a checkout link (`POST /internal/payments/links`) or weekly diagnostic (`POST /internal/reports/weekly`) for the selected user, with provider, amount, subscription duration, and optional WhatsApp delivery controls.

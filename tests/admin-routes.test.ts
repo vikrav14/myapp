@@ -68,6 +68,13 @@ describe("Admin routes", () => {
     expect(response.text).toContain("Outbound queue");
     expect(response.text).toContain("metricsCards");
     expect(response.text).toContain("applyAuditFiltersButton");
+    expect(response.text).toContain("Ops actions");
+    expect(response.text).toContain('id="generatePaymentLinkButton"');
+    expect(response.text).toContain('id="generateWeeklyReportButton"');
+    expect(response.text).toContain("/internal/payments/links");
+    expect(response.text).toContain("/internal/reports/weekly");
+    expect(response.text).toContain('id="opsPaymentProvider"');
+    expect(response.text).toContain('id="opsReportSendMessage"');
   });
 
   it("rejects protected admin endpoints without the admin key", async () => {

@@ -260,7 +260,11 @@ function renderAdminPanelHtml(): string {
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
       .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
       .kv { padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
-      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .ops-box { margin-top: 14px; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
+      .ops-result { margin-top: 10px; white-space: pre-wrap; color: var(--muted); font-size: 13px; }
+      .checkbox-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+      .checkbox-row label { display: inline-flex; gap: 6px; align-items: center; }
       .hidden { display: none; }
       @media (max-width: 1200px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } .layout { grid-template-columns: 1fr; } }
       @media (max-width: 900px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters, .two-col, .key-row, .stats-grid { grid-template-columns: 1fr; } }
@@ -404,6 +408,24 @@ function renderAdminPanelHtml(): string {
                 <button id="focusDeadLettersForUserButton" class="secondary">Focus dead letters to user</button>
                 <button id="clearSelectedUserButton" class="secondary">Clear selection</button>
               </div>
+              <div class="ops-box">
+                <h3 style="margin:0 0 8px;">Ops actions</h3>
+                <div class="panel-note" style="margin-bottom:10px;">Generate a checkout session or weekly diagnostic for the selected user.</div>
+                <div class="two-col">
+                  <div><label class="label">Payment provider</label><select id="opsPaymentProvider"><option value="MCB_JUICE">MCB_JUICE</option><option value="BLINK">BLINK</option></select></div>
+                  <div><label class="label">Amount (Rs)</label><input id="opsPaymentAmount" type="number" min="1" value="200" /></div>
+                  <div><label class="label">Subscription days</label><input id="opsPaymentDurationDays" type="number" min="1" value="30" /></div>
+                </div>
+                <div class="actions" style="margin-top:10px;">
+                  <button id="generatePaymentLinkButton" class="warning small">Generate payment link</button>
+                  <button id="generateWeeklyReportButton" class="warning small">Generate weekly report</button>
+                </div>
+                <div class="checkbox-row" style="margin-top:10px;">
+                  <label><input id="opsReportSendMessage" type="checkbox" /> Send report to WhatsApp</label>
+                  <label><input id="opsReportForceRegenerate" type="checkbox" /> Force regenerate</label>
+                </div>
+                <div id="userOpsResult" class="ops-result">Run an ops action for the selected user.</div>
+              </div>
               <div id="userProfileMeta" class="panel-note" style="margin-top:10px;"></div>
               <div style="margin-top:16px;">
                 <h3 style="margin:0 0 8px;">Recent payments</h3>
@@ -532,7 +554,13 @@ function renderAdminPanelHtml(): string {
           userRecentSessionsBody: document.getElementById('userRecentSessionsBody'),
           userRecentReportsBody: document.getElementById('userRecentReportsBody'),
           userRecentVoiceNotesBody: document.getElementById('userRecentVoiceNotesBody'),
-          userRecentMemoriesBody: document.getElementById('userRecentMemoriesBody')
+          userRecentMemoriesBody: document.getElementById('userRecentMemoriesBody'),
+          opsPaymentProvider: document.getElementById('opsPaymentProvider'),
+          opsPaymentAmount: document.getElementById('opsPaymentAmount'),
+          opsPaymentDurationDays: document.getElementById('opsPaymentDurationDays'),
+          opsReportSendMessage: document.getElementById('opsReportSendMessage'),
+          opsReportForceRegenerate: document.getElementById('opsReportForceRegenerate'),
+          userOpsResult: document.getElementById('userOpsResult')
         };
 
         el.adminKey.value = state.adminKey;
@@ -709,6 +737,69 @@ function renderAdminPanelHtml(): string {
           await api('/internal/admin/users/' + state.selectedUserId, { method: 'PATCH', body: JSON.stringify(payload) });
           setStatus('User changes saved.', 'success');
           await Promise.all([loadOverview(), loadUsers(), loadUserProfile()]);
+        }
+
+        function renderUserOpsResult(lines) {
+          el.userOpsResult.textContent = lines.filter(Boolean).join('\\n');
+        }
+
+        async function generatePaymentLinkForSelectedUser() {
+          if (!state.selectedUserId) {
+            setStatus('Select a user first.', 'error');
+            return;
+          }
+
+          setStatus('Generating payment link...');
+          const data = await api('/internal/payments/links', {
+            method: 'POST',
+            body: JSON.stringify({
+              userId: state.selectedUserId,
+              provider: el.opsPaymentProvider.value,
+              amount: Number(el.opsPaymentAmount.value || 200),
+              durationDays: Number(el.opsPaymentDurationDays.value || 30)
+            })
+          });
+
+          renderUserOpsResult([
+            'Payment link created.',
+            'Provider: ' + data.provider,
+            'Session: ' + data.sessionId,
+            'Reference: ' + data.providerReference,
+            'Checkout: ' + (data.checkoutUrl || 'not available yet'),
+            'Notes: ' + (data.notes || '-')
+          ]);
+
+          await Promise.all([loadUserProfile(), loadSessions(), loadAuditEvents()]);
+          setStatus('Payment link generated for selected user.', 'success');
+        }
+
+        async function generateWeeklyReportForSelectedUser() {
+          if (!state.selectedUserId) {
+            setStatus('Select a user first.', 'error');
+            return;
+          }
+
+          setStatus('Generating weekly report...');
+          const data = await api('/internal/reports/weekly', {
+            method: 'POST',
+            body: JSON.stringify({
+              userId: state.selectedUserId,
+              sendMessage: el.opsReportSendMessage.checked,
+              forceRegenerate: el.opsReportForceRegenerate.checked
+            })
+          });
+
+          const preview = typeof data.reportText === 'string' ? data.reportText.slice(0, 240) : '';
+          renderUserOpsResult([
+            'Weekly report generated.',
+            'Report: ' + data.reportId,
+            'Week start: ' + data.weekStart,
+            'Delivery: ' + data.deliveryStatus,
+            preview ? 'Preview: ' + preview : ''
+          ]);
+
+          await Promise.all([loadUserProfile(), loadReports(), loadAuditEvents()]);
+          setStatus('Weekly report generated for selected user.', 'success');
         }
 
         async function loadOutboundMessages() {
@@ -899,7 +990,22 @@ function renderAdminPanelHtml(): string {
           state.selectedUserId = null;
           el.userDetailEmpty.classList.remove('hidden');
           el.userDetailContent.classList.add('hidden');
+          renderUserOpsResult(['Run an ops action for the selected user.']);
           setStatus('Selected user cleared.', 'success');
+        });
+        document.getElementById('generatePaymentLinkButton').addEventListener('click', async () => {
+          try {
+            await generatePaymentLinkForSelectedUser();
+          } catch (error) {
+            setStatus(error.message || 'Payment link generation failed.', 'error');
+          }
+        });
+        document.getElementById('generateWeeklyReportButton').addEventListener('click', async () => {
+          try {
+            await generateWeeklyReportForSelectedUser();
+          } catch (error) {
+            setStatus(error.message || 'Weekly report generation failed.', 'error');
+          }
         });
 
         el.adminKey.value = state.adminKey;
