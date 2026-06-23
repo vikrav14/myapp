@@ -22,6 +22,7 @@ supabase/migrations/012_operational_alert_states.sql
 supabase/migrations/013_morning_brief_engine.sql
 supabase/migrations/016_scheduled_reminders.sql
 supabase/migrations/017_calendar_and_memory_resurfacing.sql
+supabase/migrations/018_payday_and_receipts.sql
 ```
 
 ## 2. Deploy the web service (Render)

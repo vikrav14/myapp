@@ -40,6 +40,12 @@ Calendar
 Memory
 - resurface on / resurface off — gentle memory pings (max 1/day)
 
+Money
+- snap a receipt photo — auto-log spending
+- my runway — till-payday breathing room
+- payday 25 — set payday day
+- salary 25000 — set monthly income
+
 Can't decide?
 - quantum pick 1 5
 - quantum pick Tribeca, Docker, Nandos
@@ -60,6 +66,8 @@ my streaks — habit streaks
 quantum pick 1 5 — let the universe decide
 remind me to gym at 6pm — schedule a ping
 calendar add dentist on tue at 10am — add an event
+snap receipts — photo logs spending instantly
+my runway — till-payday money check
 lesson — today's insight`;
 }
 

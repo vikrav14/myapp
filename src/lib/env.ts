@@ -112,7 +112,9 @@ const envSchema = z.object({
   CALENDAR_DELIVERY_CRON: z.string().default("*/5 * * * *"),
   CALENDAR_TODO_LOOKAHEAD_MINUTES: z.coerce.number().int().positive().default(30),
   MEMORY_RESURFACING_ENABLED: envBoolean.default(true),
-  MEMORY_RESURFACING_CRON: z.string().default("0 11 * * *")
+  MEMORY_RESURFACING_CRON: z.string().default("0 11 * * *"),
+  RECEIPT_SCAN_ENABLED: envBoolean.default(true),
+  PAYDAY_RUNWAY_ENABLED: envBoolean.default(true)
 });
 
 export const env = envSchema.parse(process.env);

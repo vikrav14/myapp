@@ -24,6 +24,14 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
     morning_digest_enabled: record.morning_digest_enabled !== false,
     calendar_sync_enabled: record.calendar_sync_enabled !== false,
     memory_resurfacing_enabled: record.memory_resurfacing_enabled !== false,
+    payday_day_of_month:
+      record.payday_day_of_month === null || record.payday_day_of_month === undefined
+        ? null
+        : Number(record.payday_day_of_month),
+    monthly_income_rs:
+      record.monthly_income_rs === null || record.monthly_income_rs === undefined
+        ? null
+        : Number(record.monthly_income_rs),
     weekly_focus_habit: record.weekly_focus_habit ? String(record.weekly_focus_habit) : null,
     weekly_focus_set_at: record.weekly_focus_set_at ? String(record.weekly_focus_set_at) : null,
     created_at: String(record.created_at),

@@ -1,5 +1,10 @@
 import { env } from "../lib/env.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
+import {
+  receiptExtractionJsonSchema,
+  receiptExtractionSchema,
+  type ReceiptExtraction
+} from "../schemas/receipt.js";
 import type {
   MauriBrainDumpExtraction,
   MauriUser,
@@ -410,4 +415,44 @@ Reply in plain text only.
     prompt,
     responseMimeType: "text/plain"
   });
+}
+
+export async function extractReceiptFromImage(input: {
+  imageBuffer: Buffer;
+  mimeType: string;
+  caption?: string | undefined;
+}): Promise<ReceiptExtraction> {
+  const prompt = `
+You are Mauri's receipt scanner for Mauritius.
+
+Read this receipt or payment screenshot and extract spending details.
+
+Rules:
+- Amount must be in Mauritian Rupees (Rs / MUR). Use the final total paid.
+- Merchant is the shop, restaurant, or service name.
+- Category should be one of: Food, Transport, Shopping, Bills, Health, Entertainment, Education, Other.
+- items_summary is a short plain-text list of what was bought.
+- confidence is high only when amount and merchant are clearly visible.
+- If this is not a receipt or payment proof, set confidence to low and make your best guess.
+
+${input.caption ? `User caption: ${input.caption}` : ""}
+
+Return JSON only.
+`;
+
+  const rawJson = await callGemini({
+    parts: [
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType: input.mimeType,
+          data: input.imageBuffer.toString("base64")
+        }
+      }
+    ],
+    responseMimeType: "application/json",
+    responseSchema: receiptExtractionJsonSchema
+  });
+
+  return receiptExtractionSchema.parse(parseStructuredJson(rawJson));
 }

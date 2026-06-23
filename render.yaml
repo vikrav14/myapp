@@ -127,6 +127,10 @@ services:
         value: "true"
       - key: MEMORY_RESURFACING_CRON
         value: "0 11 * * *"
+      - key: RECEIPT_SCAN_ENABLED
+        value: "true"
+      - key: PAYDAY_RUNWAY_ENABLED
+        value: "true"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS
