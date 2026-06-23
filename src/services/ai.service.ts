@@ -378,3 +378,36 @@ Reply in plain text only.
     responseMimeType: "text/plain"
   });
 }
+
+export async function generateMemoryResurfaceMessage(input: {
+  user: MauriUser;
+  memoryText: string;
+  memorySource: "conversation_memory" | "insight_memory" | "todo";
+  weeklyFocus: string | null;
+}): Promise<string> {
+  const prompt = `
+You are Mauri in a private WhatsApp thread for Mauritians.
+You are gently resurfacing something the user shared earlier.
+
+Rules:
+- 2 short paragraphs max.
+- Warm, grounded, not creepy.
+- Reference the memory naturally without quoting it word-for-word.
+- Ask one light question or suggest one small next move.
+- No bullet lists. No "As an AI".
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+Weekly focus: ${input.weeklyFocus ?? "not set"}
+Memory source: ${input.memorySource}
+Memory: ${input.memoryText}
+
+Reply in plain text only.
+`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}

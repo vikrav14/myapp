@@ -31,6 +31,15 @@ Reminders
 - my reminders — list active reminders
 - cancel reminder 1
 
+Calendar
+- calendar add team sync on friday at 3pm
+- my calendar / calendar today
+- connect calendar <ical-url>
+- calendar off / calendar on
+
+Memory
+- resurface on / resurface off — gentle memory pings (max 1/day)
+
 Can't decide?
 - quantum pick 1 5
 - quantum pick Tribeca, Docker, Nandos
@@ -50,6 +59,7 @@ roast me — truth from your week
 my streaks — habit streaks
 quantum pick 1 5 — let the universe decide
 remind me to gym at 6pm — schedule a ping
+calendar add dentist on tue at 10am — add an event
 lesson — today's insight`;
 }
 

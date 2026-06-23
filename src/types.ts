@@ -26,6 +26,8 @@ export interface MauriUser {
   last_payment_at: string | null;
   topic_preferences: MorningBriefTopicKey[];
   morning_digest_enabled: boolean;
+  calendar_sync_enabled: boolean;
+  memory_resurfacing_enabled: boolean;
   weekly_focus_habit: string | null;
   weekly_focus_set_at: string | null;
   created_at: string;
