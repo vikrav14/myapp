@@ -1,6 +1,11 @@
 import { env } from "../lib/env.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
 import {
+  localAlertClassificationJsonSchema,
+  localAlertClassificationSchema,
+  type LocalAlertClassification
+} from "../schemas/local-alert.js";
+import {
   receiptExtractionJsonSchema,
   receiptExtractionSchema,
   type ReceiptExtraction
@@ -455,4 +460,50 @@ Return JSON only.
   });
 
   return receiptExtractionSchema.parse(parseStructuredJson(rawJson));
+}
+
+export async function classifyLocalAlertArticle(input: {
+  title: string;
+  summary: string;
+  source: string;
+  url: string;
+  matchedKeywords: string[];
+}): Promise<LocalAlertClassification> {
+  const prompt = `You are Mauri's urgent local alert classifier for Mauritius.
+
+Decide whether this news item should trigger an immediate WhatsApp alert to Mauritian users.
+
+High-priority examples:
+- Government or Met Service heavy rain / cyclone advisories
+- School closures or class suspensions (often after overnight "avis de grosses pluies")
+- Serious flooding or major traffic disruption
+
+Rules:
+- is_actionable_alert = true only when ordinary Mauritians should change plans today (keep kids home, avoid roads, prepare for cyclone).
+- Ignore routine politics, crime, sports, celebrity gossip, and generic weather chat with no advisory impact.
+- alert_type:
+  - school_closure — schools/classes closed or parents told to keep children home
+  - heavy_rain — avis de grosses pluies, heavy rain warning, torrential rain advisory
+  - cyclone — cyclone watch/warning/class
+  - flood — flooding, inundation, blocked roads from water
+  - traffic_disruption — major road closure/accident affecting commute
+  - general_advisory — other official urgent local advisory
+- severity high for school closures, cyclone, dangerous flooding; medium for softer advisories.
+- advice_text: 1-2 short sentences telling a parent or commuter what to do right now. Plain Mauritian English. No bullet lists.
+
+Article source: ${input.source}
+Matched keywords: ${input.matchedKeywords.join(", ")}
+Title: ${input.title}
+Summary: ${input.summary}
+URL: ${input.url}
+
+Return JSON only.`;
+
+  const rawJson = await callGemini({
+    prompt,
+    responseMimeType: "application/json",
+    responseSchema: localAlertClassificationJsonSchema
+  });
+
+  return localAlertClassificationSchema.parse(parseStructuredJson(rawJson));
 }

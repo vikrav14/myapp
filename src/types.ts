@@ -28,6 +28,8 @@ export interface MauriUser {
   morning_digest_enabled: boolean;
   calendar_sync_enabled: boolean;
   memory_resurfacing_enabled: boolean;
+  local_alerts_enabled: boolean;
+  school_alerts_enabled: boolean;
   payday_day_of_month: number | null;
   monthly_income_rs: number | null;
   weekly_focus_habit: string | null;

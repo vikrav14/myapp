@@ -131,6 +131,12 @@ services:
         value: "true"
       - key: PAYDAY_RUNWAY_ENABLED
         value: "true"
+      - key: LOCAL_ALERTS_ENABLED
+        value: "true"
+      - key: LOCAL_ALERTS_CRON
+        value: "*/30 21-23,0-7 * * *"
+      - key: LOCAL_ALERT_RSS_FEEDS
+        sync: false
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS

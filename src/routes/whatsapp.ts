@@ -9,6 +9,7 @@ import { loadUserContext } from "../services/context.service.js";
 import { registerInboundEvent } from "../services/inbound-event.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
+import { handleLocalAlertsCommandMessage } from "../services/local-alerts-delivery.service.js";
 import { handleFinanceCommandMessage } from "../services/payday-runway.service.js";
 import { handleReceiptImageMessage } from "../services/receipt-scan.service.js";
 import { handleCalendarMessage } from "../services/calendar.service.js";
@@ -309,6 +310,34 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: financeResult.reply
+      });
+      return;
+    }
+
+    const localAlertsResult = await handleLocalAlertsCommandMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (localAlertsResult.handled && localAlertsResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, localAlertsResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "local_alerts_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: localAlertsResult.reply
       });
       return;
     }
