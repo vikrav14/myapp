@@ -20,6 +20,8 @@ supabase/migrations/010_dead_letter_events.sql
 supabase/migrations/011_processed_inbound_events.sql
 supabase/migrations/012_operational_alert_states.sql
 supabase/migrations/013_morning_brief_engine.sql
+supabase/migrations/016_scheduled_reminders.sql
+supabase/migrations/017_calendar_and_memory_resurfacing.sql
 ```
 
 ## 2. Deploy the web service (Render)

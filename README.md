@@ -71,6 +71,7 @@ supabase/migrations/
   011_processed_inbound_events.sql
   012_operational_alert_states.sql
   013_morning_brief_engine.sql
+  014_user_engagement.sql
 ```
 
 ## Environment variables
@@ -191,6 +192,9 @@ supabase/migrations/009_outbound_messages.sql
 supabase/migrations/010_dead_letter_events.sql
 supabase/migrations/011_processed_inbound_events.sql
 supabase/migrations/012_operational_alert_states.sql
+supabase/migrations/013_morning_brief_engine.sql
+supabase/migrations/016_scheduled_reminders.sql
+supabase/migrations/017_calendar_and_memory_resurfacing.sql
 ```
 
 ## Webhook contract
@@ -391,7 +395,7 @@ When a payment confirmation is posted to the internal payment route, the user is
 
 When a paid subscription window expires, the webhook auto-locks the account again on the next inbound message. Locked users now receive per-user checkout session references alongside the configured Juice and Blink payment links.
 
-Premium users can manage Mauri Squads directly in WhatsApp:
+Trial and premium users can manage Mauri Squads directly in WhatsApp:
 
 - `create squad` or `create squad Study Crew`
 - `join CODE`
@@ -401,9 +405,18 @@ Premium users can manage Mauri Squads directly in WhatsApp:
 - `update topics Traffic Money Tech` (change morning brief tags)
 - `digest on` / `digest off` (pause or resume the 7:00 morning brief)
 - `quantum pick 1 5` or `quantum pick Tribeca, Docker, Nandos` (true-random decision helper)
+- `help` or `menu` (full command list)
+- `my focus` (this week's one habit)
+- `my streaks` (habit consistency, no guilt)
+- `roast me` / `hype me` (weekly truth or celebration)
+- `lesson` (today's 2-minute insight)
 - `leave squad`
+- `squad goal` or `squad goal study | save | hustle | balance` (weekly pact — changes scoreboard weights)
+- `squad goal clear` (reset to default scoring)
 
-Squad nudges and Sunday showdowns only include members with an active paid subscription.
+Squad nudges and Sunday showdowns include members with an active trial or paid subscription. When a weekly pact is set, habit/todo/finance logs score differently (e.g. study pact boosts study habits).
+
+Relay nudges fire when the squad leader logs a scoring win (habit or money log) — laggers get a private *"Your move"* ping (max once per day per person). New squads auto-set a pact from the creator's archetype.
 
 The admin panel also exposes squad operations:
 
@@ -463,6 +476,8 @@ Environment:
 - `ANU_QUANTUM_API_KEY` (optional; without it Mauri uses cryptographic fallback randomness and says so honestly)
 - `ANU_QUANTUM_API_URL` (default `https://api.quantumnumbers.anu.edu.au`)
 - `QUANTUM_REQUEST_TIMEOUT_MS` (default `2500`)
+- `TRIAL_ENGAGEMENT_ENABLED` (default `true`)
+- `TRIAL_ENGAGEMENT_CRON` (default `0 10 * * *`, Mauritius timezone)
 
 ## Current constraints
 

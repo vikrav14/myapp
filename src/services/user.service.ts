@@ -22,6 +22,10 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
         )
       : [],
     morning_digest_enabled: record.morning_digest_enabled !== false,
+    calendar_sync_enabled: record.calendar_sync_enabled !== false,
+    memory_resurfacing_enabled: record.memory_resurfacing_enabled !== false,
+    weekly_focus_habit: record.weekly_focus_habit ? String(record.weekly_focus_habit) : null,
+    weekly_focus_set_at: record.weekly_focus_set_at ? String(record.weekly_focus_set_at) : null,
     created_at: String(record.created_at),
     updated_at: String(record.updated_at)
   };

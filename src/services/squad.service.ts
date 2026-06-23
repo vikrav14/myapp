@@ -3,6 +3,16 @@ import { randomBytes } from "node:crypto";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser } from "../types.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
+import {
+  buildSquadCreatedPactHint,
+  buildSquadGoalSetReply,
+  buildSquadGoalShowReply,
+  getSquadPactDefinition,
+  parseSquadGoalCommand,
+  suggestedPactKeyForArchetype,
+  type SquadPactKey
+} from "./squad-pact.service.js";
+import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
 export interface SquadRecord {
   id: string;
@@ -10,6 +20,10 @@ export interface SquadRecord {
   squad_name: string;
   member_ids: string[];
   created_at: string;
+  weekly_pact_key: string | null;
+  weekly_pact_label: string | null;
+  weekly_pact_set_at: string | null;
+  weekly_pact_set_by: string | null;
 }
 
 export interface SquadCommandResult {
@@ -23,7 +37,11 @@ function mapSquad(record: Record<string, unknown>): SquadRecord {
     squad_code: String(record.squad_code),
     squad_name: String(record.squad_name),
     member_ids: Array.isArray(record.member_ids) ? record.member_ids.map(String) : [],
-    created_at: String(record.created_at)
+    created_at: String(record.created_at),
+    weekly_pact_key: record.weekly_pact_key ? String(record.weekly_pact_key) : null,
+    weekly_pact_label: record.weekly_pact_label ? String(record.weekly_pact_label) : null,
+    weekly_pact_set_at: record.weekly_pact_set_at ? String(record.weekly_pact_set_at) : null,
+    weekly_pact_set_by: record.weekly_pact_set_by ? String(record.weekly_pact_set_by) : null
   };
 }
 
@@ -39,7 +57,15 @@ function displayName(user: MauriUser): string {
   return user.first_name?.trim() || "You";
 }
 
-function isPaidActive(user: MauriUser): boolean {
+export function hasSquadAccess(user: MauriUser): boolean {
+  if (user.subscription_status === "Trial_Active") {
+    if (!user.trial_ends_at) {
+      return true;
+    }
+
+    return new Date(user.trial_ends_at).getTime() > Date.now();
+  }
+
   if (user.subscription_status !== "Paid_Active") {
     return false;
   }
@@ -51,8 +77,8 @@ function isPaidActive(user: MauriUser): boolean {
   return new Date(user.subscription_ends_at).getTime() > Date.now();
 }
 
-function premiumRequiredReply(): string {
-  return "Mauri Squads are a premium feature. Unlock premium first, then you can create or join a squad here.";
+function squadAccessRequiredReply(): string {
+  return "Mauri Squads need an active trial or premium. Unlock premium to keep your squad after trial ends.";
 }
 
 export function parseSquadCommand(message: string): {
@@ -109,10 +135,17 @@ join ${squad.squad_code}
 Private accountability only — no group chat. Mauri nudges us when someone drifts.`;
 }
 
-function buildSquadCreatedReply(squad: SquadRecord): string {
+function buildSquadCreatedReply(squad: SquadRecord, user: MauriUser): string {
+  const pactNote =
+    squad.weekly_pact_label != null
+      ? `Weekly pact: ${squad.weekly_pact_label} (auto-set from your ${user.archetype} lane).`
+      : buildSquadCreatedPactHint(user.archetype);
+
   return `Squad live: ${squad.squad_name}
 
 Code: ${squad.squad_code}
+
+${pactNote}
 
 Copy and forward this invite:
 
@@ -313,7 +346,14 @@ export async function createSquadForUser(
           squadName: squad.squad_name
         }
       });
-      return squad;
+
+      const suggestedPact = suggestedPactKeyForArchetype(user.archetype);
+      return setSquadWeeklyPact({
+        squadId: squad.id,
+        pactKey: suggestedPact,
+        setByUserId: user.id,
+        requestId
+      });
     }
 
     if (error?.code === "23505") {
@@ -374,6 +414,120 @@ export async function joinSquadByCode(
   return updated;
 }
 
+export async function setSquadWeeklyPact(input: {
+  squadId: string;
+  pactKey: SquadPactKey;
+  setByUserId: string;
+  requestId?: string | undefined;
+}): Promise<SquadRecord> {
+  const pact = getSquadPactDefinition(input.pactKey);
+  if (!pact) {
+    throw new Error("Invalid squad pact.");
+  }
+
+  const { data, error } = await supabase
+    .from("squads")
+    .update({
+      weekly_pact_key: pact.key,
+      weekly_pact_label: pact.label,
+      weekly_pact_set_at: new Date().toISOString(),
+      weekly_pact_set_by: input.setByUserId
+    })
+    .eq("id", input.squadId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to set squad pact: ${error.message}`);
+  }
+
+  const squad = mapSquad(data as Record<string, unknown>);
+  await recordAuditEventBestEffort({
+    requestId: input.requestId,
+    eventType: "squad_pact_set",
+    userId: input.setByUserId,
+    entityType: "squad",
+    entityId: squad.id,
+    message: "User set a squad weekly pact.",
+    metadata: {
+      squadCode: squad.squad_code,
+      pactKey: pact.key,
+      pactLabel: pact.label
+    }
+  });
+
+  return squad;
+}
+
+export async function clearSquadWeeklyPact(squadId: string, requestId?: string | undefined): Promise<SquadRecord> {
+  const { data, error } = await supabase
+    .from("squads")
+    .update({
+      weekly_pact_key: null,
+      weekly_pact_label: null,
+      weekly_pact_set_at: null,
+      weekly_pact_set_by: null
+    })
+    .eq("id", squadId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to clear squad pact: ${error.message}`);
+  }
+
+  const squad = mapSquad(data as Record<string, unknown>);
+  await recordAuditEventBestEffort({
+    requestId,
+    eventType: "squad_pact_cleared",
+    entityType: "squad",
+    entityId: squad.id,
+    message: "Squad weekly pact cleared.",
+    metadata: {
+      squadCode: squad.squad_code
+    }
+  });
+
+  return squad;
+}
+
+async function notifySquadMembersOfPactChange(input: {
+  squad: SquadRecord;
+  actor: MauriUser;
+  pactLabel: string;
+  requestId?: string | undefined;
+}): Promise<void> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, phone_number, first_name")
+    .in("id", input.squad.member_ids);
+
+  if (error) {
+    throw new Error(`Failed to load squad members for pact notification: ${error.message}`);
+  }
+
+  const actorName = displayName(input.actor);
+  const message = `${actorName} set ${input.squad.squad_name}'s pact for this week: ${input.pactLabel}.
+
+Reply squad goal to see how scoring works.`;
+
+  for (const row of data ?? []) {
+    const memberId = String(row.id);
+    if (memberId === input.actor.id) {
+      continue;
+    }
+
+    await sendWhatsAppMessage(String(row.phone_number), message, {
+      userId: memberId,
+      requestId: input.requestId,
+      metadata: {
+        flow: "squad_pact_notify",
+        squadName: input.squad.squad_name
+      }
+    });
+  }
+}
+
 export async function leaveSquadForUser(user: MauriUser, requestId?: string | undefined): Promise<SquadRecord | null> {
   const squad = await findSquadForUser(user.id);
   if (!squad) {
@@ -425,23 +579,84 @@ export async function handleSquadMessage(input: {
   message: string;
   requestId?: string | undefined;
 }): Promise<SquadCommandResult> {
-  const command = parseSquadCommand(input.message);
-  if (!command) {
+  const goalCommand = parseSquadGoalCommand(input.message);
+  const command = goalCommand ? null : parseSquadCommand(input.message);
+  if (!goalCommand && !command) {
     return { handled: false };
   }
 
-  if (!isPaidActive(input.user)) {
+  if (!hasSquadAccess(input.user)) {
     return {
       handled: true,
-      reply: premiumRequiredReply()
+      reply: squadAccessRequiredReply()
     };
+  }
+
+  if (goalCommand) {
+    const squad = await findSquadForUser(input.user.id);
+    if (!squad) {
+      return {
+        handled: true,
+        reply: `You're not in a squad yet.
+
+Create one first, then set a pact:
+create squad Study Crew
+squad goal study | save | hustle | balance`
+      };
+    }
+
+    if (goalCommand.type === "show") {
+      return {
+        handled: true,
+        reply: buildSquadGoalShowReply(squad)
+      };
+    }
+
+    if (goalCommand.type === "clear") {
+      const cleared = await clearSquadWeeklyPact(squad.id, input.requestId);
+      return {
+        handled: true,
+        reply: `Pact cleared for ${cleared.squad_name}. Default scoring is back on (habits +2, todos +3, money logs +1).`
+      };
+    }
+
+    const pact = getSquadPactDefinition(goalCommand.pactKey);
+    if (!pact) {
+      return {
+        handled: true,
+        reply: buildSquadGoalShowReply(squad)
+      };
+    }
+
+    const updated = await setSquadWeeklyPact({
+      squadId: squad.id,
+      pactKey: pact.key,
+      setByUserId: input.user.id,
+      requestId: input.requestId
+    });
+
+    await notifySquadMembersOfPactChange({
+      squad: updated,
+      actor: input.user,
+      pactLabel: pact.label,
+      requestId: input.requestId
+    }).catch(() => undefined);
+
+    return {
+      handled: true,
+      reply: buildSquadGoalSetReply(updated, pact)
+    };
+  }
+
+  if (!command) {
+    return { handled: false };
   }
 
   if (command.type === "create") {
     const squad = await createSquadForUser(input.user, command.squadName, input.requestId);
     return {
       handled: true,
-      reply: buildSquadCreatedReply(squad)
+      reply: buildSquadCreatedReply(squad, input.user)
     };
   }
 
@@ -454,7 +669,9 @@ export async function handleSquadMessage(input: {
 
 Code ${squad.squad_code} is locked in.
 
-Want to invite someone? Reply "share squad" for a copy-paste invite message.`
+Want to invite someone? Reply "share squad" for a copy-paste invite message.
+
+Set the weekly pact anytime: squad goal study | save | hustle | balance`
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not join that squad.";
@@ -485,8 +702,9 @@ Reply "create squad" to start one, or "join CODE" if someone already sent you a 
 
 Code: ${squad.squad_code}
 Members: ${squad.member_ids.length}
+${squad.weekly_pact_label ? `Pact: ${squad.weekly_pact_label}` : "Pact: not set yet"}
 
-Reply "share squad" for an invite message, or "leave squad" if you want out.`
+Reply "share squad" for an invite, "squad goal" for pact scoring, or "leave squad" if you want out.`
     };
   }
 
@@ -518,25 +736,47 @@ ${buildSquadInviteMessage(squad)}`
   };
 }
 
-export async function listPaidMemberIds(memberIds: string[]): Promise<string[]> {
+function isSquadEligibleRecord(row: {
+  subscription_status: unknown;
+  trial_ends_at: unknown;
+  subscription_ends_at: unknown;
+}): boolean {
+  const subscriptionStatus = String(row.subscription_status);
+
+  if (subscriptionStatus === "Trial_Active") {
+    const trialEndsAt = row.trial_ends_at ? String(row.trial_ends_at) : null;
+    return !trialEndsAt || new Date(trialEndsAt).getTime() > Date.now();
+  }
+
+  if (subscriptionStatus !== "Paid_Active") {
+    return false;
+  }
+
+  const subscriptionEndsAt = row.subscription_ends_at ? String(row.subscription_ends_at) : null;
+  return !subscriptionEndsAt || new Date(subscriptionEndsAt).getTime() > Date.now();
+}
+
+export async function listSquadEligibleMemberIds(memberIds: string[]): Promise<string[]> {
   if (!memberIds.length) {
     return [];
   }
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, subscription_ends_at")
+    .select("id, subscription_status, trial_ends_at, subscription_ends_at")
     .in("id", memberIds)
-    .eq("subscription_status", "Paid_Active");
+    .in("subscription_status", ["Trial_Active", "Paid_Active"]);
 
   if (error) {
-    throw new Error(`Failed to load paid squad members: ${error.message}`);
+    throw new Error(`Failed to load squad-eligible members: ${error.message}`);
   }
 
   return (data ?? [])
-    .filter((row) => {
-      const subscriptionEndsAt = row.subscription_ends_at ? String(row.subscription_ends_at) : null;
-      return !subscriptionEndsAt || new Date(subscriptionEndsAt).getTime() > Date.now();
-    })
+    .filter((row) => isSquadEligibleRecord(row))
     .map((row) => String(row.id));
+}
+
+/** @deprecated Use listSquadEligibleMemberIds */
+export async function listPaidMemberIds(memberIds: string[]): Promise<string[]> {
+  return listSquadEligibleMemberIds(memberIds);
 }

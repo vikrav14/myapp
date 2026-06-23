@@ -306,3 +306,108 @@ Reply in plain text only.
     responseMimeType: "text/plain"
   });
 }
+
+export async function generatePersonalityFeedback(input: {
+  user: MauriUser;
+  mode: "roast" | "hype";
+  snapshot: {
+    financeEntries: number;
+    totalSpent: number;
+    habitLogs: number;
+    successfulHabits: number;
+    completedTodos: number;
+    openTodos: number;
+    averageAnxiety: number | null;
+  };
+  weeklyFocus: string | null;
+}): Promise<string> {
+  const tone =
+    input.mode === "roast"
+      ? "Playfully sharp, honest, Mauritian peer energy. No cruelty. No bullet lists."
+      : "Warm, hype them up, celebrate real wins only. No fake positivity. No bullet lists.";
+
+  const prompt = `
+You are Mauri in a private WhatsApp thread for Mauritians.
+Mode: ${input.mode}
+${tone}
+No "As an AI".
+Short paragraphs only.
+Use Rs for money when relevant.
+
+User:
+First name: ${input.user.first_name ?? "Unknown"}
+Archetype: ${input.user.archetype}
+Weekly focus: ${input.weeklyFocus ?? "not set"}
+
+Recent activity snapshot:
+${JSON.stringify(input.snapshot)}
+
+Write a compact ${input.mode} based on their actual data.
+If data is thin, say that directly and push one concrete next move.
+Reply in plain text only.
+`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
+export async function generateMicroLesson(input: {
+  user: MauriUser;
+  weeklyFocus: string | null;
+}): Promise<string> {
+  const prompt = `
+You are Mauri.
+Write one 2-minute life insight for a Mauritian user on WhatsApp.
+
+Rules:
+- One short paragraph, max 80 words.
+- Psychology-informed, practical, not preachy.
+- Tie to their archetype and weekly focus when possible.
+- No bullet lists. No "As an AI".
+
+User archetype: ${input.user.archetype}
+Weekly focus: ${input.weeklyFocus ?? "general balance"}
+
+Reply in plain text only.
+`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
+export async function generateMemoryResurfaceMessage(input: {
+  user: MauriUser;
+  memoryText: string;
+  memorySource: "conversation_memory" | "insight_memory" | "todo";
+  weeklyFocus: string | null;
+}): Promise<string> {
+  const prompt = `
+You are Mauri in a private WhatsApp thread for Mauritians.
+You are gently resurfacing something the user shared earlier.
+
+Rules:
+- 2 short paragraphs max.
+- Warm, grounded, not creepy.
+- Reference the memory naturally without quoting it word-for-word.
+- Ask one light question or suggest one small next move.
+- No bullet lists. No "As an AI".
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+Weekly focus: ${input.weeklyFocus ?? "not set"}
+Memory source: ${input.memorySource}
+Memory: ${input.memoryText}
+
+Reply in plain text only.
+`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}

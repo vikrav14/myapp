@@ -9,9 +9,14 @@ import { loadUserContext } from "../services/context.service.js";
 import { registerInboundEvent } from "../services/inbound-event.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
+import { handleCalendarMessage } from "../services/calendar.service.js";
+import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
+import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
+import { handleReminderMessage } from "../services/reminder-schedule.service.js";
+import { runSquadRelayAfterExtraction } from "../services/squad-relay.service.js";
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
@@ -161,6 +166,17 @@ whatsappRouter.post("/", async (request, response, next) => {
         });
       }
 
+      if (onboardingResult.discoveryReply) {
+        await sendWhatsAppMessage(inboundMessage.from, onboardingResult.discoveryReply, {
+          userId: onboardingResult.user.id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "onboarding_discovery"
+          }
+        });
+      }
+
       response.status(200).json({
         ok: true,
         userId: onboardingResult.user.id,
@@ -174,6 +190,117 @@ whatsappRouter.post("/", async (request, response, next) => {
     }
 
     const user = onboardingResult.user;
+
+    const engagementResult = await handleEngagementCommandMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (engagementResult.handled && engagementResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, engagementResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "engagement_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: engagementResult.reply
+      });
+      return;
+    }
+
+    const memoryResurfaceResult = await handleMemoryResurfaceToggleMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (memoryResurfaceResult.handled && memoryResurfaceResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, memoryResurfaceResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "memory_resurface_toggle"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: memoryResurfaceResult.reply
+      });
+      return;
+    }
+
+    const reminderResult = await handleReminderMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (reminderResult.handled && reminderResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, reminderResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "reminder_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: reminderResult.reply
+      });
+      return;
+    }
+
+    const calendarResult = await handleCalendarMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (calendarResult.handled && calendarResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, calendarResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "calendar_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: calendarResult.reply
+      });
+      return;
+    }
 
     const topicPreferenceResult = await handleTopicPreferenceMessage({
       user,
@@ -278,6 +405,11 @@ whatsappRouter.post("/", async (request, response, next) => {
     const extraction = await extractStructuredContext(normalizedMessageText);
 
     await persistExtraction(user.id, extraction);
+    await runSquadRelayAfterExtraction({
+      user,
+      extraction,
+      requestId
+    });
 
     const reply = await generateConversationalReply({
       user,

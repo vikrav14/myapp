@@ -869,8 +869,8 @@ function renderAdminPanelHtml(): string {
           ).join('');
 
           el.squadNudgeNote.textContent = profile.stats.nudgeEligible
-            ? 'This squad has enough paid members for cross-private nudges and Sunday showdowns.'
-            : 'Nudges need at least 2 paid active members. This squad currently does not qualify.';
+            ? 'This squad has enough active trial or paid members for cross-private nudges and Sunday showdowns.'
+            : 'Nudges need at least 2 active trial or paid members. This squad currently does not qualify.';
           el.squadInviteMessage.value = profile.inviteMessage || '';
 
           renderTable(el.squadMembersBody, profile.members, 5, (item) =>
