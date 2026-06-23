@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabase.js";
 import { evaluateAndPersistOperationalAlerts } from "../services/alerting.service.js";
 import { runOutboundMessageRetryLoop } from "../services/outbound-retry.service.js";
 import { runSundayDiagnosticReports } from "../services/report.service.js";
-import { listPaidMemberIds } from "../services/squad.service.js";
+import { listSquadEligibleMemberIds } from "../services/squad.service.js";
 import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
 
 interface SquadMember {
@@ -111,12 +111,12 @@ export async function runCrossPrivateNudgeLoop(): Promise<void> {
 
   for (const squad of squads ?? []) {
     const memberIds = Array.isArray(squad.member_ids) ? squad.member_ids.map(String) : [];
-    const paidMemberIds = await listPaidMemberIds(memberIds);
-    if (paidMemberIds.length < 2) {
+    const eligibleMemberIds = await listSquadEligibleMemberIds(memberIds);
+    if (eligibleMemberIds.length < 2) {
       continue;
     }
 
-    const rankings = await buildRankings(paidMemberIds, 3);
+    const rankings = await buildRankings(eligibleMemberIds, 3);
     const leader = rankings[0];
     if (!leader) {
       continue;
@@ -149,12 +149,12 @@ export async function runSundayShowdown(): Promise<void> {
 
   for (const squad of squads ?? []) {
     const memberIds = Array.isArray(squad.member_ids) ? squad.member_ids.map(String) : [];
-    const paidMemberIds = await listPaidMemberIds(memberIds);
-    if (!paidMemberIds.length) {
+    const eligibleMemberIds = await listSquadEligibleMemberIds(memberIds);
+    if (!eligibleMemberIds.length) {
       continue;
     }
 
-    const rankings = await buildRankings(paidMemberIds, 7);
+    const rankings = await buildRankings(eligibleMemberIds, 7);
     const scoreboard = rankings
       .map((entry, index) => `${index + 1}. ${displayName(entry.member)} — ${entry.score} pts`)
       .join("\n");

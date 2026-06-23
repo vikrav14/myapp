@@ -33,6 +33,16 @@ const paidUser = {
   updated_at: "2026-01-01T00:00:00.000Z"
 };
 
+const trialUser = {
+  ...paidUser,
+  subscription_status: "Trial_Active" as const,
+  trial_started_at: "2026-06-01T00:00:00.000Z",
+  trial_ends_at: "2026-07-01T00:00:00.000Z",
+  subscription_started_at: null,
+  subscription_ends_at: null,
+  last_payment_at: null
+};
+
 describe("parseSquadCommand", () => {
   it("detects create, join, status, leave, and share commands", () => {
     expect(parseSquadCommand("create squad Study Crew")?.type).toBe("create");
@@ -63,17 +73,59 @@ describe("handleSquadMessage", () => {
     mockRecordAuditEventBestEffort.mockResolvedValue(undefined);
   });
 
-  it("blocks squad commands for non-premium users", async () => {
+  it("blocks squad commands for locked users", async () => {
     const result = await handleSquadMessage({
       user: {
         ...paidUser,
-        subscription_status: "Trial_Active"
+        subscription_status: "Locked"
       },
       message: "create squad"
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("premium feature");
+    expect(result.reply).toContain("active trial or premium");
+  });
+
+  it("creates a squad for trial users", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const single = vi.fn().mockResolvedValue({
+      data: {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        squad_code: "A1B2C3",
+        squad_name: "Study Crew",
+        member_ids: [trialUser.id],
+        created_at: "2026-06-22T00:00:00.000Z"
+      },
+      error: null
+    });
+
+    mockSupabaseFrom.mockImplementation((table: string) => {
+      if (table === "squads") {
+        return {
+          select: () => ({
+            contains: () => ({
+              maybeSingle
+            })
+          }),
+          insert: () => ({
+            select: () => ({
+              single
+            })
+          })
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await handleSquadMessage({
+      user: trialUser,
+      message: "create squad Study Crew"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("A1B2C3");
+    expect(result.reply).toContain("Study Crew");
   });
 
   it("creates a squad for paid users", async () => {

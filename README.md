@@ -392,7 +392,7 @@ When a payment confirmation is posted to the internal payment route, the user is
 
 When a paid subscription window expires, the webhook auto-locks the account again on the next inbound message. Locked users now receive per-user checkout session references alongside the configured Juice and Blink payment links.
 
-Premium users can manage Mauri Squads directly in WhatsApp:
+Trial and premium users can manage Mauri Squads directly in WhatsApp:
 
 - `create squad` or `create squad Study Crew`
 - `join CODE`
@@ -409,7 +409,9 @@ Premium users can manage Mauri Squads directly in WhatsApp:
 - `lesson` (today's 2-minute insight)
 - `leave squad`
 
-Squad nudges and Sunday showdowns only include members with an active paid subscription.
+Squad nudges and Sunday showdowns include members with an active trial or paid subscription.
+
+On day 2 of trial, Mauri sends a squad invite prompt (`create squad` + `share squad`). Squads are included for the full 7-day trial.
 
 The admin panel also exposes squad operations:
 

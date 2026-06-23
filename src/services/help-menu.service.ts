@@ -1,12 +1,10 @@
 import type { MauriUser } from "../types.js";
 
 export function buildHelpMenu(user: MauriUser): string {
-  const trialLine =
-    user.subscription_status === "Trial_Active"
-      ? "\nPremium unlocks squads (create squad / join CODE)."
-      : user.subscription_status === "Paid_Active"
-        ? "\nSquads: create squad, join CODE, share squad, squad status."
-        : "";
+  const squadLine =
+    user.subscription_status === "Trial_Active" || user.subscription_status === "Paid_Active"
+      ? "\nSquads (included on trial): create squad, join CODE, share squad, squad status."
+      : "";
 
   return `Mauri command menu
 
@@ -31,7 +29,7 @@ Can't decide?
 - quantum pick 1 5
 - quantum pick Tribeca, Docker, Nandos
 
-${trialLine}
+${squadLine}
 
 Reply help or menu anytime.`;
 }
@@ -39,6 +37,7 @@ Reply help or menu anytime.`;
 export function buildQuickStartMenu(): string {
   return `Quick start commands:
 help — full menu
+create squad — invite mates (no group chat)
 my focus — this week's one habit
 roast me — truth from your week
 my streaks — habit streaks

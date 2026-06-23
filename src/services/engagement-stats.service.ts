@@ -106,14 +106,19 @@ Your Sunday diagnostic will connect the dots. Try roast me or hype me before the
 Reply help to see what else I can do.`;
 }
 
-export function buildTrialSquadTease(user: MauriUser): string {
+export function buildTrialSquadInvite(user: MauriUser): string {
   const name = user.first_name?.trim() || "there";
 
-  return `${name}, quick heads-up.
+  return `${name}, squads are already on your trial.
 
-When you unlock premium you can create squad or join CODE and run private accountability with friends. No group chat circus — just Mauri nudging each of you privately.
+Reply create squad Study Crew (or any name), then share squad to invite mates on WhatsApp.
 
-Squads are built for trial users who want mates in the lane with them.
+No group chat — Mauri nudges each of you privately and runs Sunday showdown.
 
-Reply help for the full command list.`;
+Try it before day 7 so your crew is in the game.`;
+}
+
+/** @deprecated Use buildTrialSquadInvite */
+export function buildTrialSquadTease(user: MauriUser): string {
+  return buildTrialSquadInvite(user);
 }

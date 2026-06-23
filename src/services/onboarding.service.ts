@@ -106,6 +106,8 @@ I'll send your Mauritian brief at 7:00 with weather, traffic, and stories matche
 
 Send me your messy brain dump exactly as it is. Spending. Tasks. Wins. Stress. Random thoughts. I'll sort the signal from the chaos.
 
+Squads are live on your trial — reply create squad Study Crew and invite mates before Sunday showdown.
+
 Reply help anytime for the full command menu.`;
 }
 

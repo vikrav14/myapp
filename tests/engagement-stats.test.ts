@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTrialProgressPing, buildTrialSquadTease } from "../src/services/engagement-stats.service.js";
+import { buildTrialProgressPing, buildTrialSquadInvite } from "../src/services/engagement-stats.service.js";
 
 const activeUser = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -40,7 +40,10 @@ describe("trial engagement copy", () => {
     expect(message).toContain("help");
   });
 
-  it("builds a squad tease", () => {
-    expect(buildTrialSquadTease(activeUser)).toContain("create squad");
+  it("builds a squad invite for trial users", () => {
+    const message = buildTrialSquadInvite(activeUser);
+    expect(message).toContain("create squad");
+    expect(message).toContain("Sunday showdown");
+    expect(message).not.toContain("unlock premium");
   });
 });

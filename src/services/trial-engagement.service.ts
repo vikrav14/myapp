@@ -5,7 +5,7 @@ import type { MauriUser } from "../types.js";
 import {
   buildRecentActivitySnapshot,
   buildTrialProgressPing,
-  buildTrialSquadTease
+  buildTrialSquadInvite
 } from "./engagement-stats.service.js";
 import { hasEngagementDelivery, recordEngagementDelivery } from "./engagement-delivery.service.js";
 import { buildDailyMicroLessonSection } from "./micro-lesson.service.js";
@@ -46,11 +46,11 @@ export async function listActiveTrialUsers(): Promise<MauriUser[]> {
 
 export async function runTrialEngagementDeliveries(requestId?: string): Promise<{
   progressPings: number;
-  squadTeases: number;
+  squadInvites: number;
 }> {
   const users = await listActiveTrialUsers();
   let progressPings = 0;
-  let squadTeases = 0;
+  let squadInvites = 0;
 
   for (const user of users) {
     const day = trialDayNumber(user);
@@ -59,6 +59,20 @@ export async function runTrialEngagementDeliveries(requestId?: string): Promise<
     }
 
     try {
+      if (day >= 2) {
+        const squadKey = "trial_day2_squad_invite";
+        if (!(await hasEngagementDelivery(user.id, squadKey))) {
+          const squadMessage = buildTrialSquadInvite(user);
+          await sendWhatsAppMessage(user.phone_number, squadMessage, {
+            userId: user.id,
+            requestId,
+            metadata: { flow: "trial_squad_invite", trialDay: day }
+          });
+          await recordEngagementDelivery(user.id, squadKey);
+          squadInvites += 1;
+        }
+      }
+
       if (day >= 3) {
         const key = "trial_day3_progress";
         if (!(await hasEngagementDelivery(user.id, key))) {
@@ -73,26 +87,12 @@ export async function runTrialEngagementDeliveries(requestId?: string): Promise<
           progressPings += 1;
         }
       }
-
-      if (day >= 5) {
-        const key = "trial_day5_squad_tease";
-        if (!(await hasEngagementDelivery(user.id, key))) {
-          const message = buildTrialSquadTease(user);
-          await sendWhatsAppMessage(user.phone_number, message, {
-            userId: user.id,
-            requestId,
-            metadata: { flow: "trial_squad_tease", trialDay: day }
-          });
-          await recordEngagementDelivery(user.id, key);
-          squadTeases += 1;
-        }
-      }
     } catch (error) {
       logger.warn({ error, userId: user.id }, "Failed trial engagement delivery for user.");
     }
   }
 
-  return { progressPings, squadTeases };
+  return { progressPings, squadInvites };
 }
 
 export async function appendMicroLessonToBriefMessage(user: MauriUser, message: string): Promise<string> {

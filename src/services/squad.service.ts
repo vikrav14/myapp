@@ -39,7 +39,15 @@ function displayName(user: MauriUser): string {
   return user.first_name?.trim() || "You";
 }
 
-function isPaidActive(user: MauriUser): boolean {
+export function hasSquadAccess(user: MauriUser): boolean {
+  if (user.subscription_status === "Trial_Active") {
+    if (!user.trial_ends_at) {
+      return true;
+    }
+
+    return new Date(user.trial_ends_at).getTime() > Date.now();
+  }
+
   if (user.subscription_status !== "Paid_Active") {
     return false;
   }
@@ -51,8 +59,8 @@ function isPaidActive(user: MauriUser): boolean {
   return new Date(user.subscription_ends_at).getTime() > Date.now();
 }
 
-function premiumRequiredReply(): string {
-  return "Mauri Squads are a premium feature. Unlock premium first, then you can create or join a squad here.";
+function squadAccessRequiredReply(): string {
+  return "Mauri Squads need an active trial or premium. Unlock premium to keep your squad after trial ends.";
 }
 
 export function parseSquadCommand(message: string): {
@@ -430,10 +438,10 @@ export async function handleSquadMessage(input: {
     return { handled: false };
   }
 
-  if (!isPaidActive(input.user)) {
+  if (!hasSquadAccess(input.user)) {
     return {
       handled: true,
-      reply: premiumRequiredReply()
+      reply: squadAccessRequiredReply()
     };
   }
 
@@ -518,25 +526,47 @@ ${buildSquadInviteMessage(squad)}`
   };
 }
 
-export async function listPaidMemberIds(memberIds: string[]): Promise<string[]> {
+function isSquadEligibleRecord(row: {
+  subscription_status: unknown;
+  trial_ends_at: unknown;
+  subscription_ends_at: unknown;
+}): boolean {
+  const subscriptionStatus = String(row.subscription_status);
+
+  if (subscriptionStatus === "Trial_Active") {
+    const trialEndsAt = row.trial_ends_at ? String(row.trial_ends_at) : null;
+    return !trialEndsAt || new Date(trialEndsAt).getTime() > Date.now();
+  }
+
+  if (subscriptionStatus !== "Paid_Active") {
+    return false;
+  }
+
+  const subscriptionEndsAt = row.subscription_ends_at ? String(row.subscription_ends_at) : null;
+  return !subscriptionEndsAt || new Date(subscriptionEndsAt).getTime() > Date.now();
+}
+
+export async function listSquadEligibleMemberIds(memberIds: string[]): Promise<string[]> {
   if (!memberIds.length) {
     return [];
   }
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, subscription_ends_at")
+    .select("id, subscription_status, trial_ends_at, subscription_ends_at")
     .in("id", memberIds)
-    .eq("subscription_status", "Paid_Active");
+    .in("subscription_status", ["Trial_Active", "Paid_Active"]);
 
   if (error) {
-    throw new Error(`Failed to load paid squad members: ${error.message}`);
+    throw new Error(`Failed to load squad-eligible members: ${error.message}`);
   }
 
   return (data ?? [])
-    .filter((row) => {
-      const subscriptionEndsAt = row.subscription_ends_at ? String(row.subscription_ends_at) : null;
-      return !subscriptionEndsAt || new Date(subscriptionEndsAt).getTime() > Date.now();
-    })
+    .filter((row) => isSquadEligibleRecord(row))
     .map((row) => String(row.id));
+}
+
+/** @deprecated Use listSquadEligibleMemberIds */
+export async function listPaidMemberIds(memberIds: string[]): Promise<string[]> {
+  return listSquadEligibleMemberIds(memberIds);
 }
