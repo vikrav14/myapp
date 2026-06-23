@@ -166,7 +166,9 @@ update topics Traffic Money Tech
 
 To pause or resume the 7:00 brief:
 digest off
-digest on`;
+digest on
+
+Reply help for the full command menu.`;
 }
 
 export function buildDigestToggleReply(input: {

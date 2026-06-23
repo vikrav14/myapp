@@ -3,6 +3,7 @@ import type { CuratedMorningBrief, DailyBriefRunRecord, MauriUser, MorningBriefT
 import { mapUser } from "./user.service.js";
 import { buildPersonalizedMorningBriefMessage } from "./morning-brief-curation.service.js";
 import { parseCuratedMorningBrief } from "./morning-brief-run.service.js";
+import { appendMicroLessonToBriefMessage } from "./trial-engagement.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
 function isDigestEligible(user: MauriUser): boolean {
@@ -58,11 +59,12 @@ export async function deliverMorningBriefRun(input: {
 
   for (const user of recipients) {
     const topics = user.topic_preferences as MorningBriefTopicKey[];
-    const message = buildPersonalizedMorningBriefMessage({
+    const baseMessage = buildPersonalizedMorningBriefMessage({
       firstName: user.first_name,
       topics,
       curated
     });
+    const message = await appendMicroLessonToBriefMessage(user, baseMessage);
 
     try {
       await sendWhatsAppMessage(user.phone_number, message, {

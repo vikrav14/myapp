@@ -102,7 +102,9 @@ const envSchema = z.object({
   QUANTUM_PICK_ENABLED: envBoolean.default(true),
   ANU_QUANTUM_API_KEY: optionalSecret,
   ANU_QUANTUM_API_URL: z.string().url().default("https://api.quantumnumbers.anu.edu.au"),
-  QUANTUM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(2500)
+  QUANTUM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(2500),
+  TRIAL_ENGAGEMENT_ENABLED: envBoolean.default(true),
+  TRIAL_ENGAGEMENT_CRON: z.string().default("0 10 * * *")
 });
 
 export const env = envSchema.parse(process.env);

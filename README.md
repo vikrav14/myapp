@@ -71,6 +71,7 @@ supabase/migrations/
   011_processed_inbound_events.sql
   012_operational_alert_states.sql
   013_morning_brief_engine.sql
+  014_user_engagement.sql
 ```
 
 ## Environment variables
@@ -401,6 +402,11 @@ Premium users can manage Mauri Squads directly in WhatsApp:
 - `update topics Traffic Money Tech` (change morning brief tags)
 - `digest on` / `digest off` (pause or resume the 7:00 morning brief)
 - `quantum pick 1 5` or `quantum pick Tribeca, Docker, Nandos` (true-random decision helper)
+- `help` or `menu` (full command list)
+- `my focus` (this week's one habit)
+- `my streaks` (habit consistency, no guilt)
+- `roast me` / `hype me` (weekly truth or celebration)
+- `lesson` (today's 2-minute insight)
 - `leave squad`
 
 Squad nudges and Sunday showdowns only include members with an active paid subscription.
@@ -463,6 +469,8 @@ Environment:
 - `ANU_QUANTUM_API_KEY` (optional; without it Mauri uses cryptographic fallback randomness and says so honestly)
 - `ANU_QUANTUM_API_URL` (default `https://api.quantumnumbers.anu.edu.au`)
 - `QUANTUM_REQUEST_TIMEOUT_MS` (default `2500`)
+- `TRIAL_ENGAGEMENT_ENABLED` (default `true`)
+- `TRIAL_ENGAGEMENT_CRON` (default `0 10 * * *`, Mauritius timezone)
 
 ## Current constraints
 

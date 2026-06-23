@@ -2,6 +2,7 @@ import type { MauriArchetype, MauriUser, MorningBriefTopicKey } from "../types.j
 
 import { buildLockedReplyForUser } from "./paywall.service.js";
 import { buildOnboardingPreviewBrief } from "./morning-brief-preview.service.js";
+import { buildQuickStartMenu } from "./help-menu.service.js";
 import {
   buildSuggestedTopicsPrompt,
   defaultTopicsForArchetype,
@@ -10,6 +11,7 @@ import {
   isValidTopicSelection,
   parseTopicSelection
 } from "./morning-brief-topics.service.js";
+import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
 
 const archetypeCatalog: Array<{
@@ -38,6 +40,7 @@ export interface OnboardingResult {
   handled: boolean;
   reply?: string | undefined;
   followUpReply?: string | undefined;
+  discoveryReply?: string | undefined;
   user: MauriUser;
 }
 
@@ -103,7 +106,7 @@ I'll send your Mauritian brief at 7:00 with weather, traffic, and stories matche
 
 Send me your messy brain dump exactly as it is. Spending. Tasks. Wins. Stress. Random thoughts. I'll sort the signal from the chaos.
 
-When you unlock premium later, you can reply "create squad" or "join CODE" for private accountability with friends.`;
+Reply help anytime for the full command menu.`;
 }
 
 async function activateUserWithTopics(
@@ -114,7 +117,7 @@ async function activateUserWithTopics(
   const trialEndsAt = new Date(trialStartedAt);
   trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + 7);
 
-  const updatedUser = await updateUserState(user.id, {
+  const activatedUser = await updateUserState(user.id, {
     onboarding_state: "active",
     onboarding_completed_at: trialStartedAt.toISOString(),
     trial_started_at: trialStartedAt.toISOString(),
@@ -124,6 +127,7 @@ async function activateUserWithTopics(
     locked_at: null
   });
 
+  const updatedUser = await assignWeeklyFocusForUser(activatedUser);
   const archetype = updatedUser.archetype as MauriArchetype;
   const preview = await buildOnboardingPreviewBrief({
     firstName: updatedUser.first_name,
@@ -134,8 +138,11 @@ async function activateUserWithTopics(
   return {
     handled: true,
     user: updatedUser,
-    reply: buildActivationReply(archetype, topics),
-    followUpReply: preview
+    reply: `${buildActivationReply(archetype, topics)}
+
+This week's one habit: ${updatedUser.weekly_focus_habit}`,
+    followUpReply: preview,
+    discoveryReply: buildQuickStartMenu()
   };
 }
 

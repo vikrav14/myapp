@@ -9,6 +9,7 @@ import { loadUserContext } from "../services/context.service.js";
 import { registerInboundEvent } from "../services/inbound-event.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
+import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
@@ -161,6 +162,17 @@ whatsappRouter.post("/", async (request, response, next) => {
         });
       }
 
+      if (onboardingResult.discoveryReply) {
+        await sendWhatsAppMessage(inboundMessage.from, onboardingResult.discoveryReply, {
+          userId: onboardingResult.user.id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "onboarding_discovery"
+          }
+        });
+      }
+
       response.status(200).json({
         ok: true,
         userId: onboardingResult.user.id,
@@ -174,6 +186,34 @@ whatsappRouter.post("/", async (request, response, next) => {
     }
 
     const user = onboardingResult.user;
+
+    const engagementResult = await handleEngagementCommandMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (engagementResult.handled && engagementResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, engagementResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "engagement_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: engagementResult.reply
+      });
+      return;
+    }
 
     const topicPreferenceResult = await handleTopicPreferenceMessage({
       user,
