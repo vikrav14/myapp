@@ -13,7 +13,12 @@ vi.mock("../src/services/audit.service.js", () => ({
   recordAuditEventBestEffort: mockRecordAuditEventBestEffort
 }));
 
+vi.mock("../src/services/whatsapp.service.js", () => ({
+  sendWhatsAppMessage: vi.fn().mockResolvedValue(undefined)
+}));
+
 const { parseSquadCommand, buildSquadInviteMessage, handleSquadMessage } = await import("../src/services/squad.service.js");
+const { parseSquadGoalCommand } = await import("../src/services/squad-pact.service.js");
 
 const paidUser = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -50,6 +55,7 @@ describe("parseSquadCommand", () => {
     expect(parseSquadCommand("squad status")?.type).toBe("status");
     expect(parseSquadCommand("leave squad")?.type).toBe("leave");
     expect(parseSquadCommand("share squad")?.type).toBe("share");
+    expect(parseSquadGoalCommand("squad goal hustle")?.pactKey).toBe("hustle");
     expect(parseSquadCommand("I spent 150 on food")).toBeNull();
   });
 });
@@ -94,6 +100,10 @@ describe("handleSquadMessage", () => {
         squad_code: "A1B2C3",
         squad_name: "Study Crew",
         member_ids: [trialUser.id],
+        weekly_pact_key: null,
+        weekly_pact_label: null,
+        weekly_pact_set_at: null,
+        weekly_pact_set_by: null,
         created_at: "2026-06-22T00:00:00.000Z"
       },
       error: null
@@ -136,6 +146,10 @@ describe("handleSquadMessage", () => {
         squad_code: "A1B2C3",
         squad_name: "Study Crew",
         member_ids: [paidUser.id],
+        weekly_pact_key: null,
+        weekly_pact_label: null,
+        weekly_pact_set_at: null,
+        weekly_pact_set_by: null,
         created_at: "2026-06-22T00:00:00.000Z"
       },
       error: null
@@ -183,6 +197,10 @@ describe("handleSquadMessage", () => {
         squad_code: "A1B2C3",
         squad_name: "Study Crew",
         member_ids: [paidUser.id],
+        weekly_pact_key: null,
+        weekly_pact_label: null,
+        weekly_pact_set_at: null,
+        weekly_pact_set_by: null,
         created_at: "2026-06-22T00:00:00.000Z"
       },
       error: null
@@ -210,5 +228,72 @@ describe("handleSquadMessage", () => {
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("Share this invite");
     expect(result.reply).toContain("join A1B2C3");
+  });
+
+  it("sets a weekly squad pact for members", async () => {
+    const existingSquad = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      squad_code: "A1B2C3",
+      squad_name: "Study Crew",
+      member_ids: [paidUser.id],
+      weekly_pact_key: null,
+      weekly_pact_label: null,
+      weekly_pact_set_at: null,
+      weekly_pact_set_by: null,
+      created_at: "2026-06-22T00:00:00.000Z"
+    };
+    const maybeSingle = vi.fn().mockResolvedValue({ data: existingSquad, error: null });
+    const single = vi.fn().mockResolvedValue({
+      data: {
+        ...existingSquad,
+        weekly_pact_key: "study",
+        weekly_pact_label: "Study sprint",
+        weekly_pact_set_at: "2026-06-22T12:00:00.000Z",
+        weekly_pact_set_by: paidUser.id
+      },
+      error: null
+    });
+
+    mockSupabaseFrom.mockImplementation((table: string) => {
+      if (table === "squads") {
+        return {
+          select: () => ({
+            contains: () => ({
+              maybeSingle
+            })
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single
+              })
+            })
+          })
+        };
+      }
+
+      if (table === "users") {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({ data: [], error: null })
+          })
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await handleSquadMessage({
+      user: paidUser,
+      message: "squad goal study"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Study sprint");
+    expect(mockRecordAuditEventBestEffort).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "squad_pact_set"
+      })
+    );
   });
 });

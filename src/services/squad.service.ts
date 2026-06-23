@@ -3,6 +3,15 @@ import { randomBytes } from "node:crypto";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser } from "../types.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
+import {
+  buildSquadCreatedPactHint,
+  buildSquadGoalSetReply,
+  buildSquadGoalShowReply,
+  getSquadPactDefinition,
+  parseSquadGoalCommand,
+  type SquadPactKey
+} from "./squad-pact.service.js";
+import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
 export interface SquadRecord {
   id: string;
@@ -10,6 +19,10 @@ export interface SquadRecord {
   squad_name: string;
   member_ids: string[];
   created_at: string;
+  weekly_pact_key: string | null;
+  weekly_pact_label: string | null;
+  weekly_pact_set_at: string | null;
+  weekly_pact_set_by: string | null;
 }
 
 export interface SquadCommandResult {
@@ -23,7 +36,11 @@ function mapSquad(record: Record<string, unknown>): SquadRecord {
     squad_code: String(record.squad_code),
     squad_name: String(record.squad_name),
     member_ids: Array.isArray(record.member_ids) ? record.member_ids.map(String) : [],
-    created_at: String(record.created_at)
+    created_at: String(record.created_at),
+    weekly_pact_key: record.weekly_pact_key ? String(record.weekly_pact_key) : null,
+    weekly_pact_label: record.weekly_pact_label ? String(record.weekly_pact_label) : null,
+    weekly_pact_set_at: record.weekly_pact_set_at ? String(record.weekly_pact_set_at) : null,
+    weekly_pact_set_by: record.weekly_pact_set_by ? String(record.weekly_pact_set_by) : null
   };
 }
 
@@ -126,7 +143,9 @@ Copy and forward this invite:
 
 ${buildSquadInviteMessage(squad)}
 
-Reply "share squad" anytime to get this invite again.`;
+Reply "share squad" anytime to get this invite again.
+
+${buildSquadCreatedPactHint()}`;
 }
 
 export async function findSquadForUser(userId: string): Promise<SquadRecord | null> {
@@ -382,6 +401,120 @@ export async function joinSquadByCode(
   return updated;
 }
 
+export async function setSquadWeeklyPact(input: {
+  squadId: string;
+  pactKey: SquadPactKey;
+  setByUserId: string;
+  requestId?: string | undefined;
+}): Promise<SquadRecord> {
+  const pact = getSquadPactDefinition(input.pactKey);
+  if (!pact) {
+    throw new Error("Invalid squad pact.");
+  }
+
+  const { data, error } = await supabase
+    .from("squads")
+    .update({
+      weekly_pact_key: pact.key,
+      weekly_pact_label: pact.label,
+      weekly_pact_set_at: new Date().toISOString(),
+      weekly_pact_set_by: input.setByUserId
+    })
+    .eq("id", input.squadId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to set squad pact: ${error.message}`);
+  }
+
+  const squad = mapSquad(data as Record<string, unknown>);
+  await recordAuditEventBestEffort({
+    requestId: input.requestId,
+    eventType: "squad_pact_set",
+    userId: input.setByUserId,
+    entityType: "squad",
+    entityId: squad.id,
+    message: "User set a squad weekly pact.",
+    metadata: {
+      squadCode: squad.squad_code,
+      pactKey: pact.key,
+      pactLabel: pact.label
+    }
+  });
+
+  return squad;
+}
+
+export async function clearSquadWeeklyPact(squadId: string, requestId?: string | undefined): Promise<SquadRecord> {
+  const { data, error } = await supabase
+    .from("squads")
+    .update({
+      weekly_pact_key: null,
+      weekly_pact_label: null,
+      weekly_pact_set_at: null,
+      weekly_pact_set_by: null
+    })
+    .eq("id", squadId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to clear squad pact: ${error.message}`);
+  }
+
+  const squad = mapSquad(data as Record<string, unknown>);
+  await recordAuditEventBestEffort({
+    requestId,
+    eventType: "squad_pact_cleared",
+    entityType: "squad",
+    entityId: squad.id,
+    message: "Squad weekly pact cleared.",
+    metadata: {
+      squadCode: squad.squad_code
+    }
+  });
+
+  return squad;
+}
+
+async function notifySquadMembersOfPactChange(input: {
+  squad: SquadRecord;
+  actor: MauriUser;
+  pactLabel: string;
+  requestId?: string | undefined;
+}): Promise<void> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, phone_number, first_name")
+    .in("id", input.squad.member_ids);
+
+  if (error) {
+    throw new Error(`Failed to load squad members for pact notification: ${error.message}`);
+  }
+
+  const actorName = displayName(input.actor);
+  const message = `${actorName} set ${input.squad.squad_name}'s pact for this week: ${input.pactLabel}.
+
+Reply squad goal to see how scoring works.`;
+
+  for (const row of data ?? []) {
+    const memberId = String(row.id);
+    if (memberId === input.actor.id) {
+      continue;
+    }
+
+    await sendWhatsAppMessage(String(row.phone_number), message, {
+      userId: memberId,
+      requestId: input.requestId,
+      metadata: {
+        flow: "squad_pact_notify",
+        squadName: input.squad.squad_name
+      }
+    });
+  }
+}
+
 export async function leaveSquadForUser(user: MauriUser, requestId?: string | undefined): Promise<SquadRecord | null> {
   const squad = await findSquadForUser(user.id);
   if (!squad) {
@@ -433,8 +566,9 @@ export async function handleSquadMessage(input: {
   message: string;
   requestId?: string | undefined;
 }): Promise<SquadCommandResult> {
-  const command = parseSquadCommand(input.message);
-  if (!command) {
+  const goalCommand = parseSquadGoalCommand(input.message);
+  const command = goalCommand ? null : parseSquadCommand(input.message);
+  if (!goalCommand && !command) {
     return { handled: false };
   }
 
@@ -443,6 +577,66 @@ export async function handleSquadMessage(input: {
       handled: true,
       reply: squadAccessRequiredReply()
     };
+  }
+
+  if (goalCommand) {
+    const squad = await findSquadForUser(input.user.id);
+    if (!squad) {
+      return {
+        handled: true,
+        reply: `You're not in a squad yet.
+
+Create one first, then set a pact:
+create squad Study Crew
+squad goal study | save | hustle | balance`
+      };
+    }
+
+    if (goalCommand.type === "show") {
+      return {
+        handled: true,
+        reply: buildSquadGoalShowReply(squad)
+      };
+    }
+
+    if (goalCommand.type === "clear") {
+      const cleared = await clearSquadWeeklyPact(squad.id, input.requestId);
+      return {
+        handled: true,
+        reply: `Pact cleared for ${cleared.squad_name}. Default scoring is back on (habits +2, todos +3, money logs +1).`
+      };
+    }
+
+    const pact = getSquadPactDefinition(goalCommand.pactKey);
+    if (!pact) {
+      return {
+        handled: true,
+        reply: buildSquadGoalShowReply(squad)
+      };
+    }
+
+    const updated = await setSquadWeeklyPact({
+      squadId: squad.id,
+      pactKey: pact.key,
+      setByUserId: input.user.id,
+      requestId: input.requestId
+    });
+
+    await notifySquadMembersOfPactChange({
+      squad: updated,
+      actor: input.user,
+      pactLabel: pact.label,
+      requestId: input.requestId
+    }).catch(() => undefined);
+
+    return {
+      handled: true,
+      reply: buildSquadGoalSetReply(updated, pact)
+    };
+  }
+
+  if (!command) {
+    return { handled: false };
   }
 
   if (command.type === "create") {
@@ -462,7 +656,9 @@ export async function handleSquadMessage(input: {
 
 Code ${squad.squad_code} is locked in.
 
-Want to invite someone? Reply "share squad" for a copy-paste invite message.`
+Want to invite someone? Reply "share squad" for a copy-paste invite message.
+
+Set the weekly pact anytime: squad goal study | save | hustle | balance`
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not join that squad.";
@@ -493,8 +689,9 @@ Reply "create squad" to start one, or "join CODE" if someone already sent you a 
 
 Code: ${squad.squad_code}
 Members: ${squad.member_ids.length}
+${squad.weekly_pact_label ? `Pact: ${squad.weekly_pact_label}` : "Pact: not set yet"}
 
-Reply "share squad" for an invite message, or "leave squad" if you want out.`
+Reply "share squad" for an invite, "squad goal" for pact scoring, or "leave squad" if you want out.`
     };
   }
 

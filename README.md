@@ -408,10 +408,10 @@ Trial and premium users can manage Mauri Squads directly in WhatsApp:
 - `roast me` / `hype me` (weekly truth or celebration)
 - `lesson` (today's 2-minute insight)
 - `leave squad`
+- `squad goal` or `squad goal study | save | hustle | balance` (weekly pact — changes scoreboard weights)
+- `squad goal clear` (reset to default scoring)
 
-Squad nudges and Sunday showdowns include members with an active trial or paid subscription.
-
-On day 2 of trial, Mauri sends a squad invite prompt (`create squad` + `share squad`). Squads are included for the full 7-day trial.
+Squad nudges and Sunday showdowns include members with an active trial or paid subscription. When a weekly pact is set, habit/todo/finance logs score differently (e.g. study pact boosts study habits).
 
 The admin panel also exposes squad operations:
 
