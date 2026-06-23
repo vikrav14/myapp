@@ -1,5 +1,6 @@
 import { createApp } from "./app.js";
 import { registerCalendarJobs } from "./jobs/calendar-jobs.js";
+import { registerLocalAlertsJobs } from "./jobs/local-alerts-jobs.js";
 import { registerMemoryResurfacingJobs } from "./jobs/memory-resurfacing-jobs.js";
 import { registerMorningBriefJobs } from "./jobs/morning-brief-jobs.js";
 import { registerReminderJobs } from "./jobs/reminder-jobs.js";
@@ -16,6 +17,7 @@ app.listen(env.PORT, () => {
   registerMorningBriefJobs();
   registerReminderJobs();
   registerCalendarJobs();
+  registerLocalAlertsJobs();
   registerMemoryResurfacingJobs();
   registerTrialEngagementJobs();
   logSecurityPostureWarnings();

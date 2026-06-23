@@ -114,7 +114,10 @@ const envSchema = z.object({
   MEMORY_RESURFACING_ENABLED: envBoolean.default(true),
   MEMORY_RESURFACING_CRON: z.string().default("0 11 * * *"),
   RECEIPT_SCAN_ENABLED: envBoolean.default(true),
-  PAYDAY_RUNWAY_ENABLED: envBoolean.default(true)
+  PAYDAY_RUNWAY_ENABLED: envBoolean.default(true),
+  LOCAL_ALERTS_ENABLED: envBoolean.default(true),
+  LOCAL_ALERTS_CRON: z.string().default("*/30 21-23,0-7 * * *"),
+  LOCAL_ALERT_RSS_FEEDS: optionalCsv
 });
 
 export const env = envSchema.parse(process.env);

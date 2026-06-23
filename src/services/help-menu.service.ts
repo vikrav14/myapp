@@ -40,6 +40,11 @@ Calendar
 Memory
 - resurface on / resurface off — gentle memory pings (max 1/day)
 
+Local alerts
+- Mauri pings school closures, heavy rain, cyclone warnings
+- alerts on / alerts off · school alerts on / school alerts off
+- my alerts — recent urgent advisories
+
 Money
 - snap a receipt photo — auto-log spending
 - my runway — till-payday breathing room
