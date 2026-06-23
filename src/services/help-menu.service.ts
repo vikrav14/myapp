@@ -25,6 +25,12 @@ Morning brief
 - update topics Traffic Money Tech
 - digest off / digest on
 
+Reminders
+- remind me to call mum at 6pm
+- remind me to drink water daily at 8am
+- my reminders — list active reminders
+- cancel reminder 1
+
 Can't decide?
 - quantum pick 1 5
 - quantum pick Tribeca, Docker, Nandos
@@ -43,6 +49,7 @@ my focus — this week's one habit
 roast me — truth from your week
 my streaks — habit streaks
 quantum pick 1 5 — let the universe decide
+remind me to gym at 6pm — schedule a ping
 lesson — today's insight`;
 }
 

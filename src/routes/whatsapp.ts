@@ -13,6 +13,7 @@ import { handleEngagementCommandMessage } from "../services/engagement-commands.
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
+import { handleReminderMessage } from "../services/reminder-schedule.service.js";
 import { runSquadRelayAfterExtraction } from "../services/squad-relay.service.js";
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
@@ -212,6 +213,34 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: engagementResult.reply
+      });
+      return;
+    }
+
+    const reminderResult = await handleReminderMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (reminderResult.handled && reminderResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, reminderResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "reminder_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: reminderResult.reply
       });
       return;
     }

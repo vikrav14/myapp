@@ -111,6 +111,10 @@ services:
         value: https://api.quantumnumbers.anu.edu.au
       - key: QUANTUM_REQUEST_TIMEOUT_MS
         value: "2500"
+      - key: REMINDERS_ENABLED
+        value: "true"
+      - key: REMINDER_DELIVERY_CRON
+        value: "* * * * *"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS
