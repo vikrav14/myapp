@@ -413,6 +413,8 @@ Trial and premium users can manage Mauri Squads directly in WhatsApp:
 
 Squad nudges and Sunday showdowns include members with an active trial or paid subscription. When a weekly pact is set, habit/todo/finance logs score differently (e.g. study pact boosts study habits).
 
+Relay nudges fire when the squad leader logs a scoring win (habit or money log) — laggers get a private *"Your move"* ping (max once per day per person). New squads auto-set a pact from the creator's archetype.
+
 The admin panel also exposes squad operations:
 
 - `GET /internal/admin/squads`

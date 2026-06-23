@@ -13,6 +13,7 @@ import { handleEngagementCommandMessage } from "../services/engagement-commands.
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
+import { runSquadRelayAfterExtraction } from "../services/squad-relay.service.js";
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
@@ -318,6 +319,11 @@ whatsappRouter.post("/", async (request, response, next) => {
     const extraction = await extractStructuredContext(normalizedMessageText);
 
     await persistExtraction(user.id, extraction);
+    await runSquadRelayAfterExtraction({
+      user,
+      extraction,
+      requestId
+    });
 
     const reply = await generateConversationalReply({
       user,

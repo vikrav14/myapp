@@ -9,6 +9,7 @@ import {
   buildSquadGoalShowReply,
   getSquadPactDefinition,
   parseSquadGoalCommand,
+  suggestedPactKeyForArchetype,
   type SquadPactKey
 } from "./squad-pact.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
@@ -134,18 +135,23 @@ join ${squad.squad_code}
 Private accountability only — no group chat. Mauri nudges us when someone drifts.`;
 }
 
-function buildSquadCreatedReply(squad: SquadRecord): string {
+function buildSquadCreatedReply(squad: SquadRecord, user: MauriUser): string {
+  const pactNote =
+    squad.weekly_pact_label != null
+      ? `Weekly pact: ${squad.weekly_pact_label} (auto-set from your ${user.archetype} lane).`
+      : buildSquadCreatedPactHint(user.archetype);
+
   return `Squad live: ${squad.squad_name}
 
 Code: ${squad.squad_code}
+
+${pactNote}
 
 Copy and forward this invite:
 
 ${buildSquadInviteMessage(squad)}
 
-Reply "share squad" anytime to get this invite again.
-
-${buildSquadCreatedPactHint()}`;
+Reply "share squad" anytime to get this invite again.`;
 }
 
 export async function findSquadForUser(userId: string): Promise<SquadRecord | null> {
@@ -340,7 +346,14 @@ export async function createSquadForUser(
           squadName: squad.squad_name
         }
       });
-      return squad;
+
+      const suggestedPact = suggestedPactKeyForArchetype(user.archetype);
+      return setSquadWeeklyPact({
+        squadId: squad.id,
+        pactKey: suggestedPact,
+        setByUserId: user.id,
+        requestId
+      });
     }
 
     if (error?.code === "23505") {
@@ -643,7 +656,7 @@ squad goal study | save | hustle | balance`
     const squad = await createSquadForUser(input.user, command.squadName, input.requestId);
     return {
       handled: true,
-      reply: buildSquadCreatedReply(squad)
+      reply: buildSquadCreatedReply(squad, input.user)
     };
   }
 

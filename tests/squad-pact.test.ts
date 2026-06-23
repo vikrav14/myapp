@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildSquadGoalSetReply,
   buildSundayShowdownPactFooter,
+  buildSquadCreatedPactHint,
   parseSquadGoalCommand,
   scoreMemberLogs,
-  scoringWeightsForSquad
+  scoringWeightsForSquad,
+  suggestedPactKeyForArchetype
 } from "../src/services/squad-pact.service.js";
 import type { SquadRecord } from "../src/services/squad.service.js";
 
@@ -75,5 +77,11 @@ describe("squad pact copy", () => {
       .toContain("Study sprint");
     expect(buildSundayShowdownPactFooter(studySquad)).toContain("Study sprint");
     expect(buildSundayShowdownPactFooter(baseSquad)).toContain("squad goal study");
+  });
+
+  it("suggests archetype-aligned pacts", () => {
+    expect(suggestedPactKeyForArchetype("Student Grind")).toBe("study");
+    expect(suggestedPactKeyForArchetype("Entrepreneur Mode")).toBe("hustle");
+    expect(buildSquadCreatedPactHint("Student Grind")).toContain("squad goal study");
   });
 });

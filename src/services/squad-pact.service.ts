@@ -269,7 +269,25 @@ export function buildSundayShowdownPactFooter(squad: SquadRecord): string {
   return `No pact set this week — reply squad goal study | save | hustle | balance before Monday.`;
 }
 
-export function buildSquadCreatedPactHint(): string {
+export function buildSquadCreatedPactHint(archetype?: string): string {
+  if (archetype?.trim()) {
+    const key = suggestedPactKeyForArchetype(archetype);
+    const pact = PACT_CATALOG[key];
+    return `Pact auto-set for your lane: ${pact.label} (squad goal ${key}).
+Change anytime: squad goal save | hustle | balance`;
+  }
+
   return `Pick this week's pact (changes scoring):
 squad goal study | save | hustle | balance`;
+}
+
+const ARCHETYPE_PACT: Record<string, SquadPactKey> = {
+  "Student Grind": "study",
+  "Corporate / Career": "balance",
+  "Entrepreneur Mode": "hustle",
+  "Life & Habit Tracking": "balance"
+};
+
+export function suggestedPactKeyForArchetype(archetype: string): SquadPactKey {
+  return ARCHETYPE_PACT[archetype] ?? "balance";
 }

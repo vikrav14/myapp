@@ -93,21 +93,27 @@ describe("handleSquadMessage", () => {
   });
 
   it("creates a squad for trial users", async () => {
+    const createdSquad = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      squad_code: "A1B2C3",
+      squad_name: "Study Crew",
+      member_ids: [trialUser.id],
+      weekly_pact_key: null,
+      weekly_pact_label: null,
+      weekly_pact_set_at: null,
+      weekly_pact_set_by: null,
+      created_at: "2026-06-22T00:00:00.000Z"
+    };
+    const pactSquad = {
+      ...createdSquad,
+      weekly_pact_key: "study",
+      weekly_pact_label: "Study sprint",
+      weekly_pact_set_at: "2026-06-22T12:00:00.000Z",
+      weekly_pact_set_by: trialUser.id
+    };
     const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const single = vi.fn().mockResolvedValue({
-      data: {
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        squad_code: "A1B2C3",
-        squad_name: "Study Crew",
-        member_ids: [trialUser.id],
-        weekly_pact_key: null,
-        weekly_pact_label: null,
-        weekly_pact_set_at: null,
-        weekly_pact_set_by: null,
-        created_at: "2026-06-22T00:00:00.000Z"
-      },
-      error: null
-    });
+    const insertSingle = vi.fn().mockResolvedValue({ data: createdSquad, error: null });
+    const updateSingle = vi.fn().mockResolvedValue({ data: pactSquad, error: null });
 
     mockSupabaseFrom.mockImplementation((table: string) => {
       if (table === "squads") {
@@ -119,7 +125,14 @@ describe("handleSquadMessage", () => {
           }),
           insert: () => ({
             select: () => ({
-              single
+              single: insertSingle
+            })
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: updateSingle
+              })
             })
           })
         };
@@ -135,25 +148,31 @@ describe("handleSquadMessage", () => {
 
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("A1B2C3");
-    expect(result.reply).toContain("Study Crew");
+    expect(result.reply).toContain("Study sprint");
   });
 
   it("creates a squad for paid users", async () => {
+    const createdSquad = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      squad_code: "A1B2C3",
+      squad_name: "Study Crew",
+      member_ids: [paidUser.id],
+      weekly_pact_key: null,
+      weekly_pact_label: null,
+      weekly_pact_set_at: null,
+      weekly_pact_set_by: null,
+      created_at: "2026-06-22T00:00:00.000Z"
+    };
+    const pactSquad = {
+      ...createdSquad,
+      weekly_pact_key: "study",
+      weekly_pact_label: "Study sprint",
+      weekly_pact_set_at: "2026-06-22T12:00:00.000Z",
+      weekly_pact_set_by: paidUser.id
+    };
     const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const single = vi.fn().mockResolvedValue({
-      data: {
-        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        squad_code: "A1B2C3",
-        squad_name: "Study Crew",
-        member_ids: [paidUser.id],
-        weekly_pact_key: null,
-        weekly_pact_label: null,
-        weekly_pact_set_at: null,
-        weekly_pact_set_by: null,
-        created_at: "2026-06-22T00:00:00.000Z"
-      },
-      error: null
-    });
+    const insertSingle = vi.fn().mockResolvedValue({ data: createdSquad, error: null });
+    const updateSingle = vi.fn().mockResolvedValue({ data: pactSquad, error: null });
 
     mockSupabaseFrom.mockImplementation((table: string) => {
       if (table === "squads") {
@@ -165,7 +184,14 @@ describe("handleSquadMessage", () => {
           }),
           insert: () => ({
             select: () => ({
-              single
+              single: insertSingle
+            })
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: updateSingle
+              })
             })
           })
         };
@@ -186,6 +212,11 @@ describe("handleSquadMessage", () => {
     expect(mockRecordAuditEventBestEffort).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: "squad_created"
+      })
+    );
+    expect(mockRecordAuditEventBestEffort).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "squad_pact_set"
       })
     );
   });
