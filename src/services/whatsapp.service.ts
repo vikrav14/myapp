@@ -64,6 +64,30 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
     return inboundMessage;
   }
 
+  const directImageUrl = payload.imageUrl;
+  if (typeof directFrom === "string" && typeof directImageUrl === "string") {
+    const inboundMessage: InboundMessage = {
+      from: directFrom,
+      kind: "image",
+      rawPayload: payload,
+      image: {
+        url: directImageUrl,
+        mimeType: typeof directMimeType === "string" ? directMimeType : "image/jpeg",
+        caption: typeof payload.caption === "string" ? payload.caption : undefined
+      }
+    };
+
+    if (typeof payload.profileName === "string") {
+      inboundMessage.profileName = payload.profileName;
+    }
+
+    if (typeof payload.messageId === "string") {
+      inboundMessage.messageId = payload.messageId;
+    }
+
+    return inboundMessage;
+  }
+
   const entry = Array.isArray(payload.entry) ? payload.entry[0] : undefined;
   if (!isObject(entry)) {
     return null;
@@ -123,6 +147,29 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
       audio: {
         mediaId: typeof firstMessage.audio.id === "string" ? firstMessage.audio.id : undefined,
         mimeType: typeof firstMessage.audio.mime_type === "string" ? firstMessage.audio.mime_type : "audio/ogg"
+      }
+    };
+
+    if (profileName) {
+      inboundMessage.profileName = profileName;
+    }
+
+    if (messageId) {
+      inboundMessage.messageId = messageId;
+    }
+
+    return inboundMessage;
+  }
+
+  if (messageType === "image" && isObject(firstMessage.image)) {
+    const inboundMessage: InboundMessage = {
+      from: firstMessage.from,
+      kind: "image",
+      rawPayload: payload,
+      image: {
+        mediaId: typeof firstMessage.image.id === "string" ? firstMessage.image.id : undefined,
+        mimeType: typeof firstMessage.image.mime_type === "string" ? firstMessage.image.mime_type : "image/jpeg",
+        caption: typeof firstMessage.image.caption === "string" ? firstMessage.image.caption : undefined
       }
     };
 
@@ -278,5 +325,57 @@ export async function downloadInboundAudio(message: InboundMessage): Promise<{
     audioBuffer: Buffer.from(arrayBuffer),
     mimeType: message.audio.mimeType ?? metadata.mime_type ?? mediaResponse.headers.get("content-type") ?? "audio/ogg",
     mediaId: message.audio.mediaId
+  };
+}
+
+export async function downloadInboundImage(message: InboundMessage): Promise<{
+  imageBuffer: Buffer;
+  mimeType: string;
+  mediaId: string | null;
+}> {
+  if (message.kind !== "image" || !message.image) {
+    throw new Error("Inbound message does not contain an image.");
+  }
+
+  if (message.image.url) {
+    const response = await fetch(message.image.url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch direct image URL: ${response.status}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return {
+      imageBuffer: Buffer.from(arrayBuffer),
+      mimeType: message.image.mimeType ?? response.headers.get("content-type") ?? "image/jpeg",
+      mediaId: message.image.mediaId ?? null
+    };
+  }
+
+  if (!message.image.mediaId) {
+    throw new Error("Image media ID is missing.");
+  }
+
+  const metadataResponse = await authorizedFetch(`https://graph.facebook.com/v22.0/${message.image.mediaId}`);
+  if (!metadataResponse.ok) {
+    const errorText = await metadataResponse.text();
+    throw new Error(`Failed to fetch WhatsApp image metadata: ${errorText}`);
+  }
+
+  const metadata = (await metadataResponse.json()) as { url?: string; mime_type?: string };
+  if (!metadata.url) {
+    throw new Error("WhatsApp image metadata did not return a download URL.");
+  }
+
+  const mediaResponse = await authorizedFetch(metadata.url);
+  if (!mediaResponse.ok) {
+    const errorText = await mediaResponse.text();
+    throw new Error(`Failed to download WhatsApp image media: ${errorText}`);
+  }
+
+  const arrayBuffer = await mediaResponse.arrayBuffer();
+  return {
+    imageBuffer: Buffer.from(arrayBuffer),
+    mimeType: message.image.mimeType ?? metadata.mime_type ?? mediaResponse.headers.get("content-type") ?? "image/jpeg",
+    mediaId: message.image.mediaId
   };
 }

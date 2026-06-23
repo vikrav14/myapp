@@ -9,6 +9,8 @@ import { loadUserContext } from "../services/context.service.js";
 import { registerInboundEvent } from "../services/inbound-event.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
+import { handleFinanceCommandMessage } from "../services/payday-runway.service.js";
+import { handleReceiptImageMessage } from "../services/receipt-scan.service.js";
 import { handleCalendarMessage } from "../services/calendar.service.js";
 import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
@@ -92,6 +94,68 @@ whatsappRouter.post("/", async (request, response, next) => {
       return;
     }
 
+    if (inboundMessage.kind === "image") {
+      try {
+        const receiptResult = await handleReceiptImageMessage({
+          user: accessPolicyResult.user,
+          message: inboundMessage,
+          requestId
+        });
+
+        if (receiptResult.handled && receiptResult.reply) {
+          await sendWhatsAppMessage(inboundMessage.from, receiptResult.reply, {
+            userId: accessPolicyResult.user.id,
+            requestId,
+            metadata: {
+              sourceType: inboundMessage.kind,
+              flow: "receipt_scan"
+            }
+          });
+
+          response.status(200).json({
+            ok: true,
+            userId: accessPolicyResult.user.id,
+            sourceType: inboundMessage.kind,
+            onboardingState: accessPolicyResult.user.onboarding_state,
+            subscriptionStatus: accessPolicyResult.user.subscription_status,
+            replyPreview: receiptResult.reply
+          });
+          return;
+        }
+      } catch (error) {
+        logger.error(
+          {
+            error,
+            phoneNumber: inboundMessage.from,
+            kind: inboundMessage.kind
+          },
+          "Failed to process receipt image."
+        );
+
+        const fallbackReply =
+          "I couldn't read that receipt cleanly. Try a clearer photo of the total, or type: I spent 150 on mine frite.";
+
+        await sendWhatsAppMessage(inboundMessage.from, fallbackReply, {
+          userId: accessPolicyResult.user.id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "receipt_scan_error"
+          }
+        });
+
+        response.status(200).json({
+          ok: true,
+          userId: accessPolicyResult.user.id,
+          sourceType: inboundMessage.kind,
+          onboardingState: accessPolicyResult.user.onboarding_state,
+          subscriptionStatus: accessPolicyResult.user.subscription_status,
+          replyPreview: fallbackReply
+        });
+        return;
+      }
+    }
+
     let normalizedMessageText: string;
     let transcriptPreview: string | undefined;
 
@@ -117,7 +181,9 @@ whatsappRouter.post("/", async (request, response, next) => {
       const fallbackReply =
         inboundMessage.kind === "audio"
           ? "I couldn’t catch that voice note cleanly. Send it again, keep it a bit clearer, or type the main part here."
-          : "I hit a processing issue on that message. Send it again and I’ll pick it up.";
+          : inboundMessage.kind === "image"
+            ? "I couldn't process that image. Try sending the receipt photo again."
+            : "I hit a processing issue on that message. Send it again and I’ll pick it up.";
 
       await sendWhatsAppMessage(inboundMessage.from, fallbackReply, {
         userId: accessPolicyResult.user.id,
@@ -215,6 +281,34 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: engagementResult.reply
+      });
+      return;
+    }
+
+    const financeResult = await handleFinanceCommandMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (financeResult.handled && financeResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, financeResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "finance_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: financeResult.reply
       });
       return;
     }

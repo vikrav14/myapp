@@ -28,6 +28,8 @@ export interface MauriUser {
   morning_digest_enabled: boolean;
   calendar_sync_enabled: boolean;
   memory_resurfacing_enabled: boolean;
+  payday_day_of_month: number | null;
+  monthly_income_rs: number | null;
   weekly_focus_habit: string | null;
   weekly_focus_set_at: string | null;
   created_at: string;
@@ -333,7 +335,7 @@ export interface UserContextSnapshot {
 
 export interface InboundMessage {
   from: string;
-  kind: "text" | "audio";
+  kind: "text" | "audio" | "image";
   text?: string | undefined;
   messageId?: string | undefined;
   profileName?: string | undefined;
@@ -341,6 +343,12 @@ export interface InboundMessage {
     mediaId?: string | undefined;
     mimeType?: string | undefined;
     url?: string | undefined;
+  };
+  image?: {
+    mediaId?: string | undefined;
+    mimeType?: string | undefined;
+    url?: string | undefined;
+    caption?: string | undefined;
   };
   rawPayload: unknown;
 }
