@@ -5,6 +5,7 @@ import { registerMemoryResurfacingJobs } from "./jobs/memory-resurfacing-jobs.js
 import { registerMorningBriefJobs } from "./jobs/morning-brief-jobs.js";
 import { registerReminderJobs } from "./jobs/reminder-jobs.js";
 import { registerSquadJobs } from "./jobs/squad-jobs.js";
+import { registerOpenLoopFollowUpJobs } from "./jobs/open-loop-follow-up-jobs.js";
 import { registerTrialEngagementJobs } from "./jobs/trial-engagement-jobs.js";
 import { registerUserMindJobs } from "./jobs/user-mind-jobs.js";
 import { env } from "./lib/env.js";
@@ -22,6 +23,7 @@ app.listen(env.PORT, () => {
   registerMemoryResurfacingJobs();
   registerTrialEngagementJobs();
   registerUserMindJobs();
+  registerOpenLoopFollowUpJobs();
   logSecurityPostureWarnings();
   logger.info({ port: env.PORT }, "Mauri backend listening.");
 });

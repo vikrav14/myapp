@@ -253,6 +253,34 @@ ${JSON.stringify(payload, null, 2)}`;
   return parseUserMindSnapshot(rawJson);
 }
 
+export async function generateOpenLoopFollowUpMessage(input: {
+  user: MauriUser;
+  loopText: string;
+}): Promise<string> {
+  const prompt = `You are Mauri in a private WhatsApp thread for Mauritians.
+You are gently following up on something the user mentioned earlier.
+
+Rules:
+- 2 short paragraphs max.
+- Warm, grounded, zero guilt.
+- Reference the open loop naturally without quoting it word-for-word.
+- Make clear they do not have to debrief if they do not want to.
+- No bullet lists. No numbered steps. No "As an AI".
+- Sound like a real mate checking in.
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+Open loop: ${input.loopText}
+
+Reply in plain text only.`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
 export async function generateConversationalReply(input: {
   user: MauriUser;
   message: string;

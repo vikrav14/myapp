@@ -147,6 +147,14 @@ services:
         value: "14"
       - key: USER_MIND_BATCH_SIZE
         value: "25"
+      - key: OPEN_LOOP_FOLLOWUPS_ENABLED
+        value: "true"
+      - key: OPEN_LOOP_FOLLOWUP_CRON
+        value: "0 10 * * *"
+      - key: OPEN_LOOP_FOLLOWUP_HOUR
+        value: "10"
+      - key: OPEN_LOOP_FOLLOWUP_MINUTE
+        value: "0"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS

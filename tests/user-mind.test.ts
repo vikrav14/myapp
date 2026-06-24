@@ -29,6 +29,7 @@ const baseUser: MauriUser = {
   monthly_income_rs: 18000,
   weekly_focus_habit: "Study_Deep_Work",
   weekly_focus_set_at: "2026-06-15T00:00:00.000Z",
+  open_loop_followups_enabled: true,
   created_at: "2026-06-01T00:00:00.000Z",
   updated_at: "2026-06-01T00:00:00.000Z"
 };

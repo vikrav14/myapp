@@ -39,6 +39,8 @@ Calendar
 
 Memory
 - resurface on / resurface off — gentle memory pings (max 1/day)
+- followups on / followups off — gentle check-ins on things you mentioned
+- my followups — see pending check-ins
 
 Local alerts
 - Mauri pings school closures, heavy rain, cyclone warnings

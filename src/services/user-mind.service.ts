@@ -6,6 +6,7 @@ import type { MauriUser, UserMindRecord } from "../types.js";
 import { generateUserMindSnapshot } from "./ai.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import { findUserById } from "./user.service.js";
+import { scheduleOpenLoopFollowUps } from "./open-loop-follow-up.service.js";
 import {
   DEFAULT_USER_MIND_BATCH_SIZE
 } from "./user-mind.constants.js";
@@ -141,6 +142,15 @@ export async function reflectUserMind(input: {
       conversationCount: reflectionInput.conversationSamples.length
     }
   });
+
+  try {
+    await scheduleOpenLoopFollowUps({
+      user: input.user,
+      mindRecord: record
+    });
+  } catch (error) {
+    logger.warn({ error, userId: input.user.id }, "Failed to schedule open-loop follow-ups after mind reflect.");
+  }
 
   return { reflected: true, record };
 }

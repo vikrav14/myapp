@@ -198,6 +198,7 @@ supabase/migrations/017_calendar_and_memory_resurfacing.sql
 supabase/migrations/018_payday_and_receipts.sql
 supabase/migrations/019_local_alerts.sql
 supabase/migrations/020_user_mind_snapshots.sql
+supabase/migrations/021_open_loop_follow_ups.sql
 ```
 
 ## Webhook contract
@@ -486,6 +487,29 @@ Environment:
 - `USER_MIND_LOOKBACK_DAYS`
 - `USER_MIND_ACTIVITY_LOOKBACK_DAYS`
 - `USER_MIND_BATCH_SIZE`
+
+## Open-loop follow-ups
+
+When User Mind reflection finds an open loop (interview, exam, family thing), Mauri schedules a gentle check-in WhatsApp — default **10:00** Mauritius.
+
+Flow:
+
+1. **2:00** — User Mind reflection saves `open_loops`
+2. **Same morning** — one follow-up queued for 10:00 (deduped for 14 days)
+3. **10:00** — warm check-in: *"How did it go? No pressure to debrief."*
+
+Commands: `followups on` / `followups off` / `my followups`
+
+Admin ops:
+
+- `POST /internal/admin/open-loop-followups/deliver`
+
+Environment:
+
+- `OPEN_LOOP_FOLLOWUPS_ENABLED`
+- `OPEN_LOOP_FOLLOWUP_CRON`
+- `OPEN_LOOP_FOLLOWUP_HOUR`
+- `OPEN_LOOP_FOLLOWUP_MINUTE`
 
 ## Quantum pick
 

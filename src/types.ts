@@ -38,6 +38,7 @@ export interface MauriUser {
   monthly_income_rs: number | null;
   weekly_focus_habit: string | null;
   weekly_focus_set_at: string | null;
+  open_loop_followups_enabled: boolean;
   created_at: string;
   updated_at: string;
 }

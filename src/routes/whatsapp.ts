@@ -15,6 +15,7 @@ import { handleReceiptImageMessage } from "../services/receipt-scan.service.js";
 import { handleCalendarMessage } from "../services/calendar.service.js";
 import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
+import { handleOpenLoopFollowUpMessage } from "../services/open-loop-follow-up.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
@@ -310,6 +311,33 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: financeResult.reply
+      });
+      return;
+    }
+
+    const openLoopFollowUpResult = await handleOpenLoopFollowUpMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (openLoopFollowUpResult.handled && openLoopFollowUpResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, openLoopFollowUpResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "open_loop_followup_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: openLoopFollowUpResult.reply
       });
       return;
     }
