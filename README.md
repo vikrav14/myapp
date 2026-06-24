@@ -197,6 +197,7 @@ supabase/migrations/016_scheduled_reminders.sql
 supabase/migrations/017_calendar_and_memory_resurfacing.sql
 supabase/migrations/018_payday_and_receipts.sql
 supabase/migrations/019_local_alerts.sql
+supabase/migrations/020_user_mind_snapshots.sql
 ```
 
 ## Webhook contract
@@ -460,6 +461,31 @@ Environment:
 - `MORNING_BRIEF_SCRAPE_CRON` / `MORNING_BRIEF_CURATE_CRON` / `MORNING_BRIEF_DELIVER_CRON`
 - `MORNING_BRIEF_RSS_FEEDS` (optional comma-separated override)
 - `GOOGLE_MAPS_API_KEY` (optional, for live traffic lines)
+
+## User mind (off-peak reflection)
+
+Active trial/paid users with recent chat activity get a nightly **user mind snapshot** at **2:00** (`Indian/Mauritius` by default).
+
+Pipeline:
+
+1. **2:00** — load the last 7 days of finance, habits, todos, emotions, chat samples, reminders, and calendar
+2. Gemini synthesizes a compact understanding (life summary, personality notes, goals, open loops, advice preferences)
+3. Snapshot is stored in `user_mind_snapshots` and injected into conversational replies the next day
+
+This makes Mauri feel like a mate who thought about you overnight — not a bot that only reads the last message.
+
+Admin ops:
+
+- `POST /internal/admin/user-mind/reflect` (batch all active users, or `{ "userId": "..." }` for one user)
+- `GET /internal/admin/users/:userId/user-mind`
+
+Environment:
+
+- `USER_MIND_ENABLED`
+- `USER_MIND_REFLECT_CRON`
+- `USER_MIND_LOOKBACK_DAYS`
+- `USER_MIND_ACTIVITY_LOOKBACK_DAYS`
+- `USER_MIND_BATCH_SIZE`
 
 ## Quantum pick
 

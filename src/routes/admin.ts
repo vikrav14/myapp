@@ -29,6 +29,7 @@ import {
   runMorningBriefDelivery,
   runMorningBriefScrape
 } from "../jobs/morning-brief-jobs.js";
+import { runUserMindReflectionBatch, getUserMindSnapshot, reflectUserMindById } from "../services/user-mind.service.js";
 import { getRequestId } from "../lib/request-tracing.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { getMetricsSnapshot } from "../services/metrics.service.js";
@@ -1572,6 +1573,43 @@ adminRouter.post("/morning-brief/run", async (request, response, next) => {
     response.status(200).json({
       ok: true,
       latestRun: runs[0] ?? null
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/user-mind/reflect", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const userId = typeof request.body?.userId === "string" ? request.body.userId : undefined;
+
+    if (userId) {
+      const record = await reflectUserMindById(userId, requestId);
+      response.status(200).json({
+        ok: true,
+        reflected: Boolean(record),
+        snapshot: record
+      });
+      return;
+    }
+
+    const result = await runUserMindReflectionBatch({ requestId });
+    response.status(200).json({
+      ok: true,
+      ...result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/users/:userId/user-mind", async (request, response, next) => {
+  try {
+    const snapshot = await getUserMindSnapshot(request.params.userId);
+    response.status(200).json({
+      ok: true,
+      snapshot
     });
   } catch (error) {
     next(error);

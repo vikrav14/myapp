@@ -10,12 +10,19 @@ import {
   receiptExtractionSchema,
   type ReceiptExtraction
 } from "../schemas/receipt.js";
+import {
+  parseUserMindSnapshot,
+  userMindSnapshotJsonSchema,
+  type UserMindSnapshotPayload
+} from "../schemas/user-mind.js";
 import type {
   MauriBrainDumpExtraction,
   MauriUser,
   UserContextSnapshot,
   WeeklyDiagnosticSummary
 } from "../types.js";
+import type { UserMindReflectionInput } from "./user-mind-data.service.js";
+import { buildReflectionPayloadSummary, formatUserMindForPrompt } from "./user-mind-prompt.js";
 
 interface GeminiTextResponse {
   candidates?: Array<{
@@ -215,6 +222,37 @@ ${message}
   return mauriBrainDumpSchema.parse(parsed);
 }
 
+export async function generateUserMindSnapshot(
+  reflectionInput: UserMindReflectionInput
+): Promise<UserMindSnapshotPayload> {
+  const payload = buildReflectionPayloadSummary(reflectionInput);
+  const prompt = `You are Mauri's off-peak reflection engine for a Mauritian lifestyle companion on WhatsApp.
+
+Synthesize a durable understanding of this user from the data below.
+This snapshot will be injected into future replies so Mauri feels like a mate who knows them.
+
+Rules:
+- Ground every field in the provided data only. Do not invent facts.
+- If signal is thin, say so plainly and keep arrays short.
+- Write for a Mauritian young professional / student context when relevant.
+- personality_notes should capture communication style, stress triggers, and what tone lands (direct, gentle, humour, etc.).
+- advice_preferences: how Mauri should coach this person (e.g. empathise first, then one concrete move).
+- things_to_avoid: reply patterns that would feel wrong for this user (preachy, generic, ignoring money stress, etc.).
+- active_goals, recent_wins, open_loops: short phrase items only.
+- Merge useful signal from previous_mind_snapshot when still valid; drop stale items.
+
+Reflection data:
+${JSON.stringify(payload, null, 2)}`;
+
+  const rawJson = await callGemini({
+    prompt,
+    responseMimeType: "application/json",
+    responseSchema: userMindSnapshotJsonSchema
+  });
+
+  return parseUserMindSnapshot(rawJson);
+}
+
 export async function generateConversationalReply(input: {
   user: MauriUser;
   message: string;
@@ -222,6 +260,13 @@ export async function generateConversationalReply(input: {
   context: UserContextSnapshot;
 }): Promise<string> {
   const { user, message, extraction, context } = input;
+
+  const mindBlock =
+    context.userMind !== null
+      ? `Pre-built understanding of this user (refreshed off-peak — trust this first):
+${formatUserMindForPrompt(context.userMind)}
+Last refreshed: ${context.userMindGeneratedAt ?? "unknown"}`
+      : "Pre-built user understanding: not available yet — rely on recent logs and memories below.";
 
   const replyPrompt = `
 You are Mauri.
@@ -236,12 +281,17 @@ Hard guardrails:
 - Keep paragraphs short and punchy.
 - You can naturally understand English, French, and Mauritian Creole.
 - Sound like a real peer, not a productivity bot.
+- You can answer general questions too — always weave in what you know about this user when it helps.
 
 User profile:
 First name: ${user.first_name ?? "Unknown"}
 Archetype: ${user.archetype}
 Subscription status: ${user.subscription_status}
+Morning brief tags: ${user.topic_preferences.join(", ") || "not set"}
 
+${mindBlock}
+
+Fresh same-day context (use alongside the pre-built understanding):
 Recent pending todos:
 ${JSON.stringify(context.pendingTodos)}
 
@@ -267,6 +317,7 @@ Reply in plain text only.
 If the user shared stress, respond with empathy first.
 If they implicitly logged progress, acknowledge it naturally.
 If they seem scattered, help them narrow to the next move without sounding robotic.
+Honor advice_preferences and things_to_avoid from the pre-built understanding when present.
 `;
 
   return callGemini({

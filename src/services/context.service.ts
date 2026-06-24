@@ -1,9 +1,10 @@
 import { supabase } from "../lib/supabase.js";
 import type { UserContextSnapshot } from "../types.js";
 import { searchRelevantMemories } from "./memory.service.js";
+import { getUserMindSnapshot } from "./user-mind.service.js";
 
 export async function loadUserContext(userId: string, queryText?: string): Promise<UserContextSnapshot> {
-  const [todosResult, financeResult, habitsResult, emotionsResult, semanticMemories] = await Promise.all([
+  const [todosResult, financeResult, habitsResult, emotionsResult, semanticMemories, mindRecord] = await Promise.all([
     supabase
       .from("todo_logs")
       .select("id, task_description, priority, due_date")
@@ -29,7 +30,8 @@ export async function loadUserContext(userId: string, queryText?: string): Promi
       .eq("user_id", userId)
       .order("logged_at", { ascending: false })
       .limit(5),
-    queryText ? searchRelevantMemories(userId, queryText) : Promise.resolve([])
+    queryText ? searchRelevantMemories(userId, queryText) : Promise.resolve([]),
+    getUserMindSnapshot(userId).catch(() => null)
   ]);
 
   const failures = [todosResult, financeResult, habitsResult, emotionsResult]
@@ -65,6 +67,8 @@ export async function loadUserContext(userId: string, queryText?: string): Promi
       raw_unfiltered_vent: String(row.raw_unfiltered_vent),
       logged_at: String(row.logged_at)
     })),
-    semanticMemories
+    semanticMemories,
+    userMind: mindRecord?.snapshot ?? null,
+    userMindGeneratedAt: mindRecord?.generated_at ?? null
   };
 }

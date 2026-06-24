@@ -137,6 +137,16 @@ services:
         value: "*/30 21-23,0-7 * * *"
       - key: LOCAL_ALERT_RSS_FEEDS
         sync: false
+      - key: USER_MIND_ENABLED
+        value: "true"
+      - key: USER_MIND_REFLECT_CRON
+        value: "0 2 * * *"
+      - key: USER_MIND_LOOKBACK_DAYS
+        value: "7"
+      - key: USER_MIND_ACTIVITY_LOOKBACK_DAYS
+        value: "14"
+      - key: USER_MIND_BATCH_SIZE
+        value: "25"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS
