@@ -1,5 +1,7 @@
 # Feel-safe optimization checklist
 
+> **Draft PR intent (PR #12):** Keep [`cursor/user-mind-snapshots-bb83`](https://github.com/vikrav14/myapp/pull/12) in **draft** until connection features (User Mind + open-loop follow-ups) and feel-safe token optimization ship **together**. Do not merge to `main` until the checklist in §8–9 passes and migrations `020` + `021` are ready. Mark the PR ready only when deploying.
+
 Engineering guardrails for Mauri token/latency work.  
 **Goal:** cut cost and speed up replies **without** making Mauri feel like a generic chatbot.
 
@@ -155,7 +157,21 @@ If over 1,500: trim raw logs first, **never** mind or emotional memories first.
 
 ---
 
-## 8. PR review checklist
+## 8. Merge gate (draft PR #12)
+
+Before marking PR #12 **ready for review** and merging to `main`:
+
+- [ ] Token/latency optimization pass completed on this branch (§4 safe items)
+- [ ] User Mind + open-loop follow-ups still enabled (§1 non-negotiables)
+- [ ] Migrations `020_user_mind_snapshots.sql` + `021_open_loop_follow_ups.sql` scripted for deploy
+- [ ] All items in §8 PR review checklist below
+- [ ] All five manual feel tests in §9 pass
+
+**Do not merge connection features without feel-safe optimization, or optimization that strips soul.**
+
+---
+
+## 9. PR review checklist
 
 Before merging any context/prompt/LLM optimization PR:
 
