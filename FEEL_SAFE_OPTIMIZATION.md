@@ -161,9 +161,9 @@ If over 1,500: trim raw logs first, **never** mind or emotional memories first.
 
 Before marking PR #12 **ready for review** and merging to `main`:
 
-- [ ] Token/latency optimization pass completed on this branch (§4 safe items)
-- [ ] User Mind + open-loop follow-ups still enabled (§1 non-negotiables)
-- [ ] Migrations `020_user_mind_snapshots.sql` + `021_open_loop_follow_ups.sql` scripted for deploy
+- [x] Token/latency optimization pass completed on this branch (§4 safe items)
+- [x] User Mind + open-loop follow-ups still enabled (§1 non-negotiables)
+- [x] Migrations `020_user_mind_snapshots.sql` + `021_open_loop_follow_ups.sql` scripted for deploy
 - [ ] All items in §8 PR review checklist below
 - [ ] All five manual feel tests in §9 pass
 
@@ -188,7 +188,7 @@ Before merging any context/prompt/LLM optimization PR:
 
 ---
 
-## 9. Manual feel tests (5 minutes)
+## 10. Manual feel tests (5 minutes)
 
 Run these in staging after optimization changes:
 
@@ -217,7 +217,7 @@ Run these in staging after optimization changes:
 
 ---
 
-## 10. Metrics (feel + margin)
+## 11. Metrics (feel + margin)
 
 Track weekly:
 
@@ -235,17 +235,29 @@ Track weekly:
 
 ---
 
-## 11. One-line approval rule
+## 12. One-line approval rule
 
 > If a change makes replies **faster or cheaper** but a trial user would say *"it forgot me"* or *"sounds like ChatGPT"* — **revert**.
 
 ---
 
-## Related code
+## 13. Related code
 
-- Chat reply: `src/services/ai.service.ts` → `generateConversationalReply`
+- Chat reply: `src/services/ai.service.ts` → `resolveConversationalAiResponse`, `generateConversationalReplyWithExtraction`
 - Context load: `src/services/context.service.ts` → `loadUserContext`
+- Prompt formatting: `src/services/context-prompt.service.ts` → `formatFreshContextForPrompt`
+- Q&A skip / emotional detect: `src/services/message-intent.service.ts`
 - Mind format: `src/services/user-mind-prompt.ts` → `formatUserMindForPrompt`
 - Memory search: `src/services/memory.service.ts` → `searchRelevantMemories`
 - Off-peak mind: `src/services/user-mind.service.ts`
 - Follow-ups: `src/services/open-loop-follow-up.service.ts`
+
+### Optimization shipped on PR #12 branch
+
+| Change | Effect |
+|--------|--------|
+| `resolveConversationalAiResponse` | 1 Gemini call per message (merged extract+reply, or reply-only for obvious Q&A) |
+| Prose context summaries | Replaces raw JSON blobs in chat prompts (~250 token target for fresh context) |
+| Row caps 5/5/5/3 | todos, finance, habits, emotions |
+| Payday runway snippet | One-line precomputed runway in chat context |
+| Emotional memory boost | Lower threshold + higher match count on vent/stress messages |

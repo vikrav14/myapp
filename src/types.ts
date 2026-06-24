@@ -340,6 +340,7 @@ export interface UserContextSnapshot {
   semanticMemories: SemanticMemoryMatch[];
   userMind: UserMindSnapshotPayload | null;
   userMindGeneratedAt: string | null;
+  paydayRunwaySnippet: string | null;
 }
 
 export interface UserMindRecord {

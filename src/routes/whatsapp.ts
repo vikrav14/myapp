@@ -3,7 +3,7 @@ import { Router } from "express";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { getRequestId } from "../lib/request-tracing.js";
-import { extractStructuredContext, generateConversationalReply } from "../services/ai.service.js";
+import { resolveConversationalAiResponse } from "../services/ai.service.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
 import { registerInboundEvent } from "../services/inbound-event.service.js";
@@ -537,7 +537,7 @@ whatsappRouter.post("/", async (request, response, next) => {
       return;
     }
 
-    const context = await loadUserContext(user.id, normalizedMessageText);
+    const context = await loadUserContext(user.id, normalizedMessageText, user);
 
     try {
       await storeConversationMemory({
@@ -553,20 +553,17 @@ whatsappRouter.post("/", async (request, response, next) => {
     } catch (error) {
       logger.warn({ error, userId: user.id }, "Failed to store inbound conversation memory.");
     }
-    const extraction = await extractStructuredContext(normalizedMessageText);
+    const { extraction, reply } = await resolveConversationalAiResponse({
+      user,
+      message: normalizedMessageText,
+      context
+    });
 
     await persistExtraction(user.id, extraction);
     await runSquadRelayAfterExtraction({
       user,
       extraction,
       requestId
-    });
-
-    const reply = await generateConversationalReply({
-      user,
-      message: normalizedMessageText,
-      extraction,
-      context
     });
 
     try {
