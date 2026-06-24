@@ -27,6 +27,10 @@ This repository now contains the first backend foundation for the product spec i
 - Deployment-ready Docker, Render, and CI configuration
 - Environment template for local setup
 
+## Guides
+
+- [Feel-safe optimization checklist](./FEEL_SAFE_OPTIMIZATION.md) — token/latency guardrails so replies stay personal
+
 ## Project structure
 
 ```text
@@ -434,7 +438,7 @@ From the panel you can list squads, inspect members, rename squads, remove membe
 
 Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active users and stores the report payload in `weekly_reports`.
 
-## Morning Mauritian vibe check
+- Context optimization: see [FEEL_SAFE_OPTIMIZATION.md](./FEEL_SAFE_OPTIMIZATION.md)
 
 Active users with 3–5 topic tags receive a personalized WhatsApp digest at **7:00** (`Indian/Mauritius` by default).
 
