@@ -25,6 +25,7 @@ import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
 import { parseInboundMessage, sendWhatsAppMessage } from "../services/whatsapp.service.js";
+import { reactToInboundMessageBestEffort } from "../services/whatsapp-reaction.service.js";
 
 export const whatsappRouter = Router();
 
@@ -74,6 +75,21 @@ whatsappRouter.post("/", async (request, response, next) => {
 
     const { user: initialUser, isNewUser } = await getOrCreateUser(inboundMessage.from, inboundMessage.profileName);
     const accessPolicyResult = await enforceAccessPolicy(initialUser, requestId);
+
+    if (!accessPolicyResult.handled) {
+      void reactToInboundMessageBestEffort({
+        to: inboundMessage.from,
+        inboundMessage,
+        messageText:
+          inboundMessage.kind === "text"
+            ? inboundMessage.text
+            : inboundMessage.kind === "image"
+              ? inboundMessage.image?.caption
+              : undefined,
+        user: accessPolicyResult.user,
+        requestId
+      });
+    }
 
     if (accessPolicyResult.handled && accessPolicyResult.reply) {
       await sendWhatsAppMessage(inboundMessage.from, accessPolicyResult.reply, {
