@@ -77,11 +77,18 @@ export async function buildEmotionEmbedding(rawVentText: string): Promise<string
   });
 }
 
-export async function searchRelevantMemories(userId: string, queryText: string): Promise<SemanticMemoryMatch[]> {
+export async function searchRelevantMemories(
+  userId: string,
+  queryText: string,
+  options?: { emotionalBoost?: boolean }
+): Promise<SemanticMemoryMatch[]> {
   const trimmedQuery = queryText.trim();
   if (!trimmedQuery) {
     return [];
   }
+
+  const emotionalBoost = options?.emotionalBoost ?? false;
+  const similarityThreshold = emotionalBoost ? 0.5 : 0.55;
 
   try {
     const queryEmbedding = await generateEmbeddingLiteral({
@@ -93,12 +100,12 @@ export async function searchRelevantMemories(userId: string, queryText: string):
       supabase.rpc("match_conversation_memories", {
         match_user_id: userId,
         query_embedding: queryEmbedding,
-        match_count: 5
+        match_count: emotionalBoost ? 8 : 5
       }),
       supabase.rpc("match_insight_memories", {
         match_user_id: userId,
         query_embedding: queryEmbedding,
-        match_count: 3
+        match_count: emotionalBoost ? 5 : 3
       })
     ]);
 
@@ -119,7 +126,7 @@ export async function searchRelevantMemories(userId: string, queryText: string):
         memory_type: String(row.memory_type),
         metadata: isRecord(row.metadata) ? row.metadata : null
       }))
-      .filter((row) => row.similarity > 0.55);
+      .filter((row) => row.similarity > similarityThreshold);
 
     const emotionMemories: SemanticMemoryMatch[] = insightRows
       .map((row) => ({
@@ -131,7 +138,7 @@ export async function searchRelevantMemories(userId: string, queryText: string):
         anxiety_score: row.anxiety_score === null ? null : Number(row.anxiety_score),
         core_emotional_driver: row.core_emotional_driver ? String(row.core_emotional_driver) : null
       }))
-      .filter((row) => row.similarity > 0.55);
+      .filter((row) => row.similarity > similarityThreshold);
 
     return [...conversationMemories, ...emotionMemories]
       .sort((left, right) => right.similarity - left.similarity)
