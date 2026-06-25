@@ -9,6 +9,7 @@ import { runSundayDiagnosticReports } from "../services/report.service.js";
 import {
   buildSundayShowdownPactFooter,
   formatSquadPactLine,
+  parseStoredSquadPactWeights,
   scoreMemberLogs,
   scoringWeightsForSquad
 } from "../services/squad-pact.service.js";
@@ -36,7 +37,8 @@ function mapSquadRow(record: Record<string, unknown>): SquadRecord {
     weekly_pact_key: record.weekly_pact_key ? String(record.weekly_pact_key) : null,
     weekly_pact_label: record.weekly_pact_label ? String(record.weekly_pact_label) : null,
     weekly_pact_set_at: record.weekly_pact_set_at ? String(record.weekly_pact_set_at) : null,
-    weekly_pact_set_by: record.weekly_pact_set_by ? String(record.weekly_pact_set_by) : null
+    weekly_pact_set_by: record.weekly_pact_set_by ? String(record.weekly_pact_set_by) : null,
+    weekly_pact_weights: parseStoredSquadPactWeights(record.weekly_pact_weights)
   };
 }
 

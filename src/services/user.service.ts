@@ -36,6 +36,7 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
         : Number(record.monthly_income_rs),
     weekly_focus_habit: record.weekly_focus_habit ? String(record.weekly_focus_habit) : null,
     weekly_focus_set_at: record.weekly_focus_set_at ? String(record.weekly_focus_set_at) : null,
+    open_loop_followups_enabled: record.open_loop_followups_enabled !== false,
     created_at: String(record.created_at),
     updated_at: String(record.updated_at)
   };

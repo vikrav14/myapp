@@ -1,9 +1,13 @@
+import type { UserMindSnapshotPayload } from "./schemas/user-mind.js";
+
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
 export type OnboardingState = "awaiting_archetype" | "awaiting_topics" | "active";
 export type MorningBriefTopicKey = "Traffic" | "Tech" | "Money" | "LocalBuzz" | "Entertainment";
 export type PaymentProvider = "MCB_JUICE" | "BLINK" | "MANUAL";
 export type MemoryType = "user_message" | "assistant_reply" | "emotion_signal" | "weekly_report";
 export type AuditSeverity = "info" | "warning" | "error";
+
+export type { UserMindSnapshotPayload };
 export type MauriArchetype =
   | "Life & Habit Tracking"
   | "Student Grind"
@@ -34,6 +38,7 @@ export interface MauriUser {
   monthly_income_rs: number | null;
   weekly_focus_habit: string | null;
   weekly_focus_set_at: string | null;
+  open_loop_followups_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -333,6 +338,20 @@ export interface UserContextSnapshot {
     logged_at: string;
   }>;
   semanticMemories: SemanticMemoryMatch[];
+  userMind: UserMindSnapshotPayload | null;
+  userMindGeneratedAt: string | null;
+  paydayRunwaySnippet: string | null;
+}
+
+export interface UserMindRecord {
+  id: string;
+  user_id: string;
+  snapshot: UserMindSnapshotPayload;
+  source_window_start: string;
+  source_window_end: string;
+  generated_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface InboundMessage {

@@ -1,8 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockExtractStructuredContext = vi.fn();
-const mockGenerateConversationalReply = vi.fn();
+const mockResolveConversationalAiResponse = vi.fn();
 const mockRecordAuditEventBestEffort = vi.fn();
 const mockLoadUserContext = vi.fn();
 const mockRegisterInboundEvent = vi.fn();
@@ -15,8 +14,7 @@ const mockResolveInboundMessageText = vi.fn();
 const mockSendWhatsAppMessage = vi.fn();
 
 vi.mock("../src/services/ai.service.js", () => ({
-  extractStructuredContext: mockExtractStructuredContext,
-  generateConversationalReply: mockGenerateConversationalReply
+  resolveConversationalAiResponse: mockResolveConversationalAiResponse
 }));
 
 vi.mock("../src/services/audit.service.js", () => ({
@@ -133,7 +131,7 @@ describe("WhatsApp webhook route", () => {
         })
       })
     );
-    expect(mockExtractStructuredContext).not.toHaveBeenCalled();
+    expect(mockResolveConversationalAiResponse).not.toHaveBeenCalled();
   });
 
   it("processes a normal conversational message end-to-end", async () => {
@@ -164,21 +162,26 @@ describe("WhatsApp webhook route", () => {
       recentFinance: [],
       recentHabits: [],
       recentEmotions: [],
-      semanticMemories: []
+      semanticMemories: [],
+      userMind: null,
+      userMindGeneratedAt: null,
+      paydayRunwaySnippet: null
     });
-    mockExtractStructuredContext.mockResolvedValue({
-      finance: {
-        amount: 150,
-        category: "Food",
-        raw_source_text: "I spent 150 on food"
+    mockResolveConversationalAiResponse.mockResolvedValue({
+      extraction: {
+        finance: {
+          amount: 150,
+          category: "Food",
+          raw_source_text: "I spent 150 on food"
+        },
+        habits: {
+          activity_type: "Study_Deep_Work",
+          duration_minutes: 90,
+          is_success: true
+        }
       },
-      habits: {
-        activity_type: "Study_Deep_Work",
-        duration_minutes: 90,
-        is_success: true
-      }
+      reply: "Good. You logged both progress and spending clearly."
     });
-    mockGenerateConversationalReply.mockResolvedValue("Good. You logged both progress and spending clearly.");
 
     const app = createApp();
     const response = await request(app)
@@ -189,7 +192,7 @@ describe("WhatsApp webhook route", () => {
     expect(response.body.ok).toBe(true);
     expect(response.body.extraction.finance.amount).toBe(150);
     expect(response.body.replyPreview).toContain("Good.");
-    expect(mockLoadUserContext).toHaveBeenCalledWith(activeUser.id, expect.any(String));
+    expect(mockLoadUserContext).toHaveBeenCalledWith(activeUser.id, expect.any(String), activeUser);
     expect(mockPersistExtraction).toHaveBeenCalledWith(
       activeUser.id,
       expect.objectContaining({
@@ -251,7 +254,7 @@ describe("WhatsApp webhook route", () => {
     expect(response.status).toBe(200);
     expect(response.body.replyPreview).toContain("Squad live");
     expect(mockHandleSquadMessage).toHaveBeenCalled();
-    expect(mockExtractStructuredContext).not.toHaveBeenCalled();
+    expect(mockResolveConversationalAiResponse).not.toHaveBeenCalled();
     expect(mockSendWhatsAppMessage).toHaveBeenCalledWith(
       paidUser.phone_number,
       "Squad live: Study Crew.",
@@ -276,7 +279,7 @@ describe("WhatsApp webhook route", () => {
     expect(response.body.duplicate).toBe(true);
     expect(mockGetOrCreateUser).not.toHaveBeenCalled();
     expect(mockResolveInboundMessageText).not.toHaveBeenCalled();
-    expect(mockExtractStructuredContext).not.toHaveBeenCalled();
+    expect(mockResolveConversationalAiResponse).not.toHaveBeenCalled();
     expect(mockSendWhatsAppMessage).not.toHaveBeenCalled();
   });
 });

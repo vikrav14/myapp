@@ -87,6 +87,17 @@ export const mauriBrainDumpSchema = z.object({
     .optional()
 });
 
+export const conversationalReplyWithExtractionJsonSchema = {
+  $schema: "http://json-schema.org/draft-07/schema#",
+  title: "ConversationalReplyWithExtraction",
+  type: "object",
+  properties: {
+    extraction: mauriBrainDumpJsonSchema,
+    reply: { type: "string", minLength: 1 }
+  },
+  required: ["reply", "extraction"]
+} as const;
+
 export function parseStructuredJson(rawText: string): unknown {
   const trimmed = rawText.trim();
   const withoutFence = trimmed

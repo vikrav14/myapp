@@ -4,13 +4,18 @@ import { supabase } from "../lib/supabase.js";
 import type { MauriUser } from "../types.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import {
+  buildCustomSquadGoalSetReply,
   buildSquadCreatedPactHint,
   buildSquadGoalSetReply,
   buildSquadGoalShowReply,
+  buildCustomSquadWeights,
   getSquadPactDefinition,
   parseSquadGoalCommand,
+  parseStoredSquadPactWeights,
   suggestedPactKeyForArchetype,
-  type SquadPactKey
+  type SquadPactFocus,
+  type SquadPactKey,
+  type SquadPactWeightsRecord
 } from "./squad-pact.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
@@ -24,6 +29,7 @@ export interface SquadRecord {
   weekly_pact_label: string | null;
   weekly_pact_set_at: string | null;
   weekly_pact_set_by: string | null;
+  weekly_pact_weights: SquadPactWeightsRecord | null;
 }
 
 export interface SquadCommandResult {
@@ -41,8 +47,17 @@ function mapSquad(record: Record<string, unknown>): SquadRecord {
     weekly_pact_key: record.weekly_pact_key ? String(record.weekly_pact_key) : null,
     weekly_pact_label: record.weekly_pact_label ? String(record.weekly_pact_label) : null,
     weekly_pact_set_at: record.weekly_pact_set_at ? String(record.weekly_pact_set_at) : null,
-    weekly_pact_set_by: record.weekly_pact_set_by ? String(record.weekly_pact_set_by) : null
+    weekly_pact_set_by: record.weekly_pact_set_by ? String(record.weekly_pact_set_by) : null,
+    weekly_pact_weights: parseSquadWeeklyPactWeights(record.weekly_pact_weights)
   };
+}
+
+function parseSquadWeeklyPactWeights(value: unknown): SquadPactWeightsRecord | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return parseStoredSquadPactWeights(value);
 }
 
 function normalize(text: string): string {
@@ -431,7 +446,8 @@ export async function setSquadWeeklyPact(input: {
       weekly_pact_key: pact.key,
       weekly_pact_label: pact.label,
       weekly_pact_set_at: new Date().toISOString(),
-      weekly_pact_set_by: input.setByUserId
+      weekly_pact_set_by: input.setByUserId,
+      weekly_pact_weights: null
     })
     .eq("id", input.squadId)
     .select("*")
@@ -459,6 +475,55 @@ export async function setSquadWeeklyPact(input: {
   return squad;
 }
 
+export async function setSquadCustomPact(input: {
+  squadId: string;
+  label: string;
+  focus: SquadPactFocus[];
+  setByUserId: string;
+  requestId?: string | undefined;
+}): Promise<SquadRecord> {
+  const weights = buildCustomSquadWeights(input.focus);
+  const payload: SquadPactWeightsRecord = {
+    ...weights,
+    focus: input.focus
+  };
+
+  const { data, error } = await supabase
+    .from("squads")
+    .update({
+      weekly_pact_key: "custom",
+      weekly_pact_label: input.label.trim(),
+      weekly_pact_set_at: new Date().toISOString(),
+      weekly_pact_set_by: input.setByUserId,
+      weekly_pact_weights: payload
+    })
+    .eq("id", input.squadId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to set custom squad pact: ${error.message}`);
+  }
+
+  const squad = mapSquad(data as Record<string, unknown>);
+  await recordAuditEventBestEffort({
+    requestId: input.requestId,
+    eventType: "squad_pact_set",
+    userId: input.setByUserId,
+    entityType: "squad",
+    entityId: squad.id,
+    message: "User set a custom squad weekly pact.",
+    metadata: {
+      squadCode: squad.squad_code,
+      pactKey: "custom",
+      pactLabel: input.label,
+      focus: input.focus
+    }
+  });
+
+  return squad;
+}
+
 export async function clearSquadWeeklyPact(squadId: string, requestId?: string | undefined): Promise<SquadRecord> {
   const { data, error } = await supabase
     .from("squads")
@@ -466,7 +531,8 @@ export async function clearSquadWeeklyPact(squadId: string, requestId?: string |
       weekly_pact_key: null,
       weekly_pact_label: null,
       weekly_pact_set_at: null,
-      weekly_pact_set_by: null
+      weekly_pact_set_by: null,
+      weekly_pact_weights: null
     })
     .eq("id", squadId)
     .select("*")
@@ -620,31 +686,65 @@ squad goal study | save | hustle | balance`
       };
     }
 
-    const pact = getSquadPactDefinition(goalCommand.pactKey);
-    if (!pact) {
+    if (goalCommand.type === "setCustom") {
+      const weights = buildCustomSquadWeights(goalCommand.focus);
+      const updated = await setSquadCustomPact({
+        squadId: squad.id,
+        label: goalCommand.label,
+        focus: goalCommand.focus,
+        setByUserId: input.user.id,
+        requestId: input.requestId
+      });
+
+      await notifySquadMembersOfPactChange({
+        squad: updated,
+        actor: input.user,
+        pactLabel: goalCommand.label,
+        requestId: input.requestId
+      }).catch(() => undefined);
+
       return {
         handled: true,
-        reply: buildSquadGoalShowReply(squad)
+        reply: buildCustomSquadGoalSetReply(updated, {
+          label: goalCommand.label,
+          focus: goalCommand.focus,
+          weights
+        })
       };
     }
 
-    const updated = await setSquadWeeklyPact({
-      squadId: squad.id,
-      pactKey: pact.key,
-      setByUserId: input.user.id,
-      requestId: input.requestId
-    });
+    if (goalCommand.type === "set") {
+      const pact = getSquadPactDefinition(goalCommand.pactKey);
+      if (!pact) {
+        return {
+          handled: true,
+          reply: buildSquadGoalShowReply(squad)
+        };
+      }
 
-    await notifySquadMembersOfPactChange({
-      squad: updated,
-      actor: input.user,
-      pactLabel: pact.label,
-      requestId: input.requestId
-    }).catch(() => undefined);
+      const updated = await setSquadWeeklyPact({
+        squadId: squad.id,
+        pactKey: pact.key,
+        setByUserId: input.user.id,
+        requestId: input.requestId
+      });
+
+      await notifySquadMembersOfPactChange({
+        squad: updated,
+        actor: input.user,
+        pactLabel: pact.label,
+        requestId: input.requestId
+      }).catch(() => undefined);
+
+      return {
+        handled: true,
+        reply: buildSquadGoalSetReply(updated, pact)
+      };
+    }
 
     return {
       handled: true,
-      reply: buildSquadGoalSetReply(updated, pact)
+      reply: buildSquadGoalShowReply(squad)
     };
   }
 
@@ -671,7 +771,8 @@ Code ${squad.squad_code} is locked in.
 
 Want to invite someone? Reply "share squad" for a copy-paste invite message.
 
-Set the weekly pact anytime: squad goal study | save | hustle | balance`
+Set the weekly pact anytime: squad goal study | save | hustle | balance
+squad goal custom Your theme — focus study habits todos money`
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not join that squad.";
@@ -704,7 +805,9 @@ Code: ${squad.squad_code}
 Members: ${squad.member_ids.length}
 ${squad.weekly_pact_label ? `Pact: ${squad.weekly_pact_label}` : "Pact: not set yet"}
 
-Reply "share squad" for an invite, "squad goal" for pact scoring, or "leave squad" if you want out.`
+Reply "share squad" for an invite, "squad goal" for pact scoring, or "leave squad" if you want out.
+
+Custom pact example: squad goal custom Exam week — focus study todos`
     };
   }
 
