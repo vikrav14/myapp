@@ -30,6 +30,7 @@ This repository now contains the first backend foundation for the product spec i
 ## Guides
 
 - [Feel-safe optimization checklist](./FEEL_SAFE_OPTIMIZATION.md) — token/latency guardrails so replies stay personal
+- [Future ideas](./FUTURE_IDEAS.md) — deferred concepts (e.g. Deep Think multi-model deliberation)
 
 ## Project structure
 
