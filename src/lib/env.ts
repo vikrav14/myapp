@@ -117,7 +117,20 @@ const envSchema = z.object({
   PAYDAY_RUNWAY_ENABLED: envBoolean.default(true),
   LOCAL_ALERTS_ENABLED: envBoolean.default(true),
   LOCAL_ALERTS_CRON: z.string().default("*/30 21-23,0-7 * * *"),
-  LOCAL_ALERT_RSS_FEEDS: optionalCsv
+  LOCAL_ALERT_RSS_FEEDS: optionalCsv,
+  USER_MIND_ENABLED: envBoolean.default(true),
+  USER_MIND_REFLECT_CRON: z.string().default("0 2 * * *"),
+  USER_MIND_LOOKBACK_DAYS: z.coerce.number().int().positive().default(7),
+  USER_MIND_ACTIVITY_LOOKBACK_DAYS: z.coerce.number().int().positive().default(14),
+  USER_MIND_BATCH_SIZE: z.coerce.number().int().positive().default(25),
+  OPEN_LOOP_FOLLOWUPS_ENABLED: envBoolean.default(true),
+  OPEN_LOOP_FOLLOWUP_CRON: z.string().default("0 10 * * *"),
+  OPEN_LOOP_FOLLOWUP_HOUR: z.coerce.number().int().min(0).max(23).default(10),
+  OPEN_LOOP_FOLLOWUP_MINUTE: z.coerce.number().int().min(0).max(59).default(0),
+  PROACTIVE_CHECKINS_ENABLED: envBoolean.default(true),
+  PROACTIVE_CHECKIN_CRON: z.string().default("0 16 * * *"),
+  PROACTIVE_CHECKIN_HOUR: z.coerce.number().int().min(0).max(23).default(16),
+  PROACTIVE_CHECKIN_MINUTE: z.coerce.number().int().min(0).max(59).default(0)
 });
 
 export const env = envSchema.parse(process.env);

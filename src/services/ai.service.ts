@@ -1,5 +1,10 @@
 import { env } from "../lib/env.js";
-import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
+import {
+  conversationalReplyWithExtractionJsonSchema,
+  mauriBrainDumpJsonSchema,
+  mauriBrainDumpSchema,
+  parseStructuredJson
+} from "../schemas/extraction.js";
 import {
   localAlertClassificationJsonSchema,
   localAlertClassificationSchema,
@@ -10,12 +15,24 @@ import {
   receiptExtractionSchema,
   type ReceiptExtraction
 } from "../schemas/receipt.js";
+import {
+  parseUserMindSnapshot,
+  userMindSnapshotJsonSchema,
+  type UserMindSnapshotPayload
+} from "../schemas/user-mind.js";
 import type {
   MauriBrainDumpExtraction,
   MauriUser,
   UserContextSnapshot,
   WeeklyDiagnosticSummary
 } from "../types.js";
+import type { UserMindReflectionInput } from "./user-mind-data.service.js";
+import {
+  formatFreshContextForPrompt,
+  formatSemanticMemoriesForPrompt
+} from "./context-prompt.service.js";
+import { shouldSkipStructuredExtraction } from "./message-intent.service.js";
+import { buildReflectionPayloadSummary, formatUserMindForPrompt } from "./user-mind-prompt.js";
 
 interface GeminiTextResponse {
   candidates?: Array<{
@@ -215,15 +232,30 @@ ${message}
   return mauriBrainDumpSchema.parse(parsed);
 }
 
-export async function generateConversationalReply(input: {
+function buildMindPromptBlock(context: UserContextSnapshot): string {
+  return context.userMind !== null
+    ? `Pre-built understanding of this user (refreshed off-peak — trust this first):
+${formatUserMindForPrompt(context.userMind)}
+Last refreshed: ${context.userMindGeneratedAt ?? "unknown"}`
+    : "Pre-built user understanding: not available yet — rely on recent logs and memories below.";
+}
+
+function buildConversationalReplyPrompt(input: {
   user: MauriUser;
   message: string;
   extraction: MauriBrainDumpExtraction;
   context: UserContextSnapshot;
-}): Promise<string> {
-  const { user, message, extraction, context } = input;
+  includeExtractionBlock: boolean;
+}): string {
+  const { user, message, extraction, context, includeExtractionBlock } = input;
 
-  const replyPrompt = `
+  const extractionBlock = includeExtractionBlock
+    ? `
+Structured extraction from the latest message:
+${JSON.stringify(extraction)}`
+    : "";
+
+  return `
 You are Mauri.
 You live inside a private WhatsApp thread for Mauritians.
 You sound grounded, sharp, warm, direct.
@@ -236,29 +268,22 @@ Hard guardrails:
 - Keep paragraphs short and punchy.
 - You can naturally understand English, French, and Mauritian Creole.
 - Sound like a real peer, not a productivity bot.
+- You can answer general questions too — always weave in what you know about this user when it helps.
 
 User profile:
 First name: ${user.first_name ?? "Unknown"}
 Archetype: ${user.archetype}
 Subscription status: ${user.subscription_status}
+Morning brief tags: ${user.topic_preferences.join(", ") || "not set"}
 
-Recent pending todos:
-${JSON.stringify(context.pendingTodos)}
+${buildMindPromptBlock(context)}
 
-Recent finance logs:
-${JSON.stringify(context.recentFinance)}
-
-Recent habit logs:
-${JSON.stringify(context.recentHabits)}
-
-Recent emotional logs:
-${JSON.stringify(context.recentEmotions)}
+Fresh same-day context (use alongside the pre-built understanding):
+${formatFreshContextForPrompt(context)}
 
 Semantically relevant older memories:
-${JSON.stringify(context.semanticMemories)}
-
-Structured extraction from the latest message:
-${JSON.stringify(extraction)}
+${formatSemanticMemoriesForPrompt(context.semanticMemories)}
+${extractionBlock}
 
 Latest user message:
 ${message}
@@ -267,7 +292,188 @@ Reply in plain text only.
 If the user shared stress, respond with empathy first.
 If they implicitly logged progress, acknowledge it naturally.
 If they seem scattered, help them narrow to the next move without sounding robotic.
+Honor advice_preferences and things_to_avoid from the pre-built understanding when present.
 `;
+}
+
+export async function generateConversationalReplyWithExtraction(input: {
+  user: MauriUser;
+  message: string;
+  context: UserContextSnapshot;
+}): Promise<{ extraction: MauriBrainDumpExtraction; reply: string }> {
+  const prompt = `${buildConversationalReplyPrompt({
+    ...input,
+    extraction: {},
+    includeExtractionBlock: false
+  })}
+
+Before you reply, also parse the latest message into structured extraction JSON.
+Return a single JSON object with:
+- extraction: optional finance, todos, habits, emotions keys (omit absent fields)
+- reply: your WhatsApp reply plain text
+
+Extraction shape:
+{
+  "extraction": {
+    "finance": { "amount": number, "category": string, "context_tags": string[], "raw_source_text": string },
+    "todos": [{ "task_description": string, "due_date": string, "priority": "High" | "Medium" | "Low" }],
+    "habits": { "activity_type": string, "duration_minutes": number, "is_success": boolean, "context_note": string },
+    "emotions": { "anxiety_score": 1-5, "core_emotional_driver": string, "raw_unfiltered_vent": string }
+  },
+  "reply": string
+}`;
+
+  const rawJson = await callGemini({
+    prompt,
+    responseMimeType: "application/json",
+    responseSchema: conversationalReplyWithExtractionJsonSchema
+  });
+
+  const parsed = parseStructuredJson(rawJson) as {
+    extraction?: unknown;
+    reply?: string;
+  };
+
+  const reply = parsed.reply?.trim();
+  if (!reply) {
+    throw new Error("Gemini returned an empty conversational reply.");
+  }
+
+  const extraction = mauriBrainDumpSchema.parse(parsed.extraction ?? {});
+  return { extraction, reply };
+}
+
+export async function resolveConversationalAiResponse(input: {
+  user: MauriUser;
+  message: string;
+  context: UserContextSnapshot;
+}): Promise<{ extraction: MauriBrainDumpExtraction; reply: string }> {
+  if (shouldSkipStructuredExtraction(input.message)) {
+    const reply = await generateConversationalReply({
+      ...input,
+      extraction: {}
+    });
+
+    return { extraction: {}, reply };
+  }
+
+  return generateConversationalReplyWithExtraction(input);
+}
+
+export async function generateUserMindSnapshot(
+  reflectionInput: UserMindReflectionInput
+): Promise<UserMindSnapshotPayload> {
+  const payload = buildReflectionPayloadSummary(reflectionInput);
+  const prompt = `You are Mauri's off-peak reflection engine for a Mauritian lifestyle companion on WhatsApp.
+
+Synthesize a durable understanding of this user from the data below.
+This snapshot will be injected into future replies so Mauri feels like a mate who knows them.
+
+Rules:
+- Ground every field in the provided data only. Do not invent facts.
+- If signal is thin, say so plainly and keep arrays short.
+- Write for a Mauritian young professional / student context when relevant.
+- personality_notes should capture communication style, stress triggers, and what tone lands (direct, gentle, humour, etc.).
+- advice_preferences: how Mauri should coach this person (e.g. empathise first, then one concrete move).
+- things_to_avoid: reply patterns that would feel wrong for this user (preachy, generic, ignoring money stress, etc.).
+- active_goals, recent_wins, open_loops: short phrase items only.
+- Merge useful signal from previous_mind_snapshot when still valid; drop stale items.
+
+Reflection data:
+${JSON.stringify(payload, null, 2)}`;
+
+  const rawJson = await callGemini({
+    prompt,
+    responseMimeType: "application/json",
+    responseSchema: userMindSnapshotJsonSchema
+  });
+
+  return parseUserMindSnapshot(rawJson);
+}
+
+export async function generateProactiveCheckInMessage(input: {
+  user: MauriUser;
+  mode: "care" | "useful" | "curious";
+  hookSummary: string;
+  userMind?: UserMindSnapshotPayload | null;
+}): Promise<string> {
+  const modeGuidance = {
+    care: "They have been quieter. Check in emotionally — grounded, not clingy. Reference the hook without guilt.",
+    useful: "Offer one practical, data-backed nudge tied to the hook. No lecture.",
+    curious: "Ask exactly one get-to-know question that helps you understand them better as a mate."
+  }[input.mode];
+
+  const mindBlock = input.userMind
+    ? `User mind summary: ${input.userMind.life_summary}
+Advice preferences: ${input.userMind.advice_preferences}
+Things to avoid: ${input.userMind.things_to_avoid.join("; ")}`
+    : "User mind: not built yet — keep it light.";
+
+  const prompt = `You are Mauri in a private WhatsApp thread for Mauritians.
+You are sending a proactive check-in (mode: ${input.mode}).
+
+${modeGuidance}
+
+Rules:
+- 2 short paragraphs max.
+- Warm, specific, never survey-like.
+- One question max.
+- Mention they can reply "not now" to pause proactive pings.
+- No bullet lists. No numbered steps. No "As an AI".
+- Sound like a real mate, not a bot.
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+Hook: ${input.hookSummary}
+${mindBlock}
+
+Reply in plain text only.`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
+export async function generateOpenLoopFollowUpMessage(input: {
+  user: MauriUser;
+  loopText: string;
+}): Promise<string> {
+  const prompt = `You are Mauri in a private WhatsApp thread for Mauritians.
+You are gently following up on something the user mentioned earlier.
+
+Rules:
+- 2 short paragraphs max.
+- Warm, grounded, zero guilt.
+- Reference the open loop naturally without quoting it word-for-word.
+- Make clear they do not have to debrief if they do not want to.
+- No bullet lists. No numbered steps. No "As an AI".
+- Sound like a real mate checking in.
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+Open loop: ${input.loopText}
+
+Reply in plain text only.`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
+export async function generateConversationalReply(input: {
+  user: MauriUser;
+  message: string;
+  extraction: MauriBrainDumpExtraction;
+  context: UserContextSnapshot;
+}): Promise<string> {
+  const replyPrompt = buildConversationalReplyPrompt({
+    ...input,
+    includeExtractionBlock: Object.keys(input.extraction).length > 0
+  });
 
   return callGemini({
     prompt: replyPrompt,

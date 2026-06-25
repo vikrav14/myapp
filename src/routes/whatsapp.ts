@@ -3,7 +3,7 @@ import { Router } from "express";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { getRequestId } from "../lib/request-tracing.js";
-import { extractStructuredContext, generateConversationalReply } from "../services/ai.service.js";
+import { resolveConversationalAiResponse } from "../services/ai.service.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
 import { registerInboundEvent } from "../services/inbound-event.service.js";
@@ -15,6 +15,8 @@ import { handleReceiptImageMessage } from "../services/receipt-scan.service.js";
 import { handleCalendarMessage } from "../services/calendar.service.js";
 import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
+import { handleOpenLoopFollowUpMessage } from "../services/open-loop-follow-up.service.js";
+import { handleProactiveCheckInMessage } from "../services/proactive-checkin.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
@@ -314,6 +316,60 @@ whatsappRouter.post("/", async (request, response, next) => {
       return;
     }
 
+    const openLoopFollowUpResult = await handleOpenLoopFollowUpMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (openLoopFollowUpResult.handled && openLoopFollowUpResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, openLoopFollowUpResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "open_loop_followup_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: openLoopFollowUpResult.reply
+      });
+      return;
+    }
+
+    const proactiveCheckInResult = await handleProactiveCheckInMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (proactiveCheckInResult.handled && proactiveCheckInResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, proactiveCheckInResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "proactive_checkin_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: proactiveCheckInResult.reply
+      });
+      return;
+    }
+
     const localAlertsResult = await handleLocalAlertsCommandMessage({
       user,
       message: normalizedMessageText,
@@ -509,7 +565,7 @@ whatsappRouter.post("/", async (request, response, next) => {
       return;
     }
 
-    const context = await loadUserContext(user.id, normalizedMessageText);
+    const context = await loadUserContext(user.id, normalizedMessageText, user);
 
     try {
       await storeConversationMemory({
@@ -525,20 +581,17 @@ whatsappRouter.post("/", async (request, response, next) => {
     } catch (error) {
       logger.warn({ error, userId: user.id }, "Failed to store inbound conversation memory.");
     }
-    const extraction = await extractStructuredContext(normalizedMessageText);
+    const { extraction, reply } = await resolveConversationalAiResponse({
+      user,
+      message: normalizedMessageText,
+      context
+    });
 
     await persistExtraction(user.id, extraction);
     await runSquadRelayAfterExtraction({
       user,
       extraction,
       requestId
-    });
-
-    const reply = await generateConversationalReply({
-      user,
-      message: normalizedMessageText,
-      extraction,
-      context
     });
 
     try {

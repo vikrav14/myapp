@@ -27,6 +27,12 @@ This repository now contains the first backend foundation for the product spec i
 - Deployment-ready Docker, Render, and CI configuration
 - Environment template for local setup
 
+## Guides
+
+- [Feel-safe optimization checklist](./FEEL_SAFE_OPTIMIZATION.md) — token/latency guardrails so replies stay personal
+- [Future ideas](./FUTURE_IDEAS.md) — deferred concepts (e.g. Deep Think multi-model deliberation)
+- [User customization](./USER_CUSTOMIZATION.md) — what users can personalize today (topics, pacts, toggles, etc.)
+
 ## Project structure
 
 ```text
@@ -197,6 +203,9 @@ supabase/migrations/016_scheduled_reminders.sql
 supabase/migrations/017_calendar_and_memory_resurfacing.sql
 supabase/migrations/018_payday_and_receipts.sql
 supabase/migrations/019_local_alerts.sql
+supabase/migrations/020_user_mind_snapshots.sql
+supabase/migrations/021_open_loop_follow_ups.sql
+supabase/migrations/022_squad_custom_pact_weights.sql
 ```
 
 ## Webhook contract
@@ -414,6 +423,7 @@ Trial and premium users can manage Mauri Squads directly in WhatsApp:
 - `lesson` (today's 2-minute insight)
 - `leave squad`
 - `squad goal` or `squad goal study | save | hustle | balance` (weekly pact — changes scoreboard weights)
+- `squad goal custom Exam week — focus study todos` (custom pact label + focus keywords)
 - `squad goal clear` (reset to default scoring)
 
 Squad nudges and Sunday showdowns include members with an active trial or paid subscription. When a weekly pact is set, habit/todo/finance logs score differently (e.g. study pact boosts study habits).
@@ -460,6 +470,79 @@ Environment:
 - `MORNING_BRIEF_SCRAPE_CRON` / `MORNING_BRIEF_CURATE_CRON` / `MORNING_BRIEF_DELIVER_CRON`
 - `MORNING_BRIEF_RSS_FEEDS` (optional comma-separated override)
 - `GOOGLE_MAPS_API_KEY` (optional, for live traffic lines)
+
+## User mind (off-peak reflection)
+
+Active trial/paid users with recent chat activity get a nightly **user mind snapshot** at **2:00** (`Indian/Mauritius` by default).
+
+Pipeline:
+
+1. **2:00** — load the last 7 days of finance, habits, todos, emotions, chat samples, reminders, and calendar
+2. Gemini synthesizes a compact understanding (life summary, personality notes, goals, open loops, advice preferences)
+3. Snapshot is stored in `user_mind_snapshots` and injected into conversational replies the next day
+
+This makes Mauri feel like a mate who thought about you overnight — not a bot that only reads the last message.
+
+Admin ops:
+
+- `POST /internal/admin/user-mind/reflect` (batch all active users, or `{ "userId": "..." }` for one user)
+- `GET /internal/admin/users/:userId/user-mind`
+
+Environment:
+
+- `USER_MIND_ENABLED`
+- `USER_MIND_REFLECT_CRON`
+- `USER_MIND_LOOKBACK_DAYS`
+- `USER_MIND_ACTIVITY_LOOKBACK_DAYS`
+- `USER_MIND_BATCH_SIZE`
+
+## Open-loop follow-ups
+
+When User Mind reflection finds an open loop (interview, exam, family thing), Mauri schedules a gentle check-in WhatsApp — default **10:00** Mauritius.
+
+Flow:
+
+1. **2:00** — User Mind reflection saves `open_loops`
+2. **Same morning** — one follow-up queued for 10:00 (deduped for 14 days)
+3. **10:00** — warm check-in: *"How did it go? No pressure to debrief."*
+
+Commands: `followups on` / `followups off` / `my followups`
+
+Admin ops:
+
+- `POST /internal/admin/open-loop-followups/deliver`
+
+Environment:
+
+- `OPEN_LOOP_FOLLOWUPS_ENABLED`
+- `OPEN_LOOP_FOLLOWUP_CRON`
+- `OPEN_LOOP_FOLLOWUP_HOUR`
+- `OPEN_LOOP_FOLLOWUP_MINUTE`
+
+## Proactive check-ins
+
+When you've been quiet (24h+), Mauri may reach out once a day — max **3/week** — in one of three modes:
+
+- **Care** — emotional check-in from User Mind signal
+- **Useful** — runway, todos, habits, or goals nudge
+- **Curious** — one get-to-know question when mind is still thin
+
+Runs at **16:00** Mauritius (after morning brief, open-loop, and resurfacing). Skips if you already got another proactive ping today.
+
+Shared toggle with open-loop follow-ups: `followups on` / `followups off`
+
+Commands: `my checkins` · `not now` (pause 7 days)
+
+Admin ops:
+
+- `POST /internal/admin/proactive-checkins/deliver`
+
+Environment:
+
+- `PROACTIVE_CHECKINS_ENABLED`
+- `PROACTIVE_CHECKIN_CRON`
+- `PROACTIVE_CHECKIN_HOUR`
+- `PROACTIVE_CHECKIN_MINUTE`
 
 ## Quantum pick
 
