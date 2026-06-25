@@ -103,6 +103,31 @@ export interface WeeklyDiagnosticSummary {
   trial_cliffhanger: boolean;
 }
 
+export type WeeklyFeedbackReason =
+  | "early_calibration"
+  | "low_signal"
+  | "momentum_drop"
+  | "quiet_power_user"
+  | "periodic_pulse";
+
+export type WeeklyFeedbackVariant = "rating" | "context" | "open";
+
+export interface WeeklyFeedbackPromptContext {
+  include: boolean;
+  reason: WeeklyFeedbackReason | null;
+  variant: WeeklyFeedbackVariant;
+  skip_reason:
+    | "trial_cliffhanger"
+    | "recent_feedback"
+    | "ghost_week"
+    | "no_trigger"
+    | null;
+  prior_report_count: number;
+  weeks_since_feedback: number | null;
+  message_count_this_week: number;
+  momentum_delta: number | null;
+}
+
 export interface WeeklyReportRecord {
   id: string;
   user_id: string;
@@ -113,6 +138,8 @@ export interface WeeklyReportRecord {
   delivery_status: string;
   sent_at: string | null;
   created_at: string;
+  feedback_prompt_json?: WeeklyFeedbackPromptContext | null;
+  feedback_responded_at?: string | null;
 }
 
 export interface VoiceNoteTranscriptionRecord {
