@@ -27,6 +27,11 @@ This repository now contains the first backend foundation for the product spec i
 - Deployment-ready Docker, Render, and CI configuration
 - Environment template for local setup
 
+## Guides
+
+- [User customization](./USER_CUSTOMIZATION.md) — what users can personalize today (topics, pacts, toggles, etc.)
+- [Ground zero checklist](./GROUND_ZERO.md) — deploy and smoke-test Mauri
+
 ## Project structure
 
 ```text
@@ -197,6 +202,12 @@ supabase/migrations/016_scheduled_reminders.sql
 supabase/migrations/017_calendar_and_memory_resurfacing.sql
 supabase/migrations/018_payday_and_receipts.sql
 supabase/migrations/019_local_alerts.sql
+<<<<<<< HEAD
+=======
+supabase/migrations/020_user_mind_snapshots.sql
+supabase/migrations/021_open_loop_follow_ups.sql
+supabase/migrations/022_squad_custom_pact_weights.sql
+>>>>>>> a89a4b2 (Add custom squad pacts and user customization guide)
 ```
 
 ## Webhook contract
@@ -422,6 +433,7 @@ Trial and premium users can manage Mauri Squads directly in WhatsApp:
 - `lesson` (today's 2-minute insight)
 - `leave squad`
 - `squad goal` or `squad goal study | save | hustle | balance` (weekly pact — changes scoreboard weights)
+- `squad goal custom Exam week — focus study todos` (custom pact label + focus keywords)
 - `squad goal clear` (reset to default scoring)
 
 Squad nudges and Sunday showdowns include members with an active trial or paid subscription. When a weekly pact is set, habit/todo/finance logs score differently (e.g. study pact boosts study habits).

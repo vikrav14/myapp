@@ -3,7 +3,7 @@ import type { MauriUser } from "../types.js";
 export function buildHelpMenu(user: MauriUser): string {
   const squadLine =
     user.subscription_status === "Trial_Active" || user.subscription_status === "Paid_Active"
-      ? "\nSquads (included on trial): create squad, join CODE, share squad, squad status, squad goal study | save | hustle | balance."
+      ? "\nSquads (included on trial): create squad, join CODE, share squad, squad status, squad goal study | save | hustle | balance, squad goal custom Your theme — focus study habits todos money."
       : "";
 
   return `Mauri command menu
@@ -68,7 +68,7 @@ export function buildQuickStartMenu(): string {
   return `Quick start commands:
 help — full menu
 create squad — invite mates (no group chat)
-squad goal study — set weekly squad pact (save | hustle | balance)
+squad goal study — set weekly squad pact (save | hustle | balance | custom)
 my focus — this week's one habit
 roast me — truth from your week
 my streaks — habit streaks
