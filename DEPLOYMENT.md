@@ -26,6 +26,7 @@ supabase/migrations/018_payday_and_receipts.sql
 supabase/migrations/019_local_alerts.sql
 supabase/migrations/020_user_mind_snapshots.sql
 supabase/migrations/021_open_loop_follow_ups.sql
+supabase/migrations/022_squad_custom_pact_weights.sql
 ```
 
 ## 2. Deploy the web service (Render)

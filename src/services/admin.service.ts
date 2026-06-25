@@ -20,6 +20,7 @@ import {
   updateSquadName,
   type SquadRecord
 } from "./squad.service.js";
+import { parseStoredSquadPactWeights } from "./squad-pact.service.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -35,7 +36,8 @@ function mapSquad(record: Record<string, unknown>): SquadRecord {
     weekly_pact_key: record.weekly_pact_key ? String(record.weekly_pact_key) : null,
     weekly_pact_label: record.weekly_pact_label ? String(record.weekly_pact_label) : null,
     weekly_pact_set_at: record.weekly_pact_set_at ? String(record.weekly_pact_set_at) : null,
-    weekly_pact_set_by: record.weekly_pact_set_by ? String(record.weekly_pact_set_by) : null
+    weekly_pact_set_by: record.weekly_pact_set_by ? String(record.weekly_pact_set_by) : null,
+    weekly_pact_weights: parseStoredSquadPactWeights(record.weekly_pact_weights)
   };
 }
 
