@@ -222,6 +222,8 @@ Inbound WhatsApp messages with the same `messageId` are now deduplicated before 
 
 **Reactions (human UX):** On active users, Mauri can mark messages read and react before replying — 👀 receipts, 👂 voice notes, ❤️ stress vents, 🔥 wins, 🙏 thanks. Skips commands, onboarding, and short greetings. Toggle with `WHATSAPP_REACTIONS_ENABLED` / `WHATSAPP_MARK_READ_ENABLED`.
 
+**Interactive buttons & lists:** Tap-to-reply UI for onboarding archetype/tags, `help` menu, and Sunday service ratings (`WHATSAPP_INTERACTIVE_ENABLED`). Button/list taps map to the same handlers as typed commands.
+
 There is also a secured internal payment confirmation route:
 
 - `POST /internal/payments/confirm`

@@ -81,8 +81,8 @@ describe("handleEngagementCommandMessage", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Mauri command menu");
-    expect(result.reply).toContain("roast me");
+    expect(result.reply).toContain("Tap what you need");
+    expect(result.interactive?.listButtonLabel).toBe("Open menu");
   });
 
   it("returns weekly focus", async () => {

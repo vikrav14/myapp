@@ -75,7 +75,7 @@ export function pickInboundReactionEmoji(input: {
   isCommand: boolean;
   onboardingActive: boolean;
 }): string | null {
-  if (input.onboardingActive || input.isCommand) {
+  if (input.onboardingActive || input.isCommand || input.kind === "interactive") {
     return null;
   }
 
