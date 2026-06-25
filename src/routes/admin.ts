@@ -31,6 +31,7 @@ import {
 } from "../jobs/morning-brief-jobs.js";
 import { runUserMindReflectionBatch, getUserMindSnapshot, reflectUserMindById } from "../services/user-mind.service.js";
 import { runOpenLoopFollowUpDeliveries } from "../services/open-loop-follow-up.service.js";
+import { runProactiveCheckInDeliveries } from "../services/proactive-checkin.service.js";
 import { getRequestId } from "../lib/request-tracing.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { getMetricsSnapshot } from "../services/metrics.service.js";
@@ -1621,6 +1622,19 @@ adminRouter.post("/open-loop-followups/deliver", async (request, response, next)
   try {
     const requestId = getRequestId(response);
     const result = await runOpenLoopFollowUpDeliveries(requestId);
+    response.status(200).json({
+      ok: true,
+      ...result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/proactive-checkins/deliver", async (request, response, next) => {
+  try {
+    const requestId = getRequestId(response);
+    const result = await runProactiveCheckInDeliveries(requestId);
     response.status(200).json({
       ok: true,
       ...result

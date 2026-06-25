@@ -30,6 +30,7 @@ const baseUser: MauriUser = {
   weekly_focus_habit: "Study_Deep_Work",
   weekly_focus_set_at: "2026-06-15T00:00:00.000Z",
   open_loop_followups_enabled: true,
+  proactive_checkins_paused_until: null,
   created_at: "2026-06-01T00:00:00.000Z",
   updated_at: "2026-06-01T00:00:00.000Z"
 };

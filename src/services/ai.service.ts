@@ -391,6 +391,51 @@ ${JSON.stringify(payload, null, 2)}`;
   return parseUserMindSnapshot(rawJson);
 }
 
+export async function generateProactiveCheckInMessage(input: {
+  user: MauriUser;
+  mode: "care" | "useful" | "curious";
+  hookSummary: string;
+  userMind?: UserMindSnapshotPayload | null;
+}): Promise<string> {
+  const modeGuidance = {
+    care: "They have been quieter. Check in emotionally — grounded, not clingy. Reference the hook without guilt.",
+    useful: "Offer one practical, data-backed nudge tied to the hook. No lecture.",
+    curious: "Ask exactly one get-to-know question that helps you understand them better as a mate."
+  }[input.mode];
+
+  const mindBlock = input.userMind
+    ? `User mind summary: ${input.userMind.life_summary}
+Advice preferences: ${input.userMind.advice_preferences}
+Things to avoid: ${input.userMind.things_to_avoid.join("; ")}`
+    : "User mind: not built yet — keep it light.";
+
+  const prompt = `You are Mauri in a private WhatsApp thread for Mauritians.
+You are sending a proactive check-in (mode: ${input.mode}).
+
+${modeGuidance}
+
+Rules:
+- 2 short paragraphs max.
+- Warm, specific, never survey-like.
+- One question max.
+- Mention they can reply "not now" to pause proactive pings.
+- No bullet lists. No numbered steps. No "As an AI".
+- Sound like a real mate, not a bot.
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+Hook: ${input.hookSummary}
+${mindBlock}
+
+Reply in plain text only.`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
 export async function generateOpenLoopFollowUpMessage(input: {
   user: MauriUser;
   loopText: string;

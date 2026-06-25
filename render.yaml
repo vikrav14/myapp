@@ -155,6 +155,14 @@ services:
         value: "10"
       - key: OPEN_LOOP_FOLLOWUP_MINUTE
         value: "0"
+      - key: PROACTIVE_CHECKINS_ENABLED
+        value: "true"
+      - key: PROACTIVE_CHECKIN_CRON
+        value: "0 16 * * *"
+      - key: PROACTIVE_CHECKIN_HOUR
+        value: "16"
+      - key: PROACTIVE_CHECKIN_MINUTE
+        value: "0"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS

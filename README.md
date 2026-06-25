@@ -519,6 +519,31 @@ Environment:
 - `OPEN_LOOP_FOLLOWUP_HOUR`
 - `OPEN_LOOP_FOLLOWUP_MINUTE`
 
+## Proactive check-ins
+
+When you've been quiet (24h+), Mauri may reach out once a day — max **3/week** — in one of three modes:
+
+- **Care** — emotional check-in from User Mind signal
+- **Useful** — runway, todos, habits, or goals nudge
+- **Curious** — one get-to-know question when mind is still thin
+
+Runs at **16:00** Mauritius (after morning brief, open-loop, and resurfacing). Skips if you already got another proactive ping today.
+
+Shared toggle with open-loop follow-ups: `followups on` / `followups off`
+
+Commands: `my checkins` · `not now` (pause 7 days)
+
+Admin ops:
+
+- `POST /internal/admin/proactive-checkins/deliver`
+
+Environment:
+
+- `PROACTIVE_CHECKINS_ENABLED`
+- `PROACTIVE_CHECKIN_CRON`
+- `PROACTIVE_CHECKIN_HOUR`
+- `PROACTIVE_CHECKIN_MINUTE`
+
 ## Quantum pick
 
 Active users can ask Mauri to break decision deadlock with true randomness from the [ANU Quantum Numbers API](https://quantumnumbers.anu.edu.au) when configured.

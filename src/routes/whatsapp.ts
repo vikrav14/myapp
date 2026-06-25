@@ -16,6 +16,7 @@ import { handleCalendarMessage } from "../services/calendar.service.js";
 import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
 import { handleOpenLoopFollowUpMessage } from "../services/open-loop-follow-up.service.js";
+import { handleProactiveCheckInMessage } from "../services/proactive-checkin.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
@@ -338,6 +339,33 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: openLoopFollowUpResult.reply
+      });
+      return;
+    }
+
+    const proactiveCheckInResult = await handleProactiveCheckInMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (proactiveCheckInResult.handled && proactiveCheckInResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, proactiveCheckInResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "proactive_checkin_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: proactiveCheckInResult.reply
       });
       return;
     }

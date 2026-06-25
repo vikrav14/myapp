@@ -19,6 +19,7 @@ What users can personalize today, how they do it, and where more custom options 
 | **Squad name** | ✅ At create | `create squad Study Crew` | `squads.squad_name` |
 | **Memory resurfacing** | ✅ On/off | `resurface on` / `resurface off` | `users.memory_resurfacing_enabled` |
 | **Open-loop follow-ups** | ✅ On/off | `followups on` / `followups off` | `users.open_loop_followups_enabled` |
+| **Proactive check-ins** | ✅ On/off (shared) + pause | `followups on/off`, `not now`, `my checkins` | `users.open_loop_followups_enabled`, `users.proactive_checkins_paused_until` |
 | **Local alerts** | ✅ On/off | `alerts on` / `alerts off` | `users.local_alerts_enabled` |
 | **School alerts** | ✅ On/off | `school alerts on` / `off` | `users.school_alerts_enabled` |
 | **Weekly focus** | ⚠️ System-assigned | `my focus` (read); set via onboarding/engagement | engagement layer |
@@ -96,6 +97,7 @@ squad goal custom No takeaway week — focus money
 | Morning digest | `digest off` | `digest on` |
 | Memory resurfacing | `resurface off` | `resurface on` |
 | Open-loop follow-ups | `followups off` | `followups on` |
+| Proactive mate check-ins | `not now` (7-day pause) or `followups off` | `followups on` |
 | Local alerts | `alerts off` | `alerts on` |
 | School-only alerts | `school alerts off` | `school alerts on` |
 | Calendar delivery | `calendar off` | `calendar on` |

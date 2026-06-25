@@ -372,7 +372,7 @@ export async function handleOpenLoopFollowUpMessage(input: {
         handled: true,
         user: updatedUser,
         reply:
-          "Follow-up check-ins are on. When you mention something big — interview, exam, family thing — I'll gently check back if it's still open."
+          "Follow-up check-ins are on. When you mention something big — interview, exam, family thing — I'll gently check back if it's still open. I'll also reach out when you've been quiet (max ~3/week). Reply not now anytime to pause."
       };
     }
 
