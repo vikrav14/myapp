@@ -432,6 +432,14 @@ From the panel you can list squads, inspect members, rename squads, remove membe
 
 Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active users and stores the report payload in `weekly_reports`.
 
+**Two-part structure when smart gating fires:**
+1. **Your week** — patterns from finance, habits, todos, mood (existing)
+2. **From Mauri** — optional closing section asking for service feedback (rate 1–5 or `mauri feedback …`)
+
+Feedback is **not** asked every week. Triggers include early reports, momentum drops, low chat signal, quiet long-term users, or a ~6-week pulse. Skips trial cliffhanger weeks, ghost weeks, and users who gave feedback in the last 28 days.
+
+User replies: `rate 4`, `mauri feedback: you miss when I'm stressed`
+
 ## Morning Mauritian vibe check
 
 Active users with 3–5 topic tags receive a personalized WhatsApp digest at **7:00** (`Indian/Mauritius` by default).
