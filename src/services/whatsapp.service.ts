@@ -1,6 +1,6 @@
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
-import type { InboundMessage } from "../types.js";
+import type { InboundMessage, WhatsAppInteractiveOutbound } from "../types.js";
 import {
   createOutboundMessage,
   markOutboundMessageFailed,
@@ -8,6 +8,63 @@ import {
   markOutboundMessageLoggedOnly,
   markOutboundMessageSent
 } from "./outbound-message.service.js";
+import { resolveInteractiveReplyId } from "./whatsapp-interactive.service.js";
+
+function summarizeInteractiveForLog(interactive: WhatsAppInteractiveOutbound): string {
+  if (interactive.buttons?.length) {
+    return `[interactive:buttons] ${interactive.body}`;
+  }
+
+  return `[interactive:list] ${interactive.body}`;
+}
+
+function buildInteractivePayload(interactive: WhatsAppInteractiveOutbound): Record<string, unknown> {
+  if (interactive.buttons?.length) {
+    return {
+      type: "interactive",
+      interactive: {
+        type: "button",
+        header: interactive.header ? { type: "text", text: interactive.header } : undefined,
+        body: { type: "text", text: interactive.body },
+        footer: interactive.footer ? { type: "text", text: interactive.footer } : undefined,
+        action: {
+          buttons: interactive.buttons.slice(0, 3).map((button) => ({
+            type: "reply",
+            reply: {
+              id: button.id,
+              title: button.title.slice(0, 20)
+            }
+          }))
+        }
+      }
+    };
+  }
+
+  if (!interactive.sections?.length) {
+    throw new Error("Interactive message requires buttons or list sections.");
+  }
+
+  return {
+    type: "interactive",
+    interactive: {
+      type: "list",
+      header: interactive.header ? { type: "text", text: interactive.header } : undefined,
+      body: { type: "text", text: interactive.body },
+      footer: interactive.footer ? { type: "text", text: interactive.footer } : undefined,
+      action: {
+        button: (interactive.listButtonLabel ?? "Choose").slice(0, 20),
+        sections: interactive.sections.map((section) => ({
+          title: section.title?.slice(0, 24),
+          rows: section.rows.slice(0, 10).map((row) => ({
+            id: row.id,
+            title: row.title.slice(0, 24),
+            description: row.description?.slice(0, 72)
+          }))
+        }))
+      }
+    }
+  };
+}
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -108,17 +165,62 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
 
   const messageId = typeof firstMessage.id === "string" ? firstMessage.id : undefined;
   const messageType = typeof firstMessage.type === "string" ? firstMessage.type : undefined;
+
+  const profileName =
+    contacts.length > 0 && isObject(contacts[0]) && isObject(contacts[0].profile) && typeof contacts[0].profile.name === "string"
+      ? contacts[0].profile.name
+      : undefined;
+
+  if (messageType === "reaction") {
+    return null;
+  }
+
+  if (messageType === "interactive" && isObject(firstMessage.interactive)) {
+    const interactive = firstMessage.interactive;
+    const interactiveType = typeof interactive.type === "string" ? interactive.type : undefined;
+    let replyId: string | undefined;
+    let displayTitle: string | undefined;
+
+    if (interactiveType === "button_reply" && isObject(interactive.button_reply)) {
+      replyId = typeof interactive.button_reply.id === "string" ? interactive.button_reply.id : undefined;
+      displayTitle =
+        typeof interactive.button_reply.title === "string" ? interactive.button_reply.title : undefined;
+    }
+
+    if (interactiveType === "list_reply" && isObject(interactive.list_reply)) {
+      replyId = typeof interactive.list_reply.id === "string" ? interactive.list_reply.id : undefined;
+      displayTitle =
+        typeof interactive.list_reply.title === "string" ? interactive.list_reply.title : undefined;
+    }
+
+    if (replyId) {
+      const mappedText = resolveInteractiveReplyId(replyId) ?? displayTitle ?? replyId;
+      const inboundMessage: InboundMessage = {
+        from: firstMessage.from,
+        kind: "interactive",
+        text: mappedText,
+        interactiveReplyId: replyId,
+        rawPayload: payload
+      };
+
+      if (profileName) {
+        inboundMessage.profileName = profileName;
+      }
+
+      if (messageId) {
+        inboundMessage.messageId = messageId;
+      }
+
+      return inboundMessage;
+    }
+  }
+
   const body =
     isObject(firstMessage.text) && typeof firstMessage.text.body === "string"
       ? firstMessage.text.body
       : typeof firstMessage.body === "string"
         ? firstMessage.body
         : null;
-
-  const profileName =
-    contacts.length > 0 && isObject(contacts[0]) && isObject(contacts[0].profile) && typeof contacts[0].profile.name === "string"
-      ? contacts[0].profile.name
-      : undefined;
 
   if (body) {
     const inboundMessage: InboundMessage = {
@@ -188,6 +290,21 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
 }
 
 export async function deliverWhatsAppText(to: string, body: string): Promise<void> {
+  await postWhatsAppMessage({
+    to,
+    payload: {
+      type: "text",
+      text: {
+        body
+      }
+    }
+  });
+}
+
+async function postWhatsAppMessage(input: {
+  to: string;
+  payload: Record<string, unknown>;
+}): Promise<void> {
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error("WhatsApp credentials are not configured for delivery.");
   }
@@ -202,11 +319,8 @@ export async function deliverWhatsAppText(to: string, body: string): Promise<voi
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: {
-          body
-        }
+        to: input.to,
+        ...input.payload
       })
     }
   );
@@ -215,6 +329,136 @@ export async function deliverWhatsAppText(to: string, body: string): Promise<voi
     const errorText = await response.text();
     throw new Error(`Failed to send WhatsApp message: ${errorText}`);
   }
+}
+
+export async function markWhatsAppMessageRead(messageId: string): Promise<void> {
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    throw new Error("WhatsApp credentials are not configured for delivery.");
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/v22.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to mark WhatsApp message read: ${errorText}`);
+  }
+}
+
+export async function deliverWhatsAppReaction(input: {
+  to: string;
+  messageId: string;
+  emoji: string;
+}): Promise<void> {
+  await postWhatsAppMessage({
+    to: input.to,
+    payload: {
+      type: "reaction",
+      reaction: {
+        message_id: input.messageId,
+        emoji: input.emoji
+      }
+    }
+  });
+}
+
+export async function deliverWhatsAppInteractive(to: string, interactive: WhatsAppInteractiveOutbound): Promise<void> {
+  await postWhatsAppMessage({
+    to,
+    payload: buildInteractivePayload(interactive)
+  });
+}
+
+export async function sendWhatsAppInteractive(
+  to: string,
+  interactive: WhatsAppInteractiveOutbound,
+  options?: {
+    userId?: string | null | undefined;
+    requestId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }
+): Promise<void> {
+  const body = summarizeInteractiveForLog(interactive);
+  const outbound = await createOutboundMessage({
+    phoneNumber: to,
+    body,
+    userId: options?.userId ?? null,
+    requestId: options?.requestId,
+    metadata: {
+      ...options?.metadata,
+      interactive: true
+    }
+  });
+
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    logger.info({ to, body }, "WhatsApp credentials missing. Interactive reply logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return;
+  }
+
+  if (!env.WHATSAPP_INTERACTIVE_ENABLED) {
+    logger.info({ to, body }, "WhatsApp interactive messages disabled. Logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return;
+  }
+
+  let delivered = false;
+  try {
+    await markOutboundMessageSending(outbound.id);
+    await deliverWhatsAppInteractive(to, interactive);
+    delivered = true;
+    await markOutboundMessageSent(outbound.id);
+  } catch (error) {
+    if (delivered) {
+      logger.error(
+        { error, outboundMessageId: outbound.id },
+        "WhatsApp interactive delivery succeeded but outbound finalization failed."
+      );
+      throw error;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : "Unknown interactive send error";
+    await markOutboundMessageFailed({
+      messageId: outbound.id,
+      errorMessage
+    });
+    throw error;
+  }
+}
+
+export async function sendMauriReply(
+  to: string,
+  payload: { text?: string | undefined; interactive?: WhatsAppInteractiveOutbound | undefined },
+  options?: {
+    userId?: string | null | undefined;
+    requestId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }
+): Promise<void> {
+  if (payload.interactive && env.WHATSAPP_INTERACTIVE_ENABLED) {
+    await sendWhatsAppInteractive(to, payload.interactive, options);
+    return;
+  }
+
+  if (payload.text) {
+    await sendWhatsAppMessage(to, payload.text, options);
+    return;
+  }
+
+  throw new Error("Mauri reply requires text or interactive content.");
 }
 
 export async function sendWhatsAppMessage(

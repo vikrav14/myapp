@@ -103,6 +103,31 @@ export interface WeeklyDiagnosticSummary {
   trial_cliffhanger: boolean;
 }
 
+export type WeeklyFeedbackReason =
+  | "early_calibration"
+  | "low_signal"
+  | "momentum_drop"
+  | "quiet_power_user"
+  | "periodic_pulse";
+
+export type WeeklyFeedbackVariant = "rating" | "context" | "open";
+
+export interface WeeklyFeedbackPromptContext {
+  include: boolean;
+  reason: WeeklyFeedbackReason | null;
+  variant: WeeklyFeedbackVariant;
+  skip_reason:
+    | "trial_cliffhanger"
+    | "recent_feedback"
+    | "ghost_week"
+    | "no_trigger"
+    | null;
+  prior_report_count: number;
+  weeks_since_feedback: number | null;
+  message_count_this_week: number;
+  momentum_delta: number | null;
+}
+
 export interface WeeklyReportRecord {
   id: string;
   user_id: string;
@@ -113,6 +138,8 @@ export interface WeeklyReportRecord {
   delivery_status: string;
   sent_at: string | null;
   created_at: string;
+  feedback_prompt_json?: WeeklyFeedbackPromptContext | null;
+  feedback_responded_at?: string | null;
 }
 
 export interface VoiceNoteTranscriptionRecord {
@@ -335,12 +362,43 @@ export interface UserContextSnapshot {
   semanticMemories: SemanticMemoryMatch[];
 }
 
+export interface WhatsAppReplyButton {
+  id: string;
+  title: string;
+}
+
+export interface WhatsAppListRow {
+  id: string;
+  title: string;
+  description?: string | undefined;
+}
+
+export interface WhatsAppListSection {
+  title?: string | undefined;
+  rows: WhatsAppListRow[];
+}
+
+export interface WhatsAppInteractiveOutbound {
+  body: string;
+  header?: string | undefined;
+  footer?: string | undefined;
+  buttons?: WhatsAppReplyButton[] | undefined;
+  listButtonLabel?: string | undefined;
+  sections?: WhatsAppListSection[] | undefined;
+}
+
+export interface MauriReplyPayload {
+  text?: string | undefined;
+  interactive?: WhatsAppInteractiveOutbound | undefined;
+}
+
 export interface InboundMessage {
   from: string;
-  kind: "text" | "audio" | "image";
+  kind: "text" | "audio" | "image" | "interactive";
   text?: string | undefined;
   messageId?: string | undefined;
   profileName?: string | undefined;
+  interactiveReplyId?: string | undefined;
   audio?: {
     mediaId?: string | undefined;
     mimeType?: string | undefined;

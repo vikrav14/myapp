@@ -1,8 +1,12 @@
-import type { MauriArchetype, MauriUser, MorningBriefTopicKey } from "../types.js";
+import type { MauriArchetype, MauriUser, MorningBriefTopicKey, WhatsAppInteractiveOutbound } from "../types.js";
 
 import { buildLockedReplyForUser } from "./paywall.service.js";
 import { buildOnboardingPreviewBrief } from "./morning-brief-preview.service.js";
 import { buildQuickStartMenu } from "./help-menu.service.js";
+import {
+  buildArchetypePickerInteractive,
+  buildTopicsPickerInteractive
+} from "./whatsapp-interactive.service.js";
 import {
   buildSuggestedTopicsPrompt,
   defaultTopicsForArchetype,
@@ -41,6 +45,7 @@ export interface OnboardingResult {
   reply?: string | undefined;
   followUpReply?: string | undefined;
   discoveryReply?: string | undefined;
+  interactive?: WhatsAppInteractiveOutbound | undefined;
   user: MauriUser;
 }
 
@@ -243,7 +248,8 @@ export async function handleOnboardingMessage(input: {
         user,
         reply: `${buildSuggestedTopicsPrompt(user.archetype)}
 
-Pick at least 3 and at most 5, or reply OK to keep the suggested tags.`
+Pick tags below, reply OK, or type your own (3–5 tags).`,
+        interactive: buildTopicsPickerInteractive(user.archetype)
       };
     }
 
@@ -255,7 +261,11 @@ Pick at least 3 and at most 5, or reply OK to keep the suggested tags.`
     return {
       handled: true,
       user,
-      reply: buildOnboardingPrompt(user, isNewUser)
+      reply: buildOnboardingPrompt(user, isNewUser),
+      interactive: buildArchetypePickerInteractive({
+        firstName: user.first_name,
+        isNewUser
+      })
     };
   }
 
@@ -267,6 +277,7 @@ Pick at least 3 and at most 5, or reply OK to keep the suggested tags.`
   return {
     handled: true,
     user: updatedUser,
-    reply: buildSuggestedTopicsPrompt(archetype)
+    reply: buildSuggestedTopicsPrompt(archetype),
+    interactive: buildTopicsPickerInteractive(archetype)
   };
 }

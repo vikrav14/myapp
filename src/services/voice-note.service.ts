@@ -82,7 +82,7 @@ export async function resolveInboundMessageText(input: {
   messageText: string;
   transcriptRecord?: VoiceNoteTranscriptionRecord | undefined;
 }> {
-  if (input.message.kind === "text") {
+  if (input.message.kind === "text" || input.message.kind === "interactive") {
     return {
       messageText: input.message.text ?? ""
     };
