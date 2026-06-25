@@ -108,6 +108,11 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
 
   const messageId = typeof firstMessage.id === "string" ? firstMessage.id : undefined;
   const messageType = typeof firstMessage.type === "string" ? firstMessage.type : undefined;
+
+  if (messageType === "reaction") {
+    return null;
+  }
+
   const body =
     isObject(firstMessage.text) && typeof firstMessage.text.body === "string"
       ? firstMessage.text.body
@@ -188,6 +193,21 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
 }
 
 export async function deliverWhatsAppText(to: string, body: string): Promise<void> {
+  await postWhatsAppMessage({
+    to,
+    payload: {
+      type: "text",
+      text: {
+        body
+      }
+    }
+  });
+}
+
+async function postWhatsAppMessage(input: {
+  to: string;
+  payload: Record<string, unknown>;
+}): Promise<void> {
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error("WhatsApp credentials are not configured for delivery.");
   }
@@ -202,11 +222,8 @@ export async function deliverWhatsAppText(to: string, body: string): Promise<voi
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: {
-          body
-        }
+        to: input.to,
+        ...input.payload
       })
     }
   );
@@ -215,6 +232,50 @@ export async function deliverWhatsAppText(to: string, body: string): Promise<voi
     const errorText = await response.text();
     throw new Error(`Failed to send WhatsApp message: ${errorText}`);
   }
+}
+
+export async function markWhatsAppMessageRead(messageId: string): Promise<void> {
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    throw new Error("WhatsApp credentials are not configured for delivery.");
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/v22.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to mark WhatsApp message read: ${errorText}`);
+  }
+}
+
+export async function deliverWhatsAppReaction(input: {
+  to: string;
+  messageId: string;
+  emoji: string;
+}): Promise<void> {
+  await postWhatsAppMessage({
+    to: input.to,
+    payload: {
+      type: "reaction",
+      reaction: {
+        message_id: input.messageId,
+        emoji: input.emoji
+      }
+    }
+  });
 }
 
 export async function sendWhatsAppMessage(

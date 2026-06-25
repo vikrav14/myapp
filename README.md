@@ -220,6 +220,8 @@ When a new message arrives, Mauri can retrieve similar past memories from vector
 
 Inbound WhatsApp messages with the same `messageId` are now deduplicated before user lookup and downstream processing, which prevents duplicate replies and duplicate logging when webhook deliveries are retried.
 
+**Reactions (human UX):** On active users, Mauri can mark messages read and react before replying — 👀 receipts, 👂 voice notes, ❤️ stress vents, 🔥 wins, 🙏 thanks. Skips commands, onboarding, and short greetings. Toggle with `WHATSAPP_REACTIONS_ENABLED` / `WHATSAPP_MARK_READ_ENABLED`.
+
 There is also a secured internal payment confirmation route:
 
 - `POST /internal/payments/confirm`
@@ -431,6 +433,14 @@ The admin panel also exposes squad operations:
 From the panel you can list squads, inspect members, rename squads, remove members, dissolve squads, and jump from a user profile to their squad.
 
 Every Sunday at 19:30, Mauri generates a private weekly diagnostic for active users and stores the report payload in `weekly_reports`.
+
+**Two-part structure when smart gating fires:**
+1. **Your week** — patterns from finance, habits, todos, mood (existing)
+2. **From Mauri** — optional closing section asking for service feedback (rate 1–5 or `mauri feedback …`)
+
+Feedback is **not** asked every week. Triggers include early reports, momentum drops, low chat signal, quiet long-term users, or a ~6-week pulse. Skips trial cliffhanger weeks, ghost weeks, and users who gave feedback in the last 28 days.
+
+User replies: `rate 4`, `mauri feedback: you miss when I'm stressed`
 
 ## Morning Mauritian vibe check
 
