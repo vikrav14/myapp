@@ -36,13 +36,13 @@ export function buildArchetypePickerInteractive(input: {
 }): WhatsAppInteractiveOutbound {
   const name = input.firstName?.trim() || "there";
   const opener = input.isNewUser
-    ? `Hey ${name}. I'm Mauri — your lane in Mauritius, one WhatsApp thread.`
-    : `Almost in, ${name}. Pick your lane.`;
+    ? `Hey ${name}. I'm Mauri — your week in WhatsApp, tuned to how you live.`
+    : `Almost in, ${name}. Pick a starting lane — you'll shape the rest.`;
 
   return {
     header: "Welcome to Mauri",
     body: opener,
-    footer: "Tap your vibe below",
+    footer: "Closest fit is fine · custom tags on the next step",
     listButtonLabel: "Pick vibe",
     sections: [
       {
@@ -82,8 +82,8 @@ export function buildArchetypePickerInteractive(input: {
 export function buildTopicsPickerInteractive(archetype: string): WhatsAppInteractiveOutbound {
   return {
     header: "Morning brief tags",
-    body: `For ${archetype}, pick 3–5 tags for your 7 AM vibe check.`,
-    footer: "Or type custom tags anytime",
+    body: `For ${archetype}, pick 3–5 tags for your 7 AM vibe check — or type your own mix.`,
+    footer: "Suggested combos below · custom tags anytime",
     listButtonLabel: "Pick tags",
     sections: [
       {

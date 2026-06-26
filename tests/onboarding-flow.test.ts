@@ -187,7 +187,7 @@ describe("handleOnboardingMessage", () => {
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("Student Grind");
     expect(result.reply).toContain("#Traffic #Money #LocalBuzz");
-    expect(result.reply).toContain("Reply OK to confirm");
+    expect(result.reply).toContain("Reply OK to use these");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
@@ -274,7 +274,7 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Reply OK to confirm");
+    expect(result.reply).toContain("Reply OK to use these");
     expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 });

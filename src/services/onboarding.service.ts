@@ -128,9 +128,11 @@ function inferArchetype(message: string): MauriArchetype | null {
 function buildArchetypePrompt(user: MauriUser): string {
   const name = user.first_name?.trim() || "there";
 
-  return `Pick a starting lane for your 7 AM pulse — closest fit is fine, ${name}.
+  return `Pick what's closest for your 7 AM pulse — shortcuts, not boxes, ${name}.
 
-${buildArchetypeLaneList()}`;
+${buildArchetypeLaneList()}
+
+None fit perfectly? Pick closest, or My Own Mix (5) — your tags and how you talk define the rest.`;
 }
 
 function buildActivationReply(archetype: MauriArchetype, topics: MorningBriefTopicKey[]): string {
