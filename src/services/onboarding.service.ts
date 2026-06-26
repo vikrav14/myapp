@@ -83,19 +83,20 @@ function inferArchetype(message: string): MauriArchetype | null {
 function buildOnboardingPrompt(user: MauriUser, isNewUser: boolean): string {
   const name = user.first_name?.trim() || "there";
   const opener = isNewUser
-    ? `Hey ${name}. I’m Mauri. I’ll help you clear the noise, track the real stuff, and keep you moving.`
-    : `We’re almost in, ${name}. I just need your lane first.`;
+    ? `Hey ${name}. I’m Mauri. Your week in WhatsApp — spend, plans, stress, wins. I remember so you don’t have to reconstruct Friday on Sunday.`
+    : `We’re almost in, ${name}. Pick a starting lane — you’ll shape the rest on the next step.`;
 
   return `${opener}
 
-Pick the vibe that fits you best.
+Pick what’s closest (shortcuts, not boxes):
 
 Student Grind.
 Corporate / Career.
 Entrepreneur Mode.
 Life & Habit Tracking.
 
-Reply with the exact one. Or just send 1, 2, 3, or 4.`;
+Reply with the exact one. Or send 1, 2, 3, or 4.
+None fit perfectly? Pick closest — your tags and how you talk define the rest.`;
 }
 
 function buildActivationReply(archetype: MauriArchetype, topics: MorningBriefTopicKey[]): string {
