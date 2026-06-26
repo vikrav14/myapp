@@ -56,12 +56,12 @@ export function isTopicConfirmation(message: string): boolean {
 export function buildSuggestedTopicsPrompt(archetype: MauriArchetype | string): string {
   const suggested = defaultTopicsForArchetype(archetype);
 
-  return `Locked in: ${archetype}.
+  return `Locked in: ${archetype} (starting point — not a box).
 
-Your 7:00 brief will focus on: ${formatTopicList(suggested)}
+Suggested 7:00 brief tags: ${formatTopicList(suggested)}
 
-Reply OK to confirm.
-Or send 3 to 5 different tags: Traffic, Tech, Money, LocalBuzz, Entertainment.`;
+Reply OK to use these.
+Or send your own mix — 3 to 5 tags: Traffic, Tech, Money, LocalBuzz, Entertainment.`;
 }
 
 export function buildTopicSelectionPrompt(): string {

@@ -1,0 +1,1 @@
+export const WHATSAPP_REACTION_MIN_TEXT_LENGTH = 12;
