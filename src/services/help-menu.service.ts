@@ -15,6 +15,9 @@ Daily
 - lesson — today's 2-minute insight
 
 Discover yourself
+- what do you know about me — your person profile (not just logs)
+- remember that … — save something about you
+- forget that … — remove a stored fact
 - my focus — this week's one habit
 - my streaks — habit consistency (no guilt if you miss)
 - roast me — sharp truth from your week

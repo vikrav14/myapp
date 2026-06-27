@@ -1,4 +1,9 @@
 import { env } from "../lib/env.js";
+import {
+  userMindExtractionJsonSchema,
+  userMindExtractionSchema,
+  type UserMindExtraction
+} from "../schemas/user-mind.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
 import {
   localAlertClassificationJsonSchema,
@@ -215,6 +220,33 @@ ${message}
   return mauriBrainDumpSchema.parse(parsed);
 }
 
+export async function extractUserMindProfile(message: string): Promise<UserMindExtraction> {
+  const extractionPrompt = `
+You are Mauri's person-profile parser.
+Extract stable facts about who this person is from their message.
+Do not invent facts that are not clearly supported.
+Omit fields that are absent.
+Return only JSON.
+
+Valid fields:
+preferred_name, age, age_band, area, work, life_situation,
+interests[], goals[], stressors[], tone_preference, boundaries[],
+relationships[{label, note}]
+
+Message:
+${message}
+`;
+
+  const rawJson = await callGemini({
+    prompt: extractionPrompt,
+    responseMimeType: "application/json",
+    responseSchema: userMindExtractionJsonSchema
+  });
+  const parsed = parseStructuredJson(rawJson);
+
+  return userMindExtractionSchema.parse(parsed);
+}
+
 export async function generateConversationalReply(input: {
   user: MauriUser;
   message: string;
@@ -241,6 +273,9 @@ User profile:
 First name: ${user.first_name ?? "Unknown"}
 Archetype: ${user.archetype}
 Subscription status: ${user.subscription_status}
+
+Who this person is (stable profile — not just this week's logs):
+${context.userMindPrompt}
 
 Recent pending todos:
 ${JSON.stringify(context.pendingTodos)}
@@ -278,8 +313,10 @@ If they seem scattered, help them narrow to the next move without sounding robot
 export async function generateWeeklyDiagnosticCopy(input: {
   user: MauriUser;
   summary: WeeklyDiagnosticSummary;
+  userMindPrompt?: string | undefined;
 }): Promise<string> {
   const { user, summary } = input;
+  const userMindPrompt = input.userMindPrompt ?? "No explicit person profile yet.";
 
   const prompt = `
 You are Mauri.
@@ -298,6 +335,9 @@ User:
 First name: ${user.first_name ?? "Unknown"}
 Archetype: ${user.archetype}
 Subscription status: ${user.subscription_status}
+
+Who this person is:
+${userMindPrompt}
 
 Weekly summary:
 ${JSON.stringify(summary)}

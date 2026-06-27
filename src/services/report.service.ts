@@ -2,6 +2,7 @@ import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser, WeeklyDiagnosticSummary, WeeklyReportRecord } from "../types.js";
 import { generateWeeklyDiagnosticCopy } from "./ai.service.js";
+import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 import { mapUser } from "./user.service.js";
@@ -308,12 +309,15 @@ export async function generateWeeklyDiagnosticReport(input: {
   }
 
   const summary = await buildWeeklyDiagnosticSummary(user, window);
+  const userMindFacts = await loadUserMindFacts(user.id);
+  const userMindPrompt = formatUserMindForPrompt(userMindFacts);
 
   let reportText: string;
   try {
     reportText = await generateWeeklyDiagnosticCopy({
       user,
-      summary
+      summary,
+      userMindPrompt
     });
   } catch (error) {
     logger.warn({ error, userId: user.id }, "Falling back to deterministic weekly report copy.");

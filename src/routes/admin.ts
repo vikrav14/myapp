@@ -47,7 +47,7 @@ const paginationSchema = z.object({
 
 const listUsersQuerySchema = paginationSchema.extend({
   subscriptionStatus: z.enum(["Trial_Active", "Paid_Active", "Locked"]).optional(),
-  onboardingState: z.enum(["awaiting_archetype", "awaiting_topics", "active"]).optional(),
+  onboardingState: z.enum(["awaiting_know_you", "awaiting_archetype", "awaiting_topics", "active"]).optional(),
   search: z.string().trim().min(1).optional()
 });
 
@@ -106,7 +106,7 @@ const updateUserBodySchema = z
   .object({
     first_name: z.string().trim().min(1).nullable().optional(),
     archetype: z.string().trim().min(1).optional(),
-    onboarding_state: z.enum(["awaiting_archetype", "awaiting_topics", "active"]).optional(),
+    onboarding_state: z.enum(["awaiting_know_you", "awaiting_archetype", "awaiting_topics", "active"]).optional(),
     subscription_status: z.enum(["Trial_Active", "Paid_Active", "Locked"]).optional(),
     trial_ends_at: z.iso.datetime().nullable().optional(),
     subscription_ends_at: z.iso.datetime().nullable().optional()
@@ -353,6 +353,7 @@ function renderAdminPanelHtml(): string {
               </select>
               <select id="userOnboardingFilter">
                 <option value="">All onboarding states</option>
+                <option value="awaiting_know_you">awaiting_know_you</option>
                 <option value="awaiting_archetype">awaiting_archetype</option>
                 <option value="awaiting_topics">awaiting_topics</option>
                 <option value="active">active</option>
@@ -456,7 +457,7 @@ function renderAdminPanelHtml(): string {
               <div class="two-col">
                 <div><label class="label">First name</label><input id="editFirstName" /></div>
                 <div><label class="label">Archetype</label><input id="editArchetype" /></div>
-                <div><label class="label">Onboarding state</label><select id="editOnboardingState"><option value="">No change</option><option value="awaiting_archetype">awaiting_archetype</option><option value="awaiting_topics">awaiting_topics</option><option value="active">active</option></select></div>
+                <div><label class="label">Onboarding state</label><select id="editOnboardingState"><option value="">No change</option><option value="awaiting_know_you">awaiting_know_you</option><option value="awaiting_archetype">awaiting_archetype</option><option value="awaiting_topics">awaiting_topics</option><option value="active">active</option></select></div>
                 <div><label class="label">Subscription status</label><select id="editSubscriptionStatus"><option value="">No change</option><option value="Trial_Active">Trial_Active</option><option value="Paid_Active">Paid_Active</option><option value="Locked">Locked</option></select></div>
                 <div><label class="label">Trial ends at (ISO)</label><input id="editTrialEndsAt" placeholder="2026-06-30T23:59:59.000Z" /></div>
                 <div><label class="label">Subscription ends at (ISO)</label><input id="editSubscriptionEndsAt" placeholder="2026-07-30T23:59:59.000Z" /></div>

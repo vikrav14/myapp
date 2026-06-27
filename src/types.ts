@@ -1,5 +1,17 @@
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
-export type OnboardingState = "awaiting_archetype" | "awaiting_topics" | "active";
+export type OnboardingState = "awaiting_know_you" | "awaiting_archetype" | "awaiting_topics" | "active";
+export type UserMindCategory =
+  | "identity"
+  | "location"
+  | "life_context"
+  | "interests"
+  | "goals"
+  | "stressors"
+  | "preferences"
+  | "boundaries"
+  | "relationships"
+  | "user_stated";
+export type UserMindSource = "onboarding" | "user_stated" | "inferred" | "feedback";
 export type MorningBriefTopicKey = "Traffic" | "Tech" | "Money" | "LocalBuzz" | "Entertainment";
 export type PaymentProvider = "MCB_JUICE" | "BLINK" | "MANUAL";
 export type MemoryType = "user_message" | "assistant_reply" | "emotion_signal" | "weekly_report";
@@ -333,6 +345,21 @@ export interface UserContextSnapshot {
     logged_at: string;
   }>;
   semanticMemories: SemanticMemoryMatch[];
+  userMindFacts: UserMindFact[];
+  userMindPrompt: string;
+}
+
+export interface UserMindFact {
+  id: string;
+  user_id: string;
+  category: UserMindCategory | string;
+  fact_key: string;
+  fact_value: string;
+  source: UserMindSource | string;
+  confidence: number;
+  user_visible: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface InboundMessage {

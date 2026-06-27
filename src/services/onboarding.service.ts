@@ -11,6 +11,15 @@ import {
   isValidTopicSelection,
   parseTopicSelection
 } from "./morning-brief-topics.service.js";
+import {
+  buildKnowYouAcknowledgement,
+  buildKnowYouPrompt,
+  ingestUserMindMessage,
+  isKnowYouSkipMessage,
+  isKnowYouTooShort,
+  loadUserMindFacts,
+  preferredNameFromFacts
+} from "./user-mind.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
 
@@ -75,22 +84,18 @@ function inferArchetype(message: string): MauriArchetype | null {
   return null;
 }
 
-function buildOnboardingPrompt(user: MauriUser, isNewUser: boolean): string {
+function buildArchetypePrompt(user: MauriUser): string {
   const name = user.first_name?.trim() || "there";
-  const opener = isNewUser
-    ? `Hey ${name}. I’m Mauri. I’ll help you clear the noise, track the real stuff, and keep you moving.`
-    : `We’re almost in, ${name}. I just need your lane first.`;
 
-  return `${opener}
-
-Pick the vibe that fits you best.
+  return `Pick a starting lane for your 7 AM pulse — closest fit is fine, ${name}.
 
 Student Grind.
 Corporate / Career.
 Entrepreneur Mode.
 Life & Habit Tracking.
 
-Reply with the exact one. Or just send 1, 2, 3, or 4.`;
+Reply with the exact one. Or send 1, 2, 3, or 4.
+None fit perfectly? Pick closest — your tags define the rest on the next step.`;
 }
 
 function buildActivationReply(archetype: MauriArchetype, topics: MorningBriefTopicKey[]): string {
@@ -220,12 +225,60 @@ export async function handleOnboardingMessage(input: {
   isNewUser: boolean;
   message: string;
 }): Promise<OnboardingResult> {
-  const { user, isNewUser, message } = input;
+  const { user, message } = input;
 
   if (user.onboarding_state === "active") {
     return {
       handled: false,
       user
+    };
+  }
+
+  if (user.onboarding_state === "awaiting_know_you") {
+    if (isKnowYouSkipMessage(message)) {
+      const updatedUser = await updateUserState(user.id, {
+        onboarding_state: "awaiting_archetype"
+      });
+
+      return {
+        handled: true,
+        user: updatedUser,
+        reply: buildKnowYouAcknowledgement({
+          user: updatedUser,
+          facts: [],
+          skipped: true
+        })
+      };
+    }
+
+    if (isKnowYouTooShort(message)) {
+      return {
+        handled: true,
+        user,
+        reply: buildKnowYouPrompt(user)
+      };
+    }
+
+    await ingestUserMindMessage({
+      userId: user.id,
+      message,
+      source: "onboarding"
+    });
+    const facts = await loadUserMindFacts(user.id);
+    const preferredName = preferredNameFromFacts(facts);
+    const updatedUser = await updateUserState(user.id, {
+      onboarding_state: "awaiting_archetype",
+      ...(preferredName ? { first_name: preferredName } : {})
+    });
+
+    return {
+      handled: true,
+      user: updatedUser,
+      reply: buildKnowYouAcknowledgement({
+        user: updatedUser,
+        facts,
+        skipped: false
+      })
     };
   }
 
@@ -250,12 +303,20 @@ Pick at least 3 and at most 5, or reply OK to keep the suggested tags.`
     return activateUserWithTopics(user, topics);
   }
 
+  if (user.onboarding_state !== "awaiting_archetype") {
+    return {
+      handled: true,
+      user,
+      reply: buildKnowYouPrompt(user)
+    };
+  }
+
   const archetype = inferArchetype(message);
   if (!archetype) {
     return {
       handled: true,
       user,
-      reply: buildOnboardingPrompt(user, isNewUser)
+      reply: buildArchetypePrompt(user)
     };
   }
 
