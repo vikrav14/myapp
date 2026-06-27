@@ -8,7 +8,7 @@ This repository now contains the first backend foundation for the product spec i
 
 - Express server with health check and WhatsApp webhook endpoints
 - Supabase migration for users, finance, habits, todos, insights, and squads
-- Onboarding flow for archetype selection with 7-day trial activation
+- Friend-first onboarding: know-you profile, then archetype, topics, and 7-day trial activation
 - Trial expiry enforcement with locked-state paywall response
 - Payment confirmation endpoint with subscription activation and payment event logging
 - Sunday diagnostic report generation with weekly storage and delivery
@@ -387,9 +387,11 @@ When `NODE_ENV=production`, startup warnings are emitted if key hardening contro
 
 ## Current lifecycle behavior
 
-New users are created in `awaiting_archetype`.
+New users are created in `awaiting_know_you`.
 
-Their first valid archetype selection activates onboarding, stamps the trial window, and switches them into the normal Mauri conversation loop.
+They share who they are first (voice note or text — name, area, work, interests, tone). Facts are stored in `user_mind_facts`. Reply `skip` to move on without a profile.
+
+Then they pick archetype (`awaiting_archetype`), morning brief tags (`awaiting_topics`), and trial activation moves them to `active`.
 
 When `trial_ends_at` is in the past and the user is still `Trial_Active`, the webhook auto-locks the account and returns a premium unlock message instead of running extraction and reply generation.
 
@@ -408,6 +410,8 @@ Trial and premium users can manage Mauri Squads directly in WhatsApp:
 - `digest on` / `digest off` (pause or resume the 7:00 morning brief)
 - `quantum pick 1 5` or `quantum pick Tribeca, Docker, Nandos` (true-random decision helper)
 - `help` or `menu` (full command list)
+- `what do you know about me` — person profile (not just logs)
+- `remember that …` / `forget that …` — update stored facts about you
 - `my focus` (this week's one habit)
 - `my streaks` (habit consistency, no guilt)
 - `roast me` / `hype me` (weekly truth or celebration)

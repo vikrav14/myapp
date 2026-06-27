@@ -76,7 +76,7 @@ const baseUser = {
   phone_number: "23052525252",
   first_name: "Ava",
   archetype: "Life & Habit Tracking",
-  onboarding_state: "awaiting_archetype" as const,
+  onboarding_state: "awaiting_know_you" as const,
   subscription_status: "Trial_Active" as const,
   onboarding_completed_at: null,
   trial_started_at: null,
@@ -111,7 +111,7 @@ describe("WhatsApp webhook route", () => {
     mockHandleOnboardingMessage.mockResolvedValue({
       handled: true,
       user: baseUser,
-      reply: "Pick the vibe that fits you best."
+      reply: "Before I track anything, I want to know you a bit"
     });
 
     const app = createApp();
@@ -121,10 +121,10 @@ describe("WhatsApp webhook route", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
-    expect(response.body.replyPreview).toContain("Pick the vibe");
+    expect(response.body.replyPreview).toContain("Before I track anything");
     expect(mockSendWhatsAppMessage).toHaveBeenCalledWith(
       baseUser.phone_number,
-      "Pick the vibe that fits you best.",
+      "Before I track anything, I want to know you a bit",
       expect.objectContaining({
         userId: baseUser.id,
         metadata: expect.objectContaining({

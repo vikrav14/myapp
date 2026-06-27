@@ -1,10 +1,15 @@
 import type { MauriArchetype } from "../types.js";
+import { CUSTOM_LANE_ARCHETYPE } from "../types.js";
 import {
   ARCHETYPE_DEFAULT_TOPICS,
   MORNING_BRIEF_TOPIC_CATALOG,
   MORNING_BRIEF_TOPIC_KEYS,
   type MorningBriefTopicKey
 } from "./morning-brief.constants.js";
+
+export function isCustomLaneArchetype(archetype: string): boolean {
+  return archetype === CUSTOM_LANE_ARCHETYPE;
+}
 
 function normalize(text: string): string {
   return text.trim().toLowerCase().replace(/^#/, "");
@@ -54,6 +59,17 @@ export function isTopicConfirmation(message: string): boolean {
 }
 
 export function buildSuggestedTopicsPrompt(archetype: MauriArchetype | string): string {
+  if (isCustomLaneArchetype(archetype)) {
+    return `Locked in: ${CUSTOM_LANE_ARCHETYPE}.
+
+This is your lane — no preset box.
+
+Send your own 3 to 5 morning brief tags:
+Traffic, Tech, Money, LocalBuzz, Entertainment.
+
+Example: Traffic Money LocalBuzz Tech`;
+  }
+
   const suggested = defaultTopicsForArchetype(archetype);
 
   return `Locked in: ${archetype}.

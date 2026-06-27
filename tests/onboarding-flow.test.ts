@@ -21,6 +21,21 @@ vi.mock("../src/services/weekly-focus.service.js", () => ({
   assignWeeklyFocusForUser: mockAssignWeeklyFocusForUser
 }));
 
+const mockIngestUserMindMessage = vi.fn();
+const mockLoadUserMindFacts = vi.fn();
+
+vi.mock("../src/services/user-mind.service.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/services/user-mind.service.js")>(
+    "../src/services/user-mind.service.js"
+  );
+
+  return {
+    ...actual,
+    ingestUserMindMessage: mockIngestUserMindMessage,
+    loadUserMindFacts: mockLoadUserMindFacts
+  };
+});
+
 const { handleOnboardingMessage } = await import("../src/services/onboarding.service.js");
 
 const awaitingTopicsUser = {
@@ -52,6 +67,105 @@ describe("handleOnboardingMessage", () => {
       weekly_focus_habit: "45 minutes deep study before noon",
       weekly_focus_set_at: "2026-06-22T00:00:00.000Z"
     }));
+    mockIngestUserMindMessage.mockResolvedValue([]);
+    mockLoadUserMindFacts.mockResolvedValue([]);
+  });
+
+  it("prompts know-you first for awaiting_know_you users with short replies", async () => {
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        onboarding_state: "awaiting_know_you",
+        archetype: "Life & Habit Tracking"
+      },
+      isNewUser: true,
+      message: "hi"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Before I track anything");
+    expect(mockUpdateUserState).not.toHaveBeenCalled();
+  });
+
+  it("stores know-you profile then moves to archetype selection", async () => {
+    mockLoadUserMindFacts.mockResolvedValue([
+      {
+        id: "fact-1",
+        user_id: awaitingTopicsUser.id,
+        category: "life_context",
+        fact_key: "work",
+        fact_value: "printing shop owner",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      }
+    ]);
+    mockUpdateUserState.mockResolvedValue({
+      ...awaitingTopicsUser,
+      onboarding_state: "awaiting_archetype",
+      archetype: "Entrepreneur Mode"
+    });
+
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        onboarding_state: "awaiting_know_you"
+      },
+      isNewUser: true,
+      message: "I'm 34 in Beau Bassin running a printing shop. Direct tone please."
+    });
+
+    expect(mockIngestUserMindMessage).toHaveBeenCalled();
+    expect(mockUpdateUserState).toHaveBeenCalledWith(
+      awaitingTopicsUser.id,
+      expect.objectContaining({ onboarding_state: "awaiting_archetype" })
+    );
+    expect(result.reply).toContain("Student Grind");
+  });
+
+  it("moves custom lane users to tag selection with no preset OK path", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...awaitingTopicsUser,
+      onboarding_state: "awaiting_topics",
+      archetype: "My Own Mix"
+    });
+
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        onboarding_state: "awaiting_archetype"
+      },
+      isNewUser: false,
+      message: "my own mix"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("My Own Mix");
+    expect(result.reply).toContain("Send your own 3 to 5");
+    expect(mockUpdateUserState).toHaveBeenCalledWith(
+      awaitingTopicsUser.id,
+      expect.objectContaining({
+        onboarding_state: "awaiting_topics",
+        archetype: "My Own Mix"
+      })
+    );
+  });
+
+  it("requires custom tags for My Own Mix instead of OK", async () => {
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        archetype: "My Own Mix"
+      },
+      isNewUser: false,
+      message: "OK"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("OK won't apply");
+    expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 
   it("suggests archetype-specific topics after archetype selection", async () => {

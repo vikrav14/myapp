@@ -285,7 +285,8 @@ const ARCHETYPE_PACT: Record<string, SquadPactKey> = {
   "Student Grind": "study",
   "Corporate / Career": "balance",
   "Entrepreneur Mode": "hustle",
-  "Life & Habit Tracking": "balance"
+  "Life & Habit Tracking": "balance",
+  "My Own Mix": "balance"
 };
 
 export function suggestedPactKeyForArchetype(archetype: string): SquadPactKey {

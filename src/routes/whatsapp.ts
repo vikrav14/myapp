@@ -14,6 +14,7 @@ import { handleFinanceCommandMessage } from "../services/payday-runway.service.j
 import { handleReceiptImageMessage } from "../services/receipt-scan.service.js";
 import { handleCalendarMessage } from "../services/calendar.service.js";
 import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
+import { handleUserMindCommandMessage } from "../services/user-mind.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
@@ -257,6 +258,33 @@ whatsappRouter.post("/", async (request, response, next) => {
     }
 
     const user = onboardingResult.user;
+
+    const userMindResult = await handleUserMindCommandMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (userMindResult.handled && userMindResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, userMindResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "user_mind_command"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: userMindResult.reply
+      });
+      return;
+    }
 
     const engagementResult = await handleEngagementCommandMessage({
       user,

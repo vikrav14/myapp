@@ -11,7 +11,9 @@ const FALLBACK_LESSONS: Record<string, string> = {
   "Entrepreneur Mode":
     "Founder chaos calms when cashflow gets a daily glance. Five minutes on money saves five hours of anxiety.",
   "Life & Habit Tracking":
-    "Balance isn't equal hours in every lane. It's noticing which lane is leaking energy before the week ends."
+    "Balance isn't equal hours in every lane. It's noticing which lane is leaking energy before the week ends.",
+  "My Own Mix":
+    "Your lane doesn't need a label. One honest log today beats a perfect system you never start."
 };
 
 function lessonDateKey(date = new Date()): string {

@@ -108,7 +108,7 @@ export async function getOrCreateUser(
     .insert({
       phone_number: phoneNumber,
       first_name: firstName ?? null,
-      onboarding_state: "awaiting_archetype",
+      onboarding_state: "awaiting_know_you",
       subscription_status: "Trial_Active"
     })
     .select("*")
