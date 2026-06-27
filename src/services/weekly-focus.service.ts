@@ -5,7 +5,8 @@ const ARCHETYPE_WEEKLY_FOCUS: Record<MauriArchetype, string> = {
   "Student Grind": "45 minutes deep study before noon",
   "Corporate / Career": "One focused work block without scrolling",
   "Entrepreneur Mode": "Review cash in and out before lunch",
-  "Life & Habit Tracking": "Morning check-in: mood plus one small win"
+  "Life & Habit Tracking": "Morning check-in: mood plus one small win",
+  "My Own Mix": "One small win you choose — log it when it happens"
 };
 
 export function defaultWeeklyFocusForArchetype(archetype: string): string {

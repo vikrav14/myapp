@@ -162,14 +162,15 @@ export function buildKnowYouAcknowledgement(input: {
   if (input.skipped || input.facts.length === 0) {
     return `No stress, ${name}. We'll build this as we go.
 
-Pick a starting lane for your 7 AM pulse — closest fit is fine. Custom tags on the next step.
+Pick a starting lane for your 7 AM pulse — closest fit is fine, or build your own.
 
 Student Grind.
 Corporate / Career.
 Entrepreneur Mode.
 Life & Habit Tracking.
+My Own Mix — your tags, your mix, no preset box.
 
-Reply with the exact one, or send 1, 2, 3, or 4.`;
+Reply with the exact one, or send 1, 2, 3, 4, or 5.`;
   }
 
   const highlights: string[] = [];
@@ -191,14 +192,15 @@ Reply with the exact one, or send 1, 2, 3, or 4.`;
 
 I'll hold that as *you*, not just your logs.
 
-Now pick a starting lane for your 7 AM pulse — closest fit is fine. Custom tags next.
+Now pick a starting lane for your 7 AM pulse — closest fit is fine, or build your own.
 
 Student Grind.
 Corporate / Career.
 Entrepreneur Mode.
 Life & Habit Tracking.
+My Own Mix — your tags, your mix, no preset box.
 
-Reply with the exact one, or send 1, 2, 3, or 4.`;
+Reply with the exact one, or send 1, 2, 3, 4, or 5.`;
 }
 
 export async function upsertUserMindFacts(input: {

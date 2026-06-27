@@ -20,7 +20,10 @@ export type MauriArchetype =
   | "Life & Habit Tracking"
   | "Student Grind"
   | "Corporate / Career"
-  | "Entrepreneur Mode";
+  | "Entrepreneur Mode"
+  | "My Own Mix";
+
+export const CUSTOM_LANE_ARCHETYPE = "My Own Mix" as const satisfies MauriArchetype;
 
 export interface MauriUser {
   id: string;

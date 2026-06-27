@@ -125,6 +125,49 @@ describe("handleOnboardingMessage", () => {
     expect(result.reply).toContain("Student Grind");
   });
 
+  it("moves custom lane users to tag selection with no preset OK path", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...awaitingTopicsUser,
+      onboarding_state: "awaiting_topics",
+      archetype: "My Own Mix"
+    });
+
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        onboarding_state: "awaiting_archetype"
+      },
+      isNewUser: false,
+      message: "my own mix"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("My Own Mix");
+    expect(result.reply).toContain("Send your own 3 to 5");
+    expect(mockUpdateUserState).toHaveBeenCalledWith(
+      awaitingTopicsUser.id,
+      expect.objectContaining({
+        onboarding_state: "awaiting_topics",
+        archetype: "My Own Mix"
+      })
+    );
+  });
+
+  it("requires custom tags for My Own Mix instead of OK", async () => {
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        archetype: "My Own Mix"
+      },
+      isNewUser: false,
+      message: "OK"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("OK won't apply");
+    expect(mockUpdateUserState).not.toHaveBeenCalled();
+  });
+
   it("suggests archetype-specific topics after archetype selection", async () => {
     mockUpdateUserState.mockResolvedValue({
       ...awaitingTopicsUser,

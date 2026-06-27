@@ -1,4 +1,5 @@
 import type { MauriArchetype, MauriUser, MorningBriefTopicKey } from "../types.js";
+import { CUSTOM_LANE_ARCHETYPE } from "../types.js";
 
 import { buildLockedReplyForUser } from "./paywall.service.js";
 import { buildOnboardingPreviewBrief } from "./morning-brief-preview.service.js";
@@ -7,6 +8,7 @@ import {
   buildSuggestedTopicsPrompt,
   defaultTopicsForArchetype,
   formatTopicList,
+  isCustomLaneArchetype,
   isTopicConfirmation,
   isValidTopicSelection,
   parseTopicSelection
@@ -22,6 +24,23 @@ import {
 } from "./user-mind.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
+
+function isCustomLaneSelection(normalized: string): boolean {
+  if (["5", "mix", "custom"].includes(normalized)) {
+    return true;
+  }
+
+  return [
+    "my own mix",
+    "custom lane",
+    "something else",
+    "none of these",
+    "none fit",
+    "own mix",
+    "my lane",
+    "my own lane"
+  ].some((alias) => normalized === alias);
+}
 
 const archetypeCatalog: Array<{
   archetype: MauriArchetype;
@@ -57,8 +76,21 @@ const archetypeActivationHooks: Record<MauriArchetype, string> = {
   "Student Grind": "I'll track exam pressure, commute chaos, and student spending with you.",
   "Corporate / Career": "I'll watch work wins, commute grind, and where your salary actually goes.",
   "Entrepreneur Mode": "I'll keep an eye on cashflow, focus blocks, and the messy founder week.",
-  "Life & Habit Tracking": "I'll help you spot patterns in habits, mood, and daily balance."
+  "Life & Habit Tracking": "I'll help you spot patterns in habits, mood, and daily balance.",
+  [CUSTOM_LANE_ARCHETYPE]:
+    "No preset box — I'll follow your know-you profile, your tags, and how you actually talk."
 };
+
+function buildArchetypeLaneList(): string {
+  return `Student Grind.
+Corporate / Career.
+Entrepreneur Mode.
+Life & Habit Tracking.
+My Own Mix — your tags, your mix, no preset box.
+
+Reply with the exact one. Or send 1, 2, 3, 4, or 5.
+Pick My Own Mix (or 5) if none of the presets fit.`;
+}
 
 function normalize(text: string): string {
   return text.trim().toLowerCase();
@@ -66,6 +98,10 @@ function normalize(text: string): string {
 
 function inferArchetype(message: string): MauriArchetype | null {
   const normalized = normalize(message);
+
+  if (isCustomLaneSelection(normalized)) {
+    return CUSTOM_LANE_ARCHETYPE;
+  }
 
   for (const entry of archetypeCatalog) {
     if (
@@ -89,19 +125,16 @@ function buildArchetypePrompt(user: MauriUser): string {
 
   return `Pick a starting lane for your 7 AM pulse — closest fit is fine, ${name}.
 
-Student Grind.
-Corporate / Career.
-Entrepreneur Mode.
-Life & Habit Tracking.
-
-Reply with the exact one. Or send 1, 2, 3, or 4.
-None fit perfectly? Pick closest — your tags define the rest on the next step.`;
+${buildArchetypeLaneList()}`;
 }
 
 function buildActivationReply(archetype: MauriArchetype, topics: MorningBriefTopicKey[]): string {
   const hook = archetypeActivationHooks[archetype] ?? archetypeActivationHooks["Life & Habit Tracking"];
+  const laneLine = isCustomLaneArchetype(archetype)
+    ? `You're on ${CUSTOM_LANE_ARCHETYPE} — your lane, your tags.`
+    : `Perfect. You're in on ${archetype}.`;
 
-  return `Perfect. You're in on ${archetype}.
+  return `${laneLine}
 
 ${hook}
 
@@ -284,9 +317,21 @@ export async function handleOnboardingMessage(input: {
 
   if (user.onboarding_state === "awaiting_topics") {
     const parsedTopics = parseTopicSelection(message);
+    const customLane = isCustomLaneArchetype(user.archetype);
+
+    if (customLane && isTopicConfirmation(message)) {
+      return {
+        handled: true,
+        user,
+        reply: `${buildSuggestedTopicsPrompt(user.archetype)}
+
+For My Own Mix, send your tags — OK won't apply here.`
+      };
+    }
+
     const topics = isValidTopicSelection(parsedTopics)
       ? parsedTopics
-      : isTopicConfirmation(message)
+      : !customLane && isTopicConfirmation(message)
         ? defaultTopicsForArchetype(user.archetype)
         : null;
 
