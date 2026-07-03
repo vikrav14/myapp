@@ -2,38 +2,41 @@ import { supabase } from "../lib/supabase.js";
 import type { UserContextSnapshot } from "../types.js";
 import { searchRelevantMemories } from "./memory.service.js";
 import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
+import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
+import { formatUserMindSnapshotForPrompt } from "./user-mind-prompt.js";
 
 export async function loadUserContext(userId: string, queryText?: string): Promise<UserContextSnapshot> {
-  const [todosResult, financeResult, habitsResult, emotionsResult, semanticMemories, userMindFacts] =
+  const [todosResult, financeResult, habitsResult, emotionsResult, semanticMemories, userMindFacts, mindRecord] =
     await Promise.all([
-    supabase
-      .from("todo_logs")
-      .select("id, task_description, priority, due_date")
-      .eq("user_id", userId)
-      .eq("is_completed", false)
-      .order("created_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("finance_logs")
-      .select("amount, category, logged_at")
-      .eq("user_id", userId)
-      .order("logged_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("habit_logs")
-      .select("activity_type, is_success, duration_minutes, logged_at")
-      .eq("user_id", userId)
-      .order("logged_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("insights_vault")
-      .select("anxiety_score, core_emotional_driver, raw_unfiltered_vent, logged_at")
-      .eq("user_id", userId)
-      .order("logged_at", { ascending: false })
-      .limit(5),
-    queryText ? searchRelevantMemories(userId, queryText) : Promise.resolve([]),
-    loadUserMindFacts(userId)
-  ]);
+      supabase
+        .from("todo_logs")
+        .select("id, task_description, priority, due_date")
+        .eq("user_id", userId)
+        .eq("is_completed", false)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("finance_logs")
+        .select("amount, category, logged_at")
+        .eq("user_id", userId)
+        .order("logged_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("habit_logs")
+        .select("activity_type, is_success, duration_minutes, logged_at")
+        .eq("user_id", userId)
+        .order("logged_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("insights_vault")
+        .select("anxiety_score, core_emotional_driver, raw_unfiltered_vent, logged_at")
+        .eq("user_id", userId)
+        .order("logged_at", { ascending: false })
+        .limit(5),
+      queryText ? searchRelevantMemories(userId, queryText) : Promise.resolve([]),
+      loadUserMindFacts(userId),
+      getUserMindSnapshot(userId).catch(() => null)
+    ]);
 
   const failures = [todosResult, financeResult, habitsResult, emotionsResult]
     .map((result) => result.error)
@@ -43,6 +46,8 @@ export async function loadUserContext(userId: string, queryText?: string): Promi
     const errorMessage = failures.map((error) => error?.message).join("; ");
     throw new Error(`Failed to load user context: ${errorMessage}`);
   }
+
+  const userMindSnapshot = mindRecord?.snapshot ?? null;
 
   return {
     pendingTodos: (todosResult.data ?? []).map((row) => ({
@@ -70,6 +75,9 @@ export async function loadUserContext(userId: string, queryText?: string): Promi
     })),
     semanticMemories,
     userMindFacts,
-    userMindPrompt: formatUserMindForPrompt(userMindFacts)
+    userMindPrompt: formatUserMindForPrompt(userMindFacts),
+    userMindSnapshot,
+    userMindSnapshotPrompt: userMindSnapshot ? formatUserMindSnapshotForPrompt(userMindSnapshot) : null,
+    userMindSnapshotGeneratedAt: mindRecord?.generated_at ?? null
   };
 }

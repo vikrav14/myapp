@@ -43,6 +43,9 @@ Calendar
 
 Memory
 - resurface on / resurface off — gentle memory pings (max 1/day)
+- followups on / followups off — open-loop + proactive mate check-ins (max ~3/week)
+- my followups — see pending open-loop check-ins
+- my checkins — proactive ping status · not now — pause 7 days
 
 Local alerts
 - Mauri pings school closures, heavy rain, cyclone warnings

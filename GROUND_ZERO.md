@@ -4,132 +4,79 @@ Use this after merging to `main` and before calling production "live".
 
 ## 1. GitHub / code
 
-- [ ] `main` includes merged drafts: User Mind, Sunday feedback, WhatsApp reactions, interactive buttons
-- [ ] `npm install && npm test` passes locally
-- [ ] Remaining draft branches (proactive check-ins, custom squad pacts) tracked as follow-up — they conflict with User Mind facts and need a dedicated merge pass
+- [ ] `main` includes all draft features (see table below)
+- [ ] `npm install && npm test` passes locally (**180 tests**)
+
+### What's on `main`
+
+| Feature | Source PR / branch |
+|---------|-------------------|
+| User Mind facts + know-you onboarding | #19 / user-mind-know-you |
+| My Own Mix custom lane | #19 |
+| Sunday report feedback | sunday-report-feedback |
+| WhatsApp reactions + interactive buttons | reactions / interactive branches |
+| Wide-door onboarding copy | #18 (cherry-picked) |
+| Custom squad pacts | #13 |
+| Off-peak User Mind snapshots | user-mind-snapshots |
+| Open-loop follow-ups | open-loop in snapshots branch |
+| Proactive mate check-ins | #14 |
+
+**Dual User Mind model (nothing lost):**
+
+- `user_mind_facts` — what the user *tells* you (know-you, remember/forget)
+- `user_mind_snapshots` — what Mauri *learns* nightly from logs + chat
+
+Both feed into replies.
 
 ## 2. Supabase migrations (run in order)
 
-Run every file in `supabase/migrations/` through **021** in the Supabase SQL Editor:
+Through **025**:
 
 | # | File |
 |---|------|
-| 001–013 | Core, payments, memory, morning brief |
-| 014–015 | Engagement, squad pacts |
-| 016–017 | Reminders, calendar, memory resurfacing |
-| 018 | Payday + receipts |
-| 019 | Local alerts |
-| 020 | Weekly report feedback |
-| 021 | User Mind facts (`user_mind_facts`) |
-
-Verify:
-
-```sql
-SELECT table_name FROM information_schema.tables
-WHERE table_schema = 'public'
-ORDER BY table_name;
-```
-
-Expect `user_mind_facts`, `weekly_report_feedback`, `scheduled_reminders`, etc.
+| 001–019 | Core through local alerts |
+| 020 | `weekly_report_feedback.sql` |
+| 021 | `user_mind.sql` (facts) |
+| 022 | `squad_custom_pact_weights.sql` |
+| 023 | `user_mind_snapshots.sql` |
+| 024 | `open_loop_follow_ups.sql` |
+| 025 | `proactive_checkins.sql` |
 
 ## 3. Render access
 
 1. Go to [dashboard.render.com](https://dashboard.render.com)
-2. Open service **mauri-backend** (or create from `render.yaml` Blueprint)
-3. Confirm **Settings → Build & Deploy**:
-   - Branch: `main`
-   - Auto-Deploy: On
-   - Health check: `/ready`
-4. **Environment** tab — every `sync: false` secret from `render.yaml` must be set (see `.env.production.example`)
-
-### Required secrets (minimum to function)
-
-| Variable | Purpose |
-|----------|---------|
-| `SUPABASE_URL` | Database |
-| `SUPABASE_SERVICE_ROLE_KEY` | Database writes |
-| `GOOGLE_AI_API_KEY` | Gemini chat + transcription |
-| `WHATSAPP_VERIFY_TOKEN` | Meta webhook verify |
-| `WHATSAPP_ACCESS_TOKEN` | Send/receive WhatsApp |
-| `WHATSAPP_PHONE_NUMBER_ID` | Meta API phone ID |
-| `INTERNAL_ADMIN_API_KEY` | Admin panel |
-| `PAYMENT_CALLBACK_BASE_URL` | `https://<your-render-url>` no trailing slash |
-
-### Post-deploy URL checks
-
-Replace `<HOST>` with your Render URL:
-
-```bash
-curl -s https://<HOST>/ready | jq .
-curl -s -H "x-mauri-admin-key: $INTERNAL_ADMIN_API_KEY" https://<HOST>/internal/admin/deploy-preflight | jq .
-curl -s https://<HOST>/health
-```
-
-Expect `ready: true` and deploy-preflight with no critical failures.
+2. Deploy **vikrav14/myapp** from `main` (new service if `mauri-backend.onrender.com` is wrong app)
+3. Set all secrets from `render.yaml` + `.env.production.example`
+4. Verify: `curl https://<HOST>/ready`
 
 ## 4. Meta WhatsApp webhook
 
-In [Meta Developer Console](https://developers.facebook.com/) → WhatsApp → Configuration:
+`https://<HOST>/webhooks/whatsapp` with your `WHATSAPP_VERIFY_TOKEN`
 
-| Field | Value |
-|-------|-------|
-| Callback URL | `https://<HOST>/webhooks/whatsapp` |
-| Verify token | Same as `WHATSAPP_VERIFY_TOKEN` |
-| Subscribed fields | `messages` |
+## 5. Smoke test
 
-Send a test message from your phone → check Render logs for `Processed inbound WhatsApp message`.
+1. `hi` → know-you → lane → tags
+2. `what do you know about me` (facts)
+3. `squad goal custom Exam sprint — focus study todos`
+4. `followups on` / `my checkins`
+5. Receipt photo + voice note
 
-## 5. Smoke test (real phone)
+## 6. Cron jobs (auto-registered)
 
-1. Message Mauri: `hi`
-2. Complete know-you → pick lane → confirm tags
-3. Send brain dump: `spent 200 on lunch`
-4. Send voice note (optional)
-5. Send receipt photo (if `RECEIPT_SCAN_ENABLED=true`)
-6. Reply `help` — command menu returns
-7. Reply `what do you know about me` — User Mind profile
-
-## 6. Cron jobs (Render)
-
-Confirm these are enabled in logs on startup (see `src/index.ts`):
-
-- Morning brief scrape / curate / deliver (4:30 / 5:00 / 7:00 Mauritius)
-- Reminder delivery (`* * * * *`)
-- Outbound retry (`*/5 * * * *`)
-- Local alerts (if enabled)
-- Squad nudges + Sunday showdown
+| Time (Mauritius) | Job |
+|------------------|-----|
+| 02:00 | User Mind snapshot reflection |
+| 10:00 | Open-loop follow-up delivery |
+| 16:00 | Proactive mate check-ins |
+| 07:00 | Morning brief |
+| 15:00 / 20:30 | Squad nudges / Sunday showdown |
 
 ## 7. Admin panel
 
-Open `https://<HOST>/internal/admin/panel` → enter `INTERNAL_ADMIN_API_KEY`.
+`https://<HOST>/internal/admin/panel`
 
-Check:
+Manual triggers:
 
-- Users list loads
-- Deploy preflight tab — green checks for WhatsApp, Supabase, Gemini
-- Outbound queue — no stuck `failed` messages after test send
-
-## 8. What's merged vs deferred
-
-### Merged in this consolidation
-
-- User Mind know-you onboarding + My Own Mix lane
-- Sunday report "From Mauri" feedback
-- WhatsApp reactions (emoji ack)
-- WhatsApp interactive list buttons (lane + tags)
-
-### Deferred (next merge — architecture conflict)
-
-- `cursor/proactive-checkins-bb83` — proactive mate pings
-- `cursor/custom-squad-pacts-bb83` — custom squad goals
-- `cursor/user-mind-snapshots-bb83` — snapshot-based user mind (conflicts with facts table)
-
-These branches replace the facts-based User Mind with snapshots. Merge them in a dedicated PR after reconciling both models.
-
-## 9. Quick rollback
-
-If deploy breaks:
-
-1. Render → **Manual Deploy** → previous successful build
-2. Or revert merge commit on `main` and redeploy
-3. Check `outbound_messages` and `dead_letter_events` in admin panel
+- `POST /internal/admin/user-mind/reflect`
+- `POST /internal/admin/open-loop-followups/deliver`
+- `POST /internal/admin/proactive-checkins/deliver`

@@ -1,8 +1,11 @@
 import { env } from "../lib/env.js";
 import {
+  parseUserMindSnapshot,
   userMindExtractionJsonSchema,
   userMindExtractionSchema,
-  type UserMindExtraction
+  userMindSnapshotJsonSchema,
+  type UserMindExtraction,
+  type UserMindSnapshotPayload
 } from "../schemas/user-mind.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
 import {
@@ -22,6 +25,8 @@ import type {
   WeeklyDiagnosticSummary,
   WeeklyFeedbackPromptContext
 } from "../types.js";
+import type { UserMindReflectionInput } from "./user-mind-data.service.js";
+import { buildReflectionPayloadSummary } from "./user-mind-prompt.js";
 
 interface GeminiTextResponse {
   candidates?: Array<{
@@ -248,6 +253,110 @@ ${message}
   return userMindExtractionSchema.parse(parsed);
 }
 
+export async function generateUserMindSnapshot(
+  reflectionInput: UserMindReflectionInput
+): Promise<UserMindSnapshotPayload> {
+  const payload = buildReflectionPayloadSummary(reflectionInput);
+  const prompt = `You are Mauri's off-peak reflection engine for a Mauritian lifestyle companion on WhatsApp.
+
+Synthesize a durable understanding of this user from the data below.
+This snapshot will be injected into future replies so Mauri feels like a mate who knows them.
+
+Rules:
+- Ground every field in the provided data only. Do not invent facts.
+- If signal is thin, say so plainly and keep arrays short.
+- Write for a Mauritian young professional / student context when relevant.
+- personality_notes should capture communication style, stress triggers, and what tone lands (direct, gentle, humour, etc.).
+- advice_preferences: how Mauri should coach this person (e.g. empathise first, then one concrete move).
+- things_to_avoid: reply patterns that would feel wrong for this user (preachy, generic, ignoring money stress, etc.).
+- active_goals, recent_wins, open_loops: short phrase items only.
+- Merge useful signal from previous_mind_snapshot when still valid; drop stale items.
+
+Reflection data:
+${JSON.stringify(payload, null, 2)}`;
+
+  const rawJson = await callGemini({
+    prompt,
+    responseMimeType: "application/json",
+    responseSchema: userMindSnapshotJsonSchema
+  });
+
+  return parseUserMindSnapshot(rawJson);
+}
+
+export async function generateProactiveCheckInMessage(input: {
+  user: MauriUser;
+  mode: "care" | "useful" | "curious";
+  hookSummary: string;
+  userMind?: UserMindSnapshotPayload | null;
+}): Promise<string> {
+  const modeGuidance = {
+    care: "They have been quieter. Check in emotionally — grounded, not clingy. Reference the hook without guilt.",
+    useful: "Offer one practical, data-backed nudge tied to the hook. No lecture.",
+    curious: "Ask exactly one get-to-know question that helps you understand them better as a mate."
+  }[input.mode];
+
+  const mindBlock = input.userMind
+    ? `User mind summary: ${input.userMind.life_summary}
+Advice preferences: ${input.userMind.advice_preferences}
+Things to avoid: ${input.userMind.things_to_avoid.join("; ")}`
+    : "User mind: not built yet — keep it light.";
+
+  const prompt = `You are Mauri in a private WhatsApp thread for Mauritians.
+You are sending a proactive check-in (mode: ${input.mode}).
+
+${modeGuidance}
+
+Rules:
+- 2 short paragraphs max.
+- Warm, specific, never survey-like.
+- One question max.
+- Mention they can reply "not now" to pause proactive pings.
+- No bullet lists. No numbered steps. No "As an AI".
+- Sound like a real mate, not a bot.
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+Hook: ${input.hookSummary}
+${mindBlock}
+
+Reply in plain text only.`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
+export async function generateOpenLoopFollowUpMessage(input: {
+  user: MauriUser;
+  loopText: string;
+}): Promise<string> {
+  const prompt = `You are Mauri in a private WhatsApp thread for Mauritians.
+You are gently following up on something the user mentioned earlier.
+
+Rules:
+- 2 short paragraphs max.
+- Warm, grounded, zero guilt.
+- Reference the open loop naturally without quoting it word-for-word.
+- Make clear they do not have to debrief if they do not want to.
+- No bullet lists. No numbered steps. No "As an AI".
+- Sound like a real mate checking in.
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+Open loop: ${input.loopText}
+
+Reply in plain text only.`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
 export async function generateConversationalReply(input: {
   user: MauriUser;
   message: string;
@@ -275,8 +384,11 @@ First name: ${user.first_name ?? "Unknown"}
 Archetype: ${user.archetype}
 Subscription status: ${user.subscription_status}
 
-Who this person is (stable profile — not just this week's logs):
+Who this person is (what they told you — stable profile):
 ${context.userMindPrompt}
+
+What you've learned from their week (nightly reflection — if available):
+${context.userMindSnapshotPrompt ?? "Not built yet — rely on facts and recent logs."}
 
 Recent pending todos:
 ${JSON.stringify(context.pendingTodos)}

@@ -29,8 +29,10 @@ This repository now contains the first backend foundation for the product spec i
 
 ## Guides
 
-- [User customization](./USER_CUSTOMIZATION.md) — what users can personalize today (topics, pacts, toggles, etc.)
-- [Ground zero checklist](./GROUND_ZERO.md) — deploy and smoke-test Mauri
+- [User customization](./USER_CUSTOMIZATION.md) — topics, pacts, toggles
+- [Ground zero checklist](./GROUND_ZERO.md) — deploy and smoke-test
+- [Feel-safe optimization](./FEEL_SAFE_OPTIMIZATION.md) — token/latency guardrails
+- [Future ideas](./FUTURE_IDEAS.md) — deferred concepts
 
 ## Project structure
 

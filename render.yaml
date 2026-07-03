@@ -143,6 +143,32 @@ services:
         value: "*/30 21-23,0-7 * * *"
       - key: LOCAL_ALERT_RSS_FEEDS
         sync: false
+      - key: USER_MIND_SNAPSHOTS_ENABLED
+        value: "true"
+      - key: USER_MIND_REFLECT_CRON
+        value: "0 2 * * *"
+      - key: USER_MIND_LOOKBACK_DAYS
+        value: "7"
+      - key: USER_MIND_ACTIVITY_LOOKBACK_DAYS
+        value: "14"
+      - key: USER_MIND_BATCH_SIZE
+        value: "25"
+      - key: OPEN_LOOP_FOLLOWUPS_ENABLED
+        value: "true"
+      - key: OPEN_LOOP_FOLLOWUP_CRON
+        value: "0 10 * * *"
+      - key: OPEN_LOOP_FOLLOWUP_HOUR
+        value: "10"
+      - key: OPEN_LOOP_FOLLOWUP_MINUTE
+        value: "0"
+      - key: PROACTIVE_CHECKINS_ENABLED
+        value: "true"
+      - key: PROACTIVE_CHECKIN_CRON
+        value: "0 16 * * *"
+      - key: PROACTIVE_CHECKIN_HOUR
+        value: "16"
+      - key: PROACTIVE_CHECKIN_MINUTE
+        value: "0"
       - key: TRUST_PROXY
         value: "true"
       - key: ENABLE_SECURITY_HEADERS

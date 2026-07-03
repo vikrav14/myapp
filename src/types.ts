@@ -1,3 +1,5 @@
+import type { UserMindSnapshotPayload } from "../schemas/user-mind.js";
+
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
 export type OnboardingState = "awaiting_know_you" | "awaiting_archetype" | "awaiting_topics" | "active";
 export type UserMindCategory =
@@ -49,6 +51,8 @@ export interface MauriUser {
   monthly_income_rs: number | null;
   weekly_focus_habit: string | null;
   weekly_focus_set_at: string | null;
+  open_loop_followups_enabled: boolean;
+  proactive_checkins_paused_until: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -377,6 +381,9 @@ export interface UserContextSnapshot {
   semanticMemories: SemanticMemoryMatch[];
   userMindFacts: UserMindFact[];
   userMindPrompt: string;
+  userMindSnapshot: UserMindSnapshotPayload | null;
+  userMindSnapshotPrompt: string | null;
+  userMindSnapshotGeneratedAt: string | null;
 }
 
 export interface UserMindFact {
@@ -388,6 +395,17 @@ export interface UserMindFact {
   source: UserMindSource | string;
   confidence: number;
   user_visible: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserMindRecord {
+  id: string;
+  user_id: string;
+  snapshot: UserMindSnapshotPayload;
+  source_window_start: string;
+  source_window_end: string;
+  generated_at: string;
   created_at: string;
   updated_at: string;
 }
