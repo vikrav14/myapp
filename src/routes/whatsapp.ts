@@ -15,6 +15,7 @@ import { handleReceiptImageMessage } from "../services/receipt-scan.service.js";
 import { handleCalendarMessage } from "../services/calendar.service.js";
 import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
 import { handleUserMindCommandMessage } from "../services/user-mind.service.js";
+import { handleServiceFeedbackMessage } from "../services/weekly-report-feedback.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
@@ -310,6 +311,34 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: engagementResult.reply
+      });
+      return;
+    }
+
+    const serviceFeedbackResult = await handleServiceFeedbackMessage({
+      user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (serviceFeedbackResult.handled && serviceFeedbackResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, serviceFeedbackResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "service_feedback"
+        }
+      });
+
+      response.status(200).json({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: serviceFeedbackResult.reply
       });
       return;
     }

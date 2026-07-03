@@ -19,7 +19,8 @@ import type {
   MauriBrainDumpExtraction,
   MauriUser,
   UserContextSnapshot,
-  WeeklyDiagnosticSummary
+  WeeklyDiagnosticSummary,
+  WeeklyFeedbackPromptContext
 } from "../types.js";
 
 interface GeminiTextResponse {
@@ -349,6 +350,61 @@ If the week was messy, be honest without being harsh.
 If trial_cliffhanger is true, end with a subtle but irresistible cliffhanger that hints deeper tracking gets locked after trial unless they unlock premium.
 
 Reply in plain text only.
+`;
+
+  return callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+}
+
+function feedbackVariantGuidance(prompt: WeeklyFeedbackPromptContext): string {
+  if (prompt.variant === "rating") {
+    return "Ask for a simple 1–5 rating of how useful Mauri was this week. Mention they can reply rate 1 to rate 5. Keep it optional.";
+  }
+
+  if (prompt.variant === "context") {
+    return "Invite honest context if Mauri is misunderstanding them. Mention they can reply mauri feedback with what to fix. No guilt.";
+  }
+
+  return "Early calibration: invite either rate 1–5 or mauri feedback with what Mauri should understand about them. Optional.";
+}
+
+export async function generateWeeklyFeedbackSection(input: {
+  user: MauriUser;
+  summary: WeeklyDiagnosticSummary;
+  prompt: WeeklyFeedbackPromptContext;
+}): Promise<string> {
+  const reasonNotes: Record<NonNullable<WeeklyFeedbackPromptContext["reason"]>, string> = {
+    early_calibration: "This is one of their first Sunday reports — calibrate how Mauri should read them.",
+    low_signal: "They logged data but barely chatted — Mauri may be inferring wrong.",
+    momentum_drop: "Momentum dropped sharply — check if Mauri tone or advice missed the mark.",
+    quiet_power_user: "Long-time user, low chat volume — quick usefulness pulse.",
+    periodic_pulse: "Routine quality check — keep it light."
+  };
+
+  const prompt = `
+You are Mauri in a private WhatsApp thread for Mauritians.
+You already wrote their Sunday diagnostic about THEIR week.
+Now add a short closing section FROM MAURI (about Mauri's service, not their habits).
+
+Voice rules:
+- Start with "From Mauri" on its own line.
+- 1–2 short paragraphs max.
+- Warm, humble, not needy or survey-like.
+- No bullet lists. No numbered lists. No "As an AI".
+- Make clear replying is optional.
+
+User:
+First name: ${input.user.first_name ?? "there"}
+Archetype: ${input.user.archetype}
+
+Why we're asking (internal): ${input.prompt.reason ? reasonNotes[input.prompt.reason] : "quality pulse"}
+${feedbackVariantGuidance(input.prompt)}
+
+Weekly momentum: ${input.summary.momentum_score}/100
+
+Reply in plain text only — the From Mauri section only.
 `;
 
   return callGemini({

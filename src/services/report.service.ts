@@ -1,11 +1,20 @@
 import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
-import type { MauriUser, WeeklyDiagnosticSummary, WeeklyReportRecord } from "../types.js";
-import { generateWeeklyDiagnosticCopy } from "./ai.service.js";
+import type {
+  MauriUser,
+  WeeklyDiagnosticSummary,
+  WeeklyFeedbackPromptContext,
+  WeeklyReportRecord
+} from "../types.js";
+import { generateWeeklyDiagnosticCopy, generateWeeklyFeedbackSection } from "./ai.service.js";
 import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 import { mapUser } from "./user.service.js";
+import {
+  buildFallbackFeedbackSection,
+  buildWeeklyFeedbackPromptContext
+} from "./weekly-report-feedback.service.js";
 
 interface ReportWindow {
   weekStart: string;
@@ -125,7 +134,9 @@ function mapWeeklyReportRecord(record: Record<string, unknown>): WeeklyReportRec
     summary_json: record.summary_json as WeeklyDiagnosticSummary,
     delivery_status: String(record.delivery_status),
     sent_at: record.sent_at ? String(record.sent_at) : null,
-    created_at: String(record.created_at)
+    created_at: String(record.created_at),
+    feedback_prompt_json: (record.feedback_prompt_json as WeeklyFeedbackPromptContext | null) ?? null,
+    feedback_responded_at: record.feedback_responded_at ? String(record.feedback_responded_at) : null
   };
 }
 
@@ -264,6 +275,7 @@ async function upsertWeeklyReport(input: {
   summary: WeeklyDiagnosticSummary;
   deliveryStatus: string;
   sentAt?: string | undefined;
+  feedbackPrompt?: WeeklyFeedbackPromptContext | null;
 }): Promise<WeeklyReportRecord> {
   const { data, error } = await supabase
     .from("weekly_reports")
@@ -275,7 +287,8 @@ async function upsertWeeklyReport(input: {
         report_text: input.reportText,
         summary_json: input.summary,
         delivery_status: input.deliveryStatus,
-        sent_at: input.sentAt ?? null
+        sent_at: input.sentAt ?? null,
+        feedback_prompt_json: input.feedbackPrompt ?? null
       },
       {
         onConflict: "user_id,week_start,week_end"
@@ -311,6 +324,11 @@ export async function generateWeeklyDiagnosticReport(input: {
   const summary = await buildWeeklyDiagnosticSummary(user, window);
   const userMindFacts = await loadUserMindFacts(user.id);
   const userMindPrompt = formatUserMindForPrompt(userMindFacts);
+  const feedbackPrompt = await buildWeeklyFeedbackPromptContext({
+    user,
+    window: { weekStart: window.weekStart, weekEnd: window.weekEnd },
+    summary
+  });
 
   let reportText: string;
   try {
@@ -322,6 +340,20 @@ export async function generateWeeklyDiagnosticReport(input: {
   } catch (error) {
     logger.warn({ error, userId: user.id }, "Falling back to deterministic weekly report copy.");
     reportText = buildFallbackReport(user, summary);
+  }
+
+  if (feedbackPrompt.include) {
+    try {
+      const feedbackSection = await generateWeeklyFeedbackSection({
+        user,
+        summary,
+        prompt: feedbackPrompt
+      });
+      reportText = `${reportText.trim()}\n\n${feedbackSection.trim()}`;
+    } catch (error) {
+      logger.warn({ error, userId: user.id }, "Falling back to template Sunday feedback section.");
+      reportText = `${reportText.trim()}\n\n${buildFallbackFeedbackSection(user, feedbackPrompt)}`;
+    }
   }
 
   let deliveryStatus = sendMessage ? "generated" : "stored_only";
@@ -352,7 +384,8 @@ export async function generateWeeklyDiagnosticReport(input: {
     reportText,
     summary,
     deliveryStatus,
-    sentAt
+    sentAt,
+    feedbackPrompt: feedbackPrompt.include ? feedbackPrompt : null
   });
 
   await recordAuditEventBestEffort({

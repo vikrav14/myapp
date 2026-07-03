@@ -22,6 +22,7 @@ Discover yourself
 - my streaks — habit consistency (no guilt if you miss)
 - roast me — sharp truth from your week
 - hype me — celebrate what's working
+- rate 1–5 / mauri feedback — after Sunday report, tune how I read you
 
 Morning brief
 - my topics — show your tags
