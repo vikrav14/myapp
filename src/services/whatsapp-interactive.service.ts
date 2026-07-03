@@ -67,6 +67,11 @@ export function buildArchetypePickerInteractive(input: {
             id: "archetype_life",
             title: "Life & Habits",
             description: "Mood, routines, balance"
+          },
+          {
+            id: "archetype_custom",
+            title: "My Own Mix",
+            description: "Your tags, no preset box"
           }
         ]
       }

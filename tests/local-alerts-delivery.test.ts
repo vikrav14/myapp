@@ -37,7 +37,7 @@ const activeUser = {
   subscription_status: "Trial_Active" as const,
   onboarding_completed_at: "2026-01-01T00:00:00.000Z",
   trial_started_at: "2026-01-01T00:00:00.000Z",
-  trial_ends_at: "2026-07-01T00:00:00.000Z",
+  trial_ends_at: "2027-07-01T00:00:00.000Z",
   locked_at: null,
   subscription_started_at: null,
   subscription_ends_at: null,

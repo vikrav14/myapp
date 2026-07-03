@@ -21,9 +21,9 @@ describe("resolveInteractiveReplyId", () => {
 });
 
 describe("interactive builders", () => {
-  it("builds archetype list with four rows", () => {
+  it("builds archetype list with five rows including My Own Mix", () => {
     const picker = buildArchetypePickerInteractive({ firstName: "Ava", isNewUser: true });
-    expect(picker.sections?.[0]?.rows).toHaveLength(4);
+    expect(picker.sections?.[0]?.rows).toHaveLength(5);
     expect(picker.listButtonLabel).toBe("Pick vibe");
   });
 
