@@ -9,7 +9,12 @@ import type {
 import { generateWeeklyDiagnosticCopy, generateWeeklyFeedbackSection } from "./ai.service.js";
 import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
-import { sendWhatsAppMessage } from "./whatsapp.service.js";
+import { sendWhatsAppMessage, sendWhatsAppInteractive } from "./whatsapp.service.js";
+import {
+  buildSundayContextInteractive,
+  buildSundayFeedbackInteractive,
+  buildSundayRatingInteractive
+} from "./whatsapp-interactive.service.js";
 import { mapUser } from "./user.service.js";
 import {
   buildFallbackFeedbackSection,
@@ -370,6 +375,29 @@ export async function generateWeeklyDiagnosticReport(input: {
           weekEnd: window.weekEnd
         }
       });
+
+      if (feedbackPrompt.include) {
+        const ratingInteractive =
+          feedbackPrompt.variant === "rating"
+            ? buildSundayRatingInteractive()
+            : feedbackPrompt.variant === "open"
+              ? buildSundayFeedbackInteractive()
+              : feedbackPrompt.variant === "context"
+                ? buildSundayContextInteractive()
+                : null;
+
+        if (ratingInteractive) {
+          await sendWhatsAppInteractive(user.phone_number, ratingInteractive, {
+            userId: user.id,
+            requestId,
+            metadata: {
+              flow: "weekly_report_feedback",
+              variant: feedbackPrompt.variant
+            }
+          });
+        }
+      }
+
       deliveryStatus = "sent";
       sentAt = new Date().toISOString();
     } catch (error) {

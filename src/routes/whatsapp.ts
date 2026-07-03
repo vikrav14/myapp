@@ -25,7 +25,7 @@ import { runSquadRelayAfterExtraction } from "../services/squad-relay.service.js
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
-import { parseInboundMessage, sendWhatsAppMessage } from "../services/whatsapp.service.js";
+import { parseInboundMessage, sendMauriReply, sendWhatsAppMessage } from "../services/whatsapp.service.js";
 import { reactToInboundMessageBestEffort } from "../services/whatsapp-reaction.service.js";
 
 export const whatsappRouter = Router();
@@ -231,14 +231,21 @@ whatsappRouter.post("/", async (request, response, next) => {
     });
 
     if (onboardingResult.handled && onboardingResult.reply) {
-      await sendWhatsAppMessage(inboundMessage.from, onboardingResult.reply, {
-        userId: onboardingResult.user.id,
-        requestId,
-        metadata: {
-          sourceType: inboundMessage.kind,
-          flow: "onboarding"
+      await sendMauriReply(
+        inboundMessage.from,
+        {
+          text: onboardingResult.reply,
+          interactive: onboardingResult.interactive
+        },
+        {
+          userId: onboardingResult.user.id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "onboarding"
+          }
         }
-      });
+      );
 
       if (onboardingResult.followUpReply) {
         await sendWhatsAppMessage(inboundMessage.from, onboardingResult.followUpReply, {
@@ -310,14 +317,21 @@ whatsappRouter.post("/", async (request, response, next) => {
     });
 
     if (engagementResult.handled && engagementResult.reply) {
-      await sendWhatsAppMessage(inboundMessage.from, engagementResult.reply, {
-        userId: user.id,
-        requestId,
-        metadata: {
-          sourceType: inboundMessage.kind,
-          flow: "engagement_command"
+      await sendMauriReply(
+        inboundMessage.from,
+        {
+          text: engagementResult.reply,
+          interactive: engagementResult.interactive
+        },
+        {
+          userId: user.id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "engagement_command"
+          }
         }
-      });
+      );
 
       response.status(200).json({
         ok: true,

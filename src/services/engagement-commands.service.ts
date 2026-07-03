@@ -1,5 +1,5 @@
 import { env } from "../lib/env.js";
-import type { MauriUser } from "../types.js";
+import type { MauriUser, WhatsAppInteractiveOutbound } from "../types.js";
 import { generatePersonalityFeedback } from "./ai.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import { buildRecentActivitySnapshot } from "./engagement-stats.service.js";
@@ -8,10 +8,12 @@ import { buildHabitStreakReply, loadHabitStreakSnapshot } from "./habit-streak.s
 import { buildDailyMicroLesson, buildOnDemandLessonReply } from "./micro-lesson.service.js";
 import { hasEngagementDelivery } from "./engagement-delivery.service.js";
 import { buildWeeklyFocusReply } from "./weekly-focus.service.js";
+import { buildHelpMenuInteractive } from "./whatsapp-interactive.service.js";
 
 export interface EngagementCommandResult {
   handled: boolean;
   reply?: string | undefined;
+  interactive?: WhatsAppInteractiveOutbound | undefined;
 }
 
 function normalize(message: string): string {
@@ -60,10 +62,18 @@ export async function handleEngagementCommandMessage(input: {
   message: string;
   requestId?: string | undefined;
 }): Promise<EngagementCommandResult> {
-  if (parseHelpCommand(input.message)) {
+  if (normalize(input.message) === "show full menu") {
     return {
       handled: true,
       reply: buildHelpMenu(input.user)
+    };
+  }
+
+  if (parseHelpCommand(input.message)) {
+    return {
+      handled: true,
+      reply: "Tap what you need below — or just talk normally anytime.",
+      interactive: buildHelpMenuInteractive()
     };
   }
 

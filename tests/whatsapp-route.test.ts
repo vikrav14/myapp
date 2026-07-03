@@ -13,6 +13,7 @@ const mockHandleOnboardingMessage = vi.fn();
 const mockGetOrCreateUser = vi.fn();
 const mockResolveInboundMessageText = vi.fn();
 const mockSendWhatsAppMessage = vi.fn();
+const mockSendMauriReply = vi.fn();
 
 vi.mock("../src/services/ai.service.js", () => ({
   extractStructuredContext: mockExtractStructuredContext,
@@ -65,7 +66,8 @@ vi.mock("../src/services/whatsapp.service.js", async () => {
 
   return {
     ...actual,
-    sendWhatsAppMessage: mockSendWhatsAppMessage
+    sendWhatsAppMessage: mockSendWhatsAppMessage,
+    sendMauriReply: mockSendMauriReply
   };
 });
 
@@ -94,6 +96,8 @@ describe("WhatsApp webhook route", () => {
     vi.clearAllMocks();
     mockRegisterInboundEvent.mockResolvedValue({ duplicate: false });
     mockHandleSquadMessage.mockResolvedValue({ handled: false });
+    mockSendMauriReply.mockResolvedValue(undefined);
+    mockSendWhatsAppMessage.mockResolvedValue(undefined);
   });
 
   it("returns the onboarding reply for a new user awaiting archetype", async () => {
@@ -122,9 +126,11 @@ describe("WhatsApp webhook route", () => {
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
     expect(response.body.replyPreview).toContain("Before I track anything");
-    expect(mockSendWhatsAppMessage).toHaveBeenCalledWith(
+    expect(mockSendMauriReply).toHaveBeenCalledWith(
       baseUser.phone_number,
-      "Before I track anything, I want to know you a bit",
+      expect.objectContaining({
+        text: "Before I track anything, I want to know you a bit"
+      }),
       expect.objectContaining({
         userId: baseUser.id,
         metadata: expect.objectContaining({

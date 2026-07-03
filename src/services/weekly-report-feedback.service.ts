@@ -345,6 +345,15 @@ export async function handleServiceFeedbackMessage(input: {
   message: string;
   requestId?: string | undefined;
 }): Promise<ServiceFeedbackCommandResult> {
+  const normalized = input.message.trim().toLowerCase().replace(/\s+/g, " ");
+
+  if (normalized === "mauri feedback") {
+    return {
+      handled: true,
+      reply: "Go on — what's landing wrong, or what should I understand better about you? Reply mauri feedback: your note."
+    };
+  }
+
   const parsed = parseServiceFeedbackMessage(input.message);
   if (!parsed) {
     return { handled: false };

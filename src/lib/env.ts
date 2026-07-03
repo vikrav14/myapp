@@ -119,7 +119,8 @@ const envSchema = z.object({
   LOCAL_ALERTS_CRON: z.string().default("*/30 21-23,0-7 * * *"),
   LOCAL_ALERT_RSS_FEEDS: optionalCsv,
   WHATSAPP_REACTIONS_ENABLED: envBoolean.default(true),
-  WHATSAPP_MARK_READ_ENABLED: envBoolean.default(true)
+  WHATSAPP_MARK_READ_ENABLED: envBoolean.default(true),
+  WHATSAPP_INTERACTIVE_ENABLED: envBoolean.default(true)
 });
 
 export const env = envSchema.parse(process.env);
