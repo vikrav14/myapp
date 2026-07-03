@@ -202,12 +202,9 @@ supabase/migrations/016_scheduled_reminders.sql
 supabase/migrations/017_calendar_and_memory_resurfacing.sql
 supabase/migrations/018_payday_and_receipts.sql
 supabase/migrations/019_local_alerts.sql
-<<<<<<< HEAD
-=======
-supabase/migrations/020_user_mind_snapshots.sql
-supabase/migrations/021_open_loop_follow_ups.sql
+supabase/migrations/020_weekly_report_feedback.sql
+supabase/migrations/021_user_mind.sql
 supabase/migrations/022_squad_custom_pact_weights.sql
->>>>>>> a89a4b2 (Add custom squad pacts and user customization guide)
 ```
 
 ## Webhook contract
