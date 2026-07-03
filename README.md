@@ -220,6 +220,8 @@ When a new message arrives, Mauri can retrieve similar past memories from vector
 
 Inbound WhatsApp messages with the same `messageId` are now deduplicated before user lookup and downstream processing, which prevents duplicate replies and duplicate logging when webhook deliveries are retried.
 
+**Reactions (human UX):** On active users, Mauri can mark messages read and react before replying — 👀 receipts, 👂 voice notes, ❤️ stress vents, 🔥 wins, 🙏 thanks. Skips commands, onboarding, and short greetings. Toggle with `WHATSAPP_REACTIONS_ENABLED` / `WHATSAPP_MARK_READ_ENABLED`.
+
 There is also a secured internal payment confirmation route:
 
 - `POST /internal/payments/confirm`
