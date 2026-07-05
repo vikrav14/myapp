@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase.js";
 import type { MauriUser } from "../types.js";
 import { generateMemoryResurfaceMessage } from "./ai.service.js";
 import { parseMemoryResurfaceToggle } from "./calendar-parse.service.js";
+import { canSendProactiveOutbound, recordProactivePing } from "./outbound-pace.service.js";
 import { hasEngagementDelivery, recordEngagementDelivery } from "./engagement-delivery.service.js";
 import { isReminderEligible } from "./reminder-schedule.service.js";
 import { mapUser, updateUserState } from "./user.service.js";
@@ -209,6 +210,12 @@ export async function runMemoryResurfacingDeliveries(requestId?: string): Promis
       continue;
     }
 
+    const gate = await canSendProactiveOutbound(user, "memory_resurface");
+    if (!gate.allowed) {
+      skipped += 1;
+      continue;
+    }
+
     try {
       const message = await buildResurfaceMessage(user, candidate);
       await sendWhatsAppMessage(user.phone_number, message, {
@@ -229,6 +236,7 @@ export async function runMemoryResurfacingDeliveries(requestId?: string): Promis
         message_text: message
       });
       await recordEngagementDelivery(user.id, dailyKey);
+      await recordProactivePing(user.id, "memory_resurface");
       sent += 1;
     } catch (error) {
       skipped += 1;

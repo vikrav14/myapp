@@ -40,6 +40,15 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
     proactive_checkins_paused_until: record.proactive_checkins_paused_until
       ? String(record.proactive_checkins_paused_until)
       : null,
+    quiet_hours_enabled: record.quiet_hours_enabled !== false,
+    quiet_hours_start_hour:
+      record.quiet_hours_start_hour === null || record.quiet_hours_start_hour === undefined
+        ? 22
+        : Number(record.quiet_hours_start_hour),
+    quiet_hours_end_hour:
+      record.quiet_hours_end_hour === null || record.quiet_hours_end_hour === undefined
+        ? 7
+        : Number(record.quiet_hours_end_hour),
     created_at: String(record.created_at),
     updated_at: String(record.updated_at)
   };

@@ -31,6 +31,10 @@ services:
         value: "true"
       - key: WHATSAPP_INTERACTIVE_ENABLED
         value: "true"
+      - key: WHATSAPP_TYPING_INDICATOR_ENABLED
+        value: "true"
+      - key: PROACTIVE_DAILY_BUDGET
+        value: "2"
       - key: MCB_JUICE_PAYMENT_LINK
         sync: false
       - key: BLINK_PAYMENT_LINK

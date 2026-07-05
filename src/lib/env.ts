@@ -121,6 +121,8 @@ const envSchema = z.object({
   WHATSAPP_REACTIONS_ENABLED: envBoolean.default(true),
   WHATSAPP_MARK_READ_ENABLED: envBoolean.default(true),
   WHATSAPP_INTERACTIVE_ENABLED: envBoolean.default(true),
+  PROACTIVE_DAILY_BUDGET: z.coerce.number().int().positive().default(2),
+  WHATSAPP_TYPING_INDICATOR_ENABLED: envBoolean.default(true),
   USER_MIND_SNAPSHOTS_ENABLED: envBoolean.default(true),
   USER_MIND_REFLECT_CRON: z.string().default("0 2 * * *"),
   USER_MIND_LOOKBACK_DAYS: z.coerce.number().int().positive().default(7),
