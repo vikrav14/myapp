@@ -1,4 +1,6 @@
 import { logger } from "../lib/logger.js";
+import { env } from "../lib/env.js";
+import { finalizeMauriGeneratedReply, MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT } from "../lib/mauri-voice.js";
 import { supabase } from "../lib/supabase.js";
 import type {
   MauriUser,
@@ -87,46 +89,41 @@ function computeMomentumScore(summary: Omit<WeeklyDiagnosticSummary, "momentum_s
 
 function buildFallbackReport(user: MauriUser, summary: WeeklyDiagnosticSummary): string {
   const name = user.first_name?.trim() || "You";
-  const financeLine =
-    summary.finance.entry_count > 0
-      ? `You logged Rs ${summary.finance.total_spent} across ${summary.finance.entry_count} money moves. ${
-          summary.finance.top_category ? `Most of it leaned toward ${summary.finance.top_category}.` : ""
-        }`
-      : "Money tracking stayed quiet this week. That usually means the real leaks stayed blurry too.";
+  const highlights: string[] = [];
 
-  const habitLine =
-    summary.habits.total_logs > 0
-      ? `You showed up ${summary.habits.successful_logs} times on habits out of ${summary.habits.total_logs} logged attempts. ${
-          summary.habits.top_activity ? `${summary.habits.top_activity} kept surfacing.` : ""
-        }`
-      : "Habit momentum barely showed itself this week. The pattern feels more reactive than intentional right now.";
+  if (summary.finance.entry_count > 0) {
+    highlights.push(
+      `Rs ${summary.finance.total_spent} logged across ${summary.finance.entry_count} money moves`
+    );
+  }
 
-  const todoLine = `Tasks tell a clean story. ${summary.todos.completed_count} got finished. ${summary.todos.open_count} are still hanging open.`;
+  if (summary.habits.total_logs > 0) {
+    highlights.push(`${summary.habits.successful_logs}/${summary.habits.total_logs} habit wins`);
+  }
 
-  const emotionLine =
-    summary.emotions.average_anxiety !== null
-      ? `Your emotional baseline sat around ${summary.emotions.average_anxiety}/5 on anxiety. ${
-          summary.emotions.dominant_driver ? `${summary.emotions.dominant_driver} kept showing up underneath it.` : ""
-        }`
-      : "You did not log much emotional signal this week, which can mean either steadiness or suppression. Mauri still clocks the difference.";
+  if (summary.todos.completed_count > 0 || summary.todos.open_count > 0) {
+    highlights.push(`${summary.todos.completed_count} tasks done, ${summary.todos.open_count} still open`);
+  }
 
-  const cliffhanger = summary.trial_cliffhanger
-    ? "One more thing. The pattern under this week is getting clearer than the surface mess. That deeper layer is exactly what gets locked when trial ends."
-    : "The next win is not a dramatic reset. It is one clean decision repeated faster next week.";
+  const signal =
+    highlights.length > 0
+      ? highlights.join(" · ")
+      : "A quiet week on the logs — the pattern still matters.";
 
-  return `${name}, your Sunday diagnostic is in.
+  const closer = summary.trial_cliffhanger
+    ? "The deeper pattern is getting clearer. That layer locks when trial ends."
+    : "One clean repeat next week beats a dramatic reset.";
 
-${financeLine}
+  return finalizeMauriGeneratedReply({
+    reply: `Sunday check-in, ${name}.
 
-${habitLine}
+${signal}
 
-${todoLine}
+Momentum: ${summary.momentum_score}/100.
 
-${emotionLine}
-
-Momentum this week sat around ${summary.momentum_score}/100.
-
-${cliffhanger}`;
+${closer}`,
+    maxWords: MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT
+  });
 }
 
 function mapWeeklyReportRecord(record: Record<string, unknown>): WeeklyReportRecord {
@@ -347,7 +344,15 @@ export async function generateWeeklyDiagnosticReport(input: {
     reportText = buildFallbackReport(user, summary);
   }
 
-  if (feedbackPrompt.include) {
+  reportText = finalizeMauriGeneratedReply({
+    reply: reportText,
+    maxWords: MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT
+  });
+
+  const useInteractiveFeedback =
+    Boolean(feedbackPrompt.include && sendMessage && env.WHATSAPP_INTERACTIVE_ENABLED);
+
+  if (feedbackPrompt.include && !useInteractiveFeedback) {
     try {
       const feedbackSection = await generateWeeklyFeedbackSection({
         user,
@@ -376,7 +381,7 @@ export async function generateWeeklyDiagnosticReport(input: {
         }
       });
 
-      if (feedbackPrompt.include) {
+      if (useInteractiveFeedback) {
         const ratingInteractive =
           feedbackPrompt.variant === "rating"
             ? buildSundayRatingInteractive()

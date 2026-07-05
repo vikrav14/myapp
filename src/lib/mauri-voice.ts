@@ -3,6 +3,10 @@ export const MAURI_ENGLISH_ONLY_LANGUAGE_RULE = `- Always reply in English only.
 
 export const MAURI_REPLY_MAX_WORDS = 120;
 export const MAURI_REPLY_MAX_WORDS_EMOTIONAL = 160;
+export const MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT = 150;
+export const MAURI_REPLY_MAX_WORDS_PROACTIVE = 100;
+export const MAURI_REPLY_MAX_WORDS_ROAST_HYPE = 100;
+export const MAURI_REPLY_MAX_WORDS_MICRO_LESSON = 80;
 
 const EMOTIONAL_MESSAGE_PATTERN =
   /\b(stress|stressed|anxious|anxiety|overwhelm|overwhelmed|tired|exhausted|sad|depressed|panic|worried|struggling|burnout|hopeless|lonely|scared|afraid|crying|breakdown|can't cope|cannot cope)\b/i;
@@ -56,3 +60,25 @@ export function finalizeMauriTextReply(input: { message: string; reply: string }
 
   return clampMauriReplyLength(input.reply, maxWords);
 }
+
+export function finalizeMauriGeneratedReply(input: {
+  reply: string;
+  message?: string | undefined;
+  maxWords?: number | undefined;
+}): string {
+  const maxWords =
+    input.maxWords ??
+    (input.message && isEmotionalMessage(input.message)
+      ? MAURI_REPLY_MAX_WORDS_EMOTIONAL
+      : MAURI_REPLY_MAX_WORDS);
+
+  return clampMauriReplyLength(input.reply, maxWords);
+}
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+export const OUTBOUND_PAIR_DELAY_MS = 1200;

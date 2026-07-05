@@ -29,6 +29,7 @@ import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
 import { parseInboundMessage, sendMauriReply, sendWhatsAppMessage } from "../services/whatsapp.service.js";
 import { reactToInboundMessageBestEffort } from "../services/whatsapp-reaction.service.js";
+import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
 
 export const whatsappRouter = Router();
 
@@ -107,8 +108,9 @@ whatsappRouter.post("/", async (request, response, next) => {
     const { user: initialUser, isNewUser } = await getOrCreateUser(inboundMessage.from, inboundMessage.profileName);
     const accessPolicyResult = await enforceAccessPolicy(initialUser, requestId);
 
+    let inboundReaction: { reacted: boolean; emoji?: string | undefined } = { reacted: false };
     if (!accessPolicyResult.handled) {
-      void reactToInboundMessageBestEffort({
+      inboundReaction = await reactToInboundMessageBestEffort({
         to: inboundMessage.from,
         inboundMessage,
         messageText:
@@ -703,6 +705,10 @@ whatsappRouter.post("/", async (request, response, next) => {
       });
     } catch (error) {
       logger.warn({ error, userId: user.id }, "Failed to store assistant reply memory.");
+    }
+
+    if (inboundReaction.reacted) {
+      await sleep(OUTBOUND_PAIR_DELAY_MS);
     }
 
     await sendWhatsAppMessage(inboundMessage.from, reply, {

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   clampMauriReplyLength,
+  finalizeMauriGeneratedReply,
   finalizeMauriTextReply,
   isEmotionalMessage,
   MAURI_ENGLISH_ONLY_LANGUAGE_RULE,
   MAURI_REPLY_MAX_WORDS,
   MAURI_REPLY_MAX_WORDS_EMOTIONAL,
+  MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT,
   MAURI_TEXT_REPLY_GUARDRAILS
 } from "../src/lib/mauri-voice.js";
 
@@ -48,5 +50,15 @@ describe("reply length guard", () => {
 
     const clamped = finalizeMauriTextReply({ message: emotionalMessage, reply });
     expect(clamped.split(/\s+/).length).toBeLessThanOrEqual(MAURI_REPLY_MAX_WORDS_EMOTIONAL);
+  });
+
+  it("supports explicit max word limits for generated copy", () => {
+    const reply = Array.from({ length: MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT + 20 }, () => "word").join(" ");
+    const clamped = finalizeMauriGeneratedReply({
+      reply,
+      maxWords: MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT
+    });
+
+    expect(clamped.split(/\s+/).length).toBeLessThanOrEqual(MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT);
   });
 });

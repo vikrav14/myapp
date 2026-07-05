@@ -1,8 +1,13 @@
 import { env } from "../lib/env.js";
 import { sanitizeGeminiResponseSchema } from "../lib/gemini-schema.js";
 import {
+  finalizeMauriGeneratedReply,
   finalizeMauriTextReply,
   MAURI_ENGLISH_ONLY_LANGUAGE_RULE,
+  MAURI_REPLY_MAX_WORDS_MICRO_LESSON,
+  MAURI_REPLY_MAX_WORDS_PROACTIVE,
+  MAURI_REPLY_MAX_WORDS_ROAST_HYPE,
+  MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT,
   MAURI_TEXT_REPLY_GUARDRAILS
 } from "../lib/mauri-voice.js";
 import {
@@ -332,10 +337,12 @@ ${mindBlock}
 
 Reply in plain text only.`;
 
-  return callGemini({
+  const rawReply = await callGemini({
     prompt,
     responseMimeType: "text/plain"
   });
+
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_PROACTIVE });
 }
 
 export async function generateOpenLoopFollowUpMessage(input: {
@@ -360,10 +367,12 @@ Open loop: ${input.loopText}
 
 Reply in plain text only.`;
 
-  return callGemini({
+  const rawReply = await callGemini({
     prompt,
     responseMimeType: "text/plain"
   });
+
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_PROACTIVE });
 }
 
 export async function generateConversationalReply(input: {
@@ -448,6 +457,7 @@ ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Short paragraphs.
 - Sharp, warm, grounded.
 - Sound real and emotionally intelligent.
+- Hard limit: ${MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT} words. Max 3 short paragraphs.
 
 User:
 First name: ${user.first_name ?? "Unknown"}
@@ -469,10 +479,12 @@ If trial_cliffhanger is true, end with a subtle but irresistible cliffhanger tha
 Reply in plain text only.
 `;
 
-  return callGemini({
+  const rawReply = await callGemini({
     prompt,
     responseMimeType: "text/plain"
   });
+
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT });
 }
 
 function feedbackVariantGuidance(prompt: WeeklyFeedbackPromptContext): string {
@@ -524,10 +536,12 @@ Weekly momentum: ${input.summary.momentum_score}/100
 Reply in plain text only — the From Mauri section only.
 `;
 
-  return callGemini({
+  const rawReply = await callGemini({
     prompt,
     responseMimeType: "text/plain"
   });
+
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_PROACTIVE });
 }
 
 export async function generatePersonalityFeedback(input: {
@@ -570,10 +584,12 @@ If data is thin, say that directly and push one concrete next move.
 Reply in plain text only.
 `;
 
-  return callGemini({
+  const rawReply = await callGemini({
     prompt,
     responseMimeType: "text/plain"
   });
+
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_ROAST_HYPE });
 }
 
 export async function generateMicroLesson(input: {
@@ -596,10 +612,12 @@ Weekly focus: ${input.weeklyFocus ?? "general balance"}
 Reply in plain text only.
 `;
 
-  return callGemini({
+  const rawReply = await callGemini({
     prompt,
     responseMimeType: "text/plain"
   });
+
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_MICRO_LESSON });
 }
 
 export async function generateMemoryResurfaceMessage(input: {
@@ -629,10 +647,12 @@ Memory: ${input.memoryText}
 Reply in plain text only.
 `;
 
-  return callGemini({
+  const rawReply = await callGemini({
     prompt,
     responseMimeType: "text/plain"
   });
+
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_PROACTIVE });
 }
 
 export async function extractReceiptFromImage(input: {

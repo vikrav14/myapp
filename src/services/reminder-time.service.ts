@@ -232,3 +232,22 @@ export function computeNextDailyFireAt(input: {
 
   throw new Error("Could not compute next daily reminder time.");
 }
+
+export function computeSnoozeMinutesUntilTomorrowMorning(
+  reference = new Date(),
+  hour = 9,
+  minute = 0
+): number {
+  const local = getMauritiusLocalParts(reference);
+  const tomorrowLocal = addDaysToLocal(local, 1);
+  const target = mauritiusLocalToUtc({
+    year: tomorrowLocal.year,
+    month: tomorrowLocal.month,
+    day: tomorrowLocal.day,
+    hour,
+    minute
+  });
+
+  const diffMs = target.getTime() - reference.getTime();
+  return Math.max(15, Math.round(diffMs / 60000));
+}
