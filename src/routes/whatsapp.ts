@@ -6,7 +6,7 @@ import { getRequestId } from "../lib/request-tracing.js";
 import { extractStructuredContext, generateConversationalReply } from "../services/ai.service.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
-import { registerInboundEvent } from "../services/inbound-event.service.js";
+import { completeInboundEvent, registerInboundEvent } from "../services/inbound-event.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
 import { handleLocalAlertsCommandMessage } from "../services/local-alerts-delivery.service.js";
@@ -31,6 +31,22 @@ import { parseInboundMessage, sendMauriReply, sendWhatsAppMessage } from "../ser
 import { reactToInboundMessageBestEffort } from "../services/whatsapp-reaction.service.js";
 
 export const whatsappRouter = Router();
+
+async function finishInboundEvent(input: {
+  provider: string;
+  eventId?: string | undefined;
+  requestId: string;
+}): Promise<void> {
+  if (!input.eventId) {
+    return;
+  }
+
+  await completeInboundEvent({
+    provider: input.provider,
+    eventId: input.eventId,
+    requestId: input.requestId
+  });
+}
 
 whatsappRouter.get("/", (request, response) => {
   const mode = request.query["hub.mode"];
@@ -64,7 +80,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         requestId
       });
 
-      if (inboundEvent.duplicate) {
+      if (inboundEvent.duplicate && !inboundEvent.reclaim) {
         response.status(200).json({
           ok: true,
           ignored: true,
@@ -75,6 +91,18 @@ whatsappRouter.post("/", async (request, response, next) => {
         return;
       }
     }
+
+    const inboundEventId = inboundMessage.messageId;
+    const finishInbound = () =>
+      finishInboundEvent({
+        provider: "whatsapp",
+        eventId: inboundEventId,
+        requestId
+      });
+    const respondOk = async (body: Record<string, unknown>) => {
+      await finishInbound();
+      response.status(200).json(body);
+    };
 
     const { user: initialUser, isNewUser } = await getOrCreateUser(inboundMessage.from, inboundMessage.profileName);
     const accessPolicyResult = await enforceAccessPolicy(initialUser, requestId);
@@ -104,7 +132,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: accessPolicyResult.user.id,
         sourceType: inboundMessage.kind,
@@ -133,7 +161,7 @@ whatsappRouter.post("/", async (request, response, next) => {
             }
           });
 
-          response.status(200).json({
+          await respondOk({
             ok: true,
             userId: accessPolicyResult.user.id,
             sourceType: inboundMessage.kind,
@@ -165,7 +193,7 @@ whatsappRouter.post("/", async (request, response, next) => {
           }
         });
 
-        response.status(200).json({
+        await respondOk({
           ok: true,
           userId: accessPolicyResult.user.id,
           sourceType: inboundMessage.kind,
@@ -215,7 +243,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: accessPolicyResult.user.id,
         onboardingState: accessPolicyResult.user.onboarding_state,
@@ -249,7 +277,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       );
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: accessPolicyResult.user.id,
         sourceType: inboundMessage.kind,
@@ -306,7 +334,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         });
       }
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: onboardingResult.user.id,
         sourceType: inboundMessage.kind,
@@ -335,7 +363,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -363,7 +391,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -391,7 +419,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -418,7 +446,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -445,7 +473,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -473,7 +501,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -500,7 +528,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -528,7 +556,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -556,7 +584,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -584,7 +612,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: topicPreferenceResult.user.id,
         sourceType: inboundMessage.kind,
@@ -612,7 +640,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: topicPreferenceResult.user.id,
         sourceType: inboundMessage.kind,
@@ -640,7 +668,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       });
 
-      response.status(200).json({
+      await respondOk({
         ok: true,
         userId: user.id,
         sourceType: inboundMessage.kind,
@@ -735,7 +763,7 @@ whatsappRouter.post("/", async (request, response, next) => {
       }
     });
 
-    response.status(200).json({
+    await respondOk({
       ok: true,
       userId: user.id,
       sourceType: inboundMessage.kind,
