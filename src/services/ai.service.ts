@@ -1,4 +1,5 @@
 import { env } from "../lib/env.js";
+import { sanitizeGeminiResponseSchema } from "../lib/gemini-schema.js";
 import {
   parseUserMindSnapshot,
   userMindExtractionJsonSchema,
@@ -79,7 +80,9 @@ async function callGemini(input: {
         generationConfig: responseMimeType
           ? {
               responseMimeType,
-              responseSchema
+              ...(responseSchema
+                ? { responseSchema: sanitizeGeminiResponseSchema(responseSchema) }
+                : {})
             }
           : undefined
       })
