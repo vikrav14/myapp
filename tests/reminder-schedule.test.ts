@@ -168,7 +168,7 @@ describe("buildReminderListReply", () => {
 });
 
 describe("markReminderDelivered", () => {
-  it("marks one-time reminders completed after delivery", async () => {
+  it("keeps one-time reminders active until the user acknowledges", async () => {
     const reminder = {
       id: "22222222-2222-4222-8222-222222222222",
       user_id: activeUser.id,
@@ -189,15 +189,56 @@ describe("markReminderDelivered", () => {
       buildSelectChain({
         data: {
           ...reminder,
-          status: "completed",
-          last_fired_at: "2026-06-23T14:01:00.000Z"
+          status: "active",
+          last_fired_at: "2026-06-23T14:01:00.000Z",
+          next_fire_at: "2099-01-01T00:00:00.000Z"
         }
       })
     );
 
     const updated = await markReminderDelivered(reminder);
 
-    expect(updated.status).toBe("completed");
+    expect(updated.status).toBe("active");
     expect(updated.last_fired_at).toBeTruthy();
+    expect(updated.next_fire_at).toBe("2099-01-01T00:00:00.000Z");
+  });
+
+  it("lets users mark a recently delivered reminder done", async () => {
+    const reminder = {
+      id: "22222222-2222-4222-8222-222222222222",
+      user_id: activeUser.id,
+      label: "eat",
+      next_fire_at: "2099-01-01T00:00:00.000Z",
+      repeat_kind: "once" as const,
+      repeat_hour: null,
+      repeat_minute: null,
+      repeat_weekdays: null,
+      timezone: "Indian/Mauritius",
+      status: "active",
+      last_fired_at: new Date().toISOString(),
+      created_at: "2026-06-22T00:00:00.000Z",
+      updated_at: "2026-06-22T00:00:00.000Z"
+    };
+
+    mockSupabaseFrom.mockImplementation((table: string) => {
+      if (table === "scheduled_reminders") {
+        return buildSelectChain({
+          data: {
+            ...reminder,
+            status: "completed"
+          }
+        });
+      }
+
+      return buildSelectChain({ data: [] });
+    });
+
+    const result = await handleReminderMessage({
+      user: activeUser,
+      message: "done"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain('Done. "eat" is cleared.');
   });
 });

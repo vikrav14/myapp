@@ -40,6 +40,7 @@ export interface ReminderCommandResult {
 
 const MAX_ACTIVE_REMINDERS = 20;
 const RECENT_ACTION_WINDOW_MS = 48 * 60 * 60 * 1000;
+const ONCE_REMINDER_ACK_HOLD_UNTIL = "2099-01-01T00:00:00.000Z";
 
 function mapReminder(row: Record<string, unknown>): ScheduledReminderRecord {
   return {
@@ -140,14 +141,18 @@ function computeNextFireAt(input: {
 }
 
 export function buildReminderListReply(reminders: ScheduledReminderRecord[]): string {
-  if (reminders.length === 0) {
+  const visible = reminders.filter(
+    (reminder) => !(reminder.repeat_kind === "once" && reminder.last_fired_at)
+  );
+
+  if (visible.length === 0) {
     return `No active reminders yet.
 
 Try: remind me to call mum at 6pm
-Or: remind me to drink water daily at 8am`;
+Or: remind me to drink water in 15 minutes`;
   }
 
-  const lines = reminders.map((reminder, index) => {
+  const lines = visible.map((reminder, index) => {
     const clock =
       reminder.repeat_hour !== null && reminder.repeat_minute !== null
         ? formatClockTime(reminder.repeat_hour, reminder.repeat_minute)
@@ -580,8 +585,8 @@ export async function markReminderDelivered(reminder: ScheduledReminderRecord): 
 
   if (reminder.repeat_kind === "once") {
     return updateReminder(reminder.id, {
-      status: "completed",
-      last_fired_at: now.toISOString()
+      last_fired_at: now.toISOString(),
+      next_fire_at: ONCE_REMINDER_ACK_HOLD_UNTIL
     });
   }
 

@@ -28,6 +28,18 @@ function normalize(message: string): string {
   return message.trim().replace(/\s+/g, " ");
 }
 
+function normalizeReminderAction(message: string): string {
+  const firstLine = message.trim().split(/\n/)[0]?.trim().toLowerCase() ?? "";
+  if (firstLine === "done" || firstLine.startsWith("done ")) {
+    return "done";
+  }
+  if (firstLine === "skip" || firstLine.startsWith("skip ")) {
+    return "skip";
+  }
+
+  return message.trim().toLowerCase();
+}
+
 function normalizeTimeToken(token: string): string {
   return token.trim().replace(/(\d{1,2})\s+(\d{2})\b/i, "$1:$2");
 }
@@ -76,7 +88,7 @@ function extractRemindBody(message: string): string | null {
     .replace(/[?.!,]+$/g, "")
     .trim();
 
-  const remindMatch = normalized.match(/remind(?:\s+me)?\s+to\s+(.+)/i);
+  const remindMatch = normalized.match(/remind(?:\s+me)?(?:\s+to)?\s+(.+)/i);
   if (remindMatch?.[1]) {
     return remindMatch[1].trim();
   }
@@ -100,8 +112,9 @@ function extractRemindBody(message: string): string | null {
 }
 
 function parseRelativeDelayToken(token: string): number | null {
-  const match = token.trim().match(/^(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)$/i);
-  if (!match?.[1] || !match[2]) {
+  const trimmed = token.trim();
+  const match = trimmed.match(/^(\d+)(?:\s+(\S+))?$/i);
+  if (!match?.[1]) {
     return null;
   }
 
@@ -110,12 +123,16 @@ function parseRelativeDelayToken(token: string): number | null {
     return null;
   }
 
-  const unit = match[2].toLowerCase();
-  if (unit.startsWith("m")) {
+  const unit = (match[2] ?? "min").toLowerCase();
+  if (/^m/.test(unit)) {
     return amount;
   }
 
-  return amount * 60;
+  if (/^h/.test(unit)) {
+    return amount * 60;
+  }
+
+  return null;
 }
 
 function parseCreateBody(
@@ -127,13 +144,14 @@ function parseCreateBody(
     .replace(/[?.!,]+$/g, "")
     .trim();
 
-  const relativeMatch = cleanedBody.match(
-    /^(.+?)\s+in\s+(\d+\s*(?:m|min|mins|minute|minutes|h|hr|hrs|hour|hours))\s*$/i
-  );
+  const relativeMatch = cleanedBody.match(/^(.+?)\s+in\s+(\d+)(?:\s+(\S+))?\s*$/i);
   const relativeLabel = relativeMatch?.[1];
-  const relativeDelayToken = relativeMatch?.[2];
-  if (relativeLabel && relativeDelayToken) {
-    const delayMinutes = parseRelativeDelayToken(relativeDelayToken);
+  const relativeAmount = relativeMatch?.[2];
+  const relativeUnit = relativeMatch?.[3];
+  if (relativeLabel && relativeAmount) {
+    const delayMinutes = parseRelativeDelayToken(
+      relativeUnit ? `${relativeAmount} ${relativeUnit}` : relativeAmount
+    );
     const label = relativeLabel.trim();
     if (label && delayMinutes) {
       return {
@@ -213,7 +231,7 @@ export function looksLikeReminderAttempt(message: string): boolean {
     return false;
   }
 
-  if (/\bin\s+\d+\s*(?:m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b/i.test(normalized)) {
+  if (/\bin\s+\d+(?:\s*(?:m|min|mins|minute|minutes|mina|h|hr|hrs|hour|hours))?\b/i.test(normalized)) {
     return true;
   }
 
@@ -224,15 +242,15 @@ export function buildReminderParseFailureReply(): string {
   return [
     "I didn't save that reminder — I couldn't read the time clearly from your message.",
     "",
-    "Try: remind me to close door at 00:50",
-    "Or: reminder close door in 5 mins",
+    "Try: remind me to <anything> in 15 minutes",
+    "Or: remind me to <anything> at 11:55pm",
     "Reply my reminders to check what's scheduled."
   ].join("\n");
 }
 
 export function parseReminderCommand(message: string): ReminderParseResult | null {
   const trimmed = normalize(message);
-  const lowered = trimmed.toLowerCase();
+  const lowered = normalizeReminderAction(trimmed);
 
   if (
     lowered === "my reminders" ||

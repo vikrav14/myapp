@@ -164,6 +164,24 @@ describe("parseReminderCommand", () => {
     });
   });
 
+  it("accepts any label and tolerates common time typos", () => {
+    expect(parseReminderCommand("Remind me to shit in 2 mina")).toEqual({
+      type: "create_relative",
+      label: "shit",
+      delayMinutes: 2
+    });
+
+    expect(parseReminderCommand("remind me eat in 5")).toEqual({
+      type: "create_relative",
+      label: "eat",
+      delayMinutes: 5
+    });
+  });
+
+  it("parses reminder action replies from interactive button text", () => {
+    expect(parseReminderCommand("Done\nMark complete")).toEqual({ type: "done" });
+  });
+
   it("detects reminder-shaped messages for guardrail", () => {
     expect(looksLikeReminderAttempt("Can you remind me to drink water at 11:55 PM tonight?")).toBe(true);
     expect(looksLikeReminderAttempt("Set a reminder to drink water at 11:55 PM")).toBe(true);
