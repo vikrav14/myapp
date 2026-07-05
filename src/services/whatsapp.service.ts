@@ -25,8 +25,8 @@ function buildInteractivePayload(interactive: WhatsAppInteractiveOutbound): Reco
       interactive: {
         type: "button",
         header: interactive.header ? { type: "text", text: interactive.header } : undefined,
-        body: { type: "text", text: interactive.body },
-        footer: interactive.footer ? { type: "text", text: interactive.footer } : undefined,
+        body: { text: interactive.body },
+        footer: interactive.footer ? { text: interactive.footer } : undefined,
         action: {
           buttons: interactive.buttons.slice(0, 3).map((button) => ({
             type: "reply",
@@ -49,8 +49,8 @@ function buildInteractivePayload(interactive: WhatsAppInteractiveOutbound): Reco
     interactive: {
       type: "list",
       header: interactive.header ? { type: "text", text: interactive.header } : undefined,
-      body: { type: "text", text: interactive.body },
-      footer: interactive.footer ? { type: "text", text: interactive.footer } : undefined,
+      body: { text: interactive.body },
+      footer: interactive.footer ? { text: interactive.footer } : undefined,
       action: {
         button: (interactive.listButtonLabel ?? "Choose").slice(0, 20),
         sections: interactive.sections.map((section) => ({
