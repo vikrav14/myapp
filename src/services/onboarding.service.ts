@@ -348,7 +348,9 @@ For My Own Mix, send your tags — OK won't apply here.`
         user,
         reply: `${buildSuggestedTopicsPrompt(user.archetype)}
 
-Pick tags below, reply OK, or type your own (3–5 tags).`,
+Pick tags below, reply OK, or type your own (3–5 tags).
+
+Example: Traffic Money Tech`,
         interactive: buildTopicsPickerInteractive(user.archetype)
       };
     }

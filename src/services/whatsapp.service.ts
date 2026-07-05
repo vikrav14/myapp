@@ -448,13 +448,22 @@ export async function sendMauriReply(
     metadata?: Record<string, unknown> | undefined;
   }
 ): Promise<void> {
+  if (payload.text) {
+    await sendWhatsAppMessage(to, payload.text, {
+      ...options,
+      metadata: {
+        ...options?.metadata,
+        ...(payload.interactive ? { alsoSendingInteractive: true } : {})
+      }
+    });
+  }
+
   if (payload.interactive && env.WHATSAPP_INTERACTIVE_ENABLED) {
     await sendWhatsAppInteractive(to, payload.interactive, options);
     return;
   }
 
   if (payload.text) {
-    await sendWhatsAppMessage(to, payload.text, options);
     return;
   }
 

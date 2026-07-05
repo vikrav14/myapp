@@ -226,6 +226,41 @@ whatsappRouter.post("/", async (request, response, next) => {
       return;
     }
 
+    const engagementResult = await handleEngagementCommandMessage({
+      user: accessPolicyResult.user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (engagementResult.handled && engagementResult.reply) {
+      await sendMauriReply(
+        inboundMessage.from,
+        {
+          text: engagementResult.reply,
+          interactive: engagementResult.interactive
+        },
+        {
+          userId: accessPolicyResult.user.id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "engagement_command"
+          }
+        }
+      );
+
+      response.status(200).json({
+        ok: true,
+        userId: accessPolicyResult.user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: accessPolicyResult.user.onboarding_state,
+        subscriptionStatus: accessPolicyResult.user.subscription_status,
+        transcriptPreview,
+        replyPreview: engagementResult.reply
+      });
+      return;
+    }
+
     const onboardingResult = await handleOnboardingMessage({
       user: accessPolicyResult.user,
       isNewUser,
@@ -308,41 +343,6 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: userMindResult.reply
-      });
-      return;
-    }
-
-    const engagementResult = await handleEngagementCommandMessage({
-      user,
-      message: normalizedMessageText,
-      requestId
-    });
-
-    if (engagementResult.handled && engagementResult.reply) {
-      await sendMauriReply(
-        inboundMessage.from,
-        {
-          text: engagementResult.reply,
-          interactive: engagementResult.interactive
-        },
-        {
-          userId: user.id,
-          requestId,
-          metadata: {
-            sourceType: inboundMessage.kind,
-            flow: "engagement_command"
-          }
-        }
-      );
-
-      response.status(200).json({
-        ok: true,
-        userId: user.id,
-        sourceType: inboundMessage.kind,
-        onboardingState: user.onboarding_state,
-        subscriptionStatus: user.subscription_status,
-        transcriptPreview,
-        replyPreview: engagementResult.reply
       });
       return;
     }
