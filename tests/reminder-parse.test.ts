@@ -81,4 +81,18 @@ describe("parseReminderCommand", () => {
   it("ignores unrelated messages", () => {
     expect(parseReminderCommand("I spent 150 on mine frite")).toBeNull();
   });
+
+  it("parses remind-me phrases embedded in longer chat", () => {
+    const result = parseReminderCommand(
+      "lets test reminders. ok. so remind me to drink water at 21.50 PM today"
+    );
+
+    expect(result).toEqual({
+      type: "create",
+      label: "drink water",
+      repeatKind: "once",
+      hour: 21,
+      minute: 50
+    });
+  });
 });

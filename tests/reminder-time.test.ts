@@ -5,10 +5,15 @@ import {
   computeNextOnceFireAt,
   computeNextWeeklyFireAt,
   getMauritiusLocalParts,
-  mauritiusLocalToUtc
+  mauritiusLocalToUtc,
+  parseClockTime
 } from "../src/services/reminder-time.service.js";
 
 describe("reminder time helpers", () => {
+  it("parses dotted clock times", () => {
+    expect(parseClockTime("21.50 PM")).toEqual({ hour: 21, minute: 50 });
+  });
+
   it("computes the next one-time fire in Mauritius time", () => {
     const after = mauritiusLocalToUtc({ year: 2026, month: 6, day: 22, hour: 10, minute: 0 });
     const next = computeNextOnceFireAt({ hour: 18, minute: 0, after });
