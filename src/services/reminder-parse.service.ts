@@ -11,6 +11,11 @@ export type ReminderParseResult =
       minute: number;
       weekdays?: number[] | undefined;
     }
+  | {
+      type: "create_relative";
+      label: string;
+      delayMinutes: number;
+    }
   | { type: "list" }
   | { type: "cancel"; index: number }
   | { type: "done" }
@@ -80,12 +85,50 @@ function extractRemindBody(message: string): string | null {
   return null;
 }
 
-function parseCreateBody(body: string): Extract<ReminderParseResult, { type: "create" }> | null {
+function parseRelativeDelayToken(token: string): number | null {
+  const match = token.trim().match(/^(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)$/i);
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  const unit = match[2].toLowerCase();
+  if (unit.startsWith("m")) {
+    return amount;
+  }
+
+  return amount * 60;
+}
+
+function parseCreateBody(
+  body: string
+): Extract<ReminderParseResult, { type: "create" } | { type: "create_relative" }> | null {
   const cleanedBody = body
     .replace(/\s+today$/i, "")
     .replace(/\s+tonight$/i, "")
     .replace(/[?.!,]+$/g, "")
     .trim();
+
+  const relativeMatch = cleanedBody.match(
+    /^(.+?)\s+in\s+(\d+\s*(?:m|min|mins|minute|minutes|h|hr|hrs|hour|hours))\s*$/i
+  );
+  const relativeLabel = relativeMatch?.[1];
+  const relativeDelayToken = relativeMatch?.[2];
+  if (relativeLabel && relativeDelayToken) {
+    const delayMinutes = parseRelativeDelayToken(relativeDelayToken);
+    const label = relativeLabel.trim();
+    if (label && delayMinutes) {
+      return {
+        type: "create_relative",
+        label,
+        delayMinutes
+      };
+    }
+  }
 
   const atMatch = cleanedBody.match(new RegExp(`^(.+?)\\s+at\\s+(${TIME_TOKEN_PATTERN})\\s*$`, "i"));
   const bareTimeMatch = cleanedBody.match(new RegExp(`^(.+?)\\s+(${TIME_TOKEN_PATTERN})\\s*$`, "i"));
@@ -153,6 +196,10 @@ export function looksLikeReminderAttempt(message: string): boolean {
     return false;
   }
 
+  if (/\bin\s+\d+\s*(?:m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b/i.test(normalized)) {
+    return true;
+  }
+
   return new RegExp(String.raw`\b(?:at\s+)?${TIME_TOKEN_PATTERN}\b`, "i").test(normalized);
 }
 
@@ -161,7 +208,7 @@ export function buildReminderParseFailureReply(): string {
     "I didn't save that reminder — I couldn't read the time clearly from your message.",
     "",
     "Try: remind me to drink water at 11:55pm",
-    "Or type it right after a voice note.",
+    "Or: remind me to drink water in 15 minutes",
     "Reply my reminders to check what's scheduled."
   ].join("\n");
 }

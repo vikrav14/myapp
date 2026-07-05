@@ -246,6 +246,36 @@ async function createReminder(input: {
   return mapReminder(data as Record<string, unknown>);
 }
 
+async function createRelativeReminder(input: {
+  userId: string;
+  label: string;
+  delayMinutes: number;
+}): Promise<ScheduledReminderRecord> {
+  const nextFireAt = new Date(Date.now() + input.delayMinutes * 60 * 1000);
+
+  const { data, error } = await supabase
+    .from("scheduled_reminders")
+    .insert({
+      user_id: input.userId,
+      label: input.label,
+      next_fire_at: nextFireAt.toISOString(),
+      repeat_kind: "once",
+      repeat_hour: null,
+      repeat_minute: null,
+      repeat_weekdays: null,
+      timezone: MAURITIUS_TIMEZONE,
+      status: "active"
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create reminder: ${error.message}`);
+  }
+
+  return mapReminder(data as Record<string, unknown>);
+}
+
 async function cancelReminderByIndex(userId: string, index: number): Promise<ScheduledReminderRecord | null> {
   const reminders = await listActiveReminders(userId);
   const target = reminders[index - 1];
@@ -485,6 +515,34 @@ export async function handleReminderMessage(input: {
     return {
       handled: true,
       reply: `You already have ${MAX_ACTIVE_REMINDERS} active reminders. Cancel one first with: cancel reminder 1`
+    };
+  }
+
+  if (command.type === "create_relative") {
+    const reminder = await createRelativeReminder({
+      userId: input.user.id,
+      label: command.label,
+      delayMinutes: command.delayMinutes
+    });
+
+    await recordAuditEventBestEffort({
+      requestId: input.requestId,
+      eventType: "reminder_created",
+      userId: input.user.id,
+      entityType: "scheduled_reminder",
+      entityId: reminder.id,
+      message: "User created a relative scheduled reminder.",
+      metadata: {
+        label: reminder.label,
+        repeat_kind: reminder.repeat_kind,
+        delay_minutes: command.delayMinutes,
+        next_fire_at: reminder.next_fire_at
+      }
+    });
+
+    return {
+      handled: true,
+      reply: buildReminderCreatedReply(reminder)
     };
   }
 

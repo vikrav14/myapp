@@ -128,9 +128,24 @@ describe("parseReminderCommand", () => {
     });
   });
 
+  it("parses relative-time reminders", () => {
+    expect(parseReminderCommand("remind me to drink water in 15 minutes")).toEqual({
+      type: "create_relative",
+      label: "drink water",
+      delayMinutes: 15
+    });
+
+    expect(parseReminderCommand("remind me to drink water in 1 hour")).toEqual({
+      type: "create_relative",
+      label: "drink water",
+      delayMinutes: 60
+    });
+  });
+
   it("detects reminder-shaped messages for guardrail", () => {
     expect(looksLikeReminderAttempt("Can you remind me to drink water at 11:55 PM tonight?")).toBe(true);
     expect(looksLikeReminderAttempt("Set a reminder to drink water at 11:55 PM")).toBe(true);
+    expect(looksLikeReminderAttempt("remind me to drink water in 15 minutes")).toBe(true);
     expect(looksLikeReminderAttempt("I spent 150 on mine frite")).toBe(false);
   });
 });
