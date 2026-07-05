@@ -35,7 +35,7 @@ export const whatsappRouter = Router();
 async function finishInboundEvent(input: {
   provider: string;
   eventId?: string | undefined;
-  requestId: string;
+  requestId?: string | undefined;
 }): Promise<void> {
   if (!input.eventId) {
     return;
