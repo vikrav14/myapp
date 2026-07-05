@@ -19,6 +19,7 @@ import { handleServiceFeedbackMessage } from "../services/weekly-report-feedback
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
 import { handleOpenLoopFollowUpMessage } from "../services/open-loop-follow-up.service.js";
 import { handleProactiveCheckInMessage } from "../services/proactive-checkin.service.js";
+import { handleQuietHoursCommandMessage } from "../services/quiet-hours-command.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
@@ -27,7 +28,7 @@ import { runSquadRelayAfterExtraction } from "../services/squad-relay.service.js
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
-import { parseInboundMessage, sendMauriReply, sendWhatsAppMessage } from "../services/whatsapp.service.js";
+import { parseInboundMessage, sendMauriReply, sendWhatsAppMessage, sendWhatsAppTypingIndicator } from "../services/whatsapp.service.js";
 import { reactToInboundMessageBestEffort } from "../services/whatsapp-reaction.service.js";
 import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
 
@@ -439,6 +440,33 @@ whatsappRouter.post("/", async (request, response, next) => {
       return;
     }
 
+    const quietHoursResult = await handleQuietHoursCommandMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (quietHoursResult.handled && quietHoursResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, quietHoursResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "quiet_hours_command"
+        }
+      });
+
+      await respondOk({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: quietHoursResult.reply
+      });
+      return;
+    }
+
     const proactiveCheckInResult = await handleProactiveCheckInMessage({
       user,
       message: normalizedMessageText
@@ -709,6 +737,14 @@ whatsappRouter.post("/", async (request, response, next) => {
 
     if (inboundReaction.reacted) {
       await sleep(OUTBOUND_PAIR_DELAY_MS);
+    }
+
+    if (inboundMessage.messageId && env.WHATSAPP_TYPING_INDICATOR_ENABLED) {
+      try {
+        await sendWhatsAppTypingIndicator(inboundMessage.messageId);
+      } catch (error) {
+        logger.warn({ error, messageId: inboundMessage.messageId }, "Failed to send typing indicator.");
+      }
     }
 
     await sendWhatsAppMessage(inboundMessage.from, reply, {

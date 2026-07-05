@@ -7,6 +7,10 @@ import type { UserMindSnapshotPayload } from "../schemas/user-mind.js";
 import type { MauriUser } from "../types.js";
 import { generateProactiveCheckInMessage } from "./ai.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
+import {
+  canSendProactiveOutbound,
+  recordProactivePing
+} from "./outbound-pace.service.js";
 import { hasEngagementDelivery, recordEngagementDelivery } from "./engagement-delivery.service.js";
 import { buildPaydayRunwaySnippet, loadPayCycleSpend } from "./payday-runway.service.js";
 import { isReminderEligible } from "./reminder-schedule.service.js";
@@ -492,6 +496,11 @@ export async function deliverProactiveCheckIn(input: {
   mind: UserMindSnapshotPayload | null;
   requestId?: string | undefined;
 }): Promise<boolean> {
+  const gate = await canSendProactiveOutbound(input.user, "proactive_checkin");
+  if (!gate.allowed) {
+    return false;
+  }
+
   const message =
     (await generateProactiveCheckInMessage({
       user: input.user,
@@ -525,6 +534,7 @@ export async function deliverProactiveCheckIn(input: {
   }
 
   await recordEngagementDelivery(input.user.id, buildDailyDeliveryKey());
+  await recordProactivePing(input.user.id, "proactive_checkin");
   await recordAuditEventBestEffort({
     requestId: input.requestId,
     eventType: "proactive_checkin_sent",
@@ -585,8 +595,12 @@ export async function runProactiveCheckInDeliveries(requestId?: string): Promise
     }
 
     try {
-      await deliverProactiveCheckIn({ user, candidate, mind, requestId });
-      sent += 1;
+      const delivered = await deliverProactiveCheckIn({ user, candidate, mind, requestId });
+      if (delivered) {
+        sent += 1;
+      } else {
+        skipped += 1;
+      }
     } catch (error) {
       skipped += 1;
       logger.warn({ error, userId: user.id }, "Failed proactive check-in delivery for user.");
@@ -627,7 +641,7 @@ export async function handleProactiveCheckInMessage(input: {
     return {
       handled: true,
       user: updatedUser,
-      reply: `Got it — I won't proactively check in for ${PROACTIVE_CHECKIN_PAUSE_DAYS} days. Message me anytime; followups on turns proactive pings back on when you're ready.`
+      reply: `Got it — no unprompted pings for ${PROACTIVE_CHECKIN_PAUSE_DAYS} days. Message me anytime; reminders and replies to you still work.`
     };
   }
 

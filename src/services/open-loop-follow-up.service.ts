@@ -13,6 +13,7 @@ import {
 } from "./reminder-time.service.js";
 import { isReminderEligible } from "./reminder-schedule.service.js";
 import { findUserById, mapUser, updateUserState } from "./user.service.js";
+import { canSendProactiveOutbound, recordProactivePing } from "./outbound-pace.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 import {
   OPEN_LOOP_FOLLOWUP_COOLDOWN_DAYS,
@@ -280,6 +281,11 @@ export async function deliverOpenLoopFollowUp(input: {
     return false;
   }
 
+  const gate = await canSendProactiveOutbound(user, "open_loop_followup");
+  if (!gate.allowed) {
+    return false;
+  }
+
   const message =
     (await generateOpenLoopFollowUpMessage({
       user,
@@ -299,6 +305,8 @@ export async function deliverOpenLoopFollowUp(input: {
     followUpId: input.followUp.id,
     messageText: message
   });
+
+  await recordProactivePing(user.id, "open_loop_followup");
 
   await recordAuditEventBestEffort({
     requestId: input.requestId,

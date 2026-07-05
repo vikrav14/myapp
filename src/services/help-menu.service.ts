@@ -46,6 +46,8 @@ Memory
 - followups on / followups off — open-loop + proactive mate check-ins (max ~3/week)
 - my followups — see pending open-loop check-ins
 - my checkins — proactive ping status · not now — pause 7 days
+- quiet hours — unprompted ping quiet window status
+- quiet hours on / quiet hours off — mute unprompted pings overnight (default 10pm–7am)
 
 Local alerts
 - Mauri pings school closures, heavy rain, cyclone warnings

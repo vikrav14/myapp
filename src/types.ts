@@ -53,6 +53,9 @@ export interface MauriUser {
   weekly_focus_set_at: string | null;
   open_loop_followups_enabled: boolean;
   proactive_checkins_paused_until: string | null;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start_hour: number;
+  quiet_hours_end_hour: number;
   created_at: string;
   updated_at: string;
 }

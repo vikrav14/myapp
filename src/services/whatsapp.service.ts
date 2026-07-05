@@ -358,6 +358,36 @@ export async function markWhatsAppMessageRead(messageId: string): Promise<void> 
   }
 }
 
+export async function sendWhatsAppTypingIndicator(messageId: string): Promise<void> {
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    return;
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/v22.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+        typing_indicator: {
+          type: "text"
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to send WhatsApp typing indicator: ${errorText}`);
+  }
+}
+
 export async function deliverWhatsAppReaction(input: {
   to: string;
   messageId: string;
