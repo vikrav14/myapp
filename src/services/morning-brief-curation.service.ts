@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { env } from "../lib/env.js";
+import { sanitizeGeminiResponseSchema } from "../lib/gemini-schema.js";
 import { parseStructuredJson } from "../schemas/extraction.js";
 import type { CuratedMorningBrief, MorningBriefTopicKey } from "../types.js";
 import type { MorningBriefScrapeResult } from "./morning-brief-scraper.service.js";
@@ -57,7 +58,7 @@ async function callGeminiJson(prompt: string): Promise<string> {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: curatedBriefJsonSchema
+          responseSchema: sanitizeGeminiResponseSchema(curatedBriefJsonSchema)
         }
       })
     }
