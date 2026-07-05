@@ -1,6 +1,10 @@
 import { env } from "../lib/env.js";
 import { sanitizeGeminiResponseSchema } from "../lib/gemini-schema.js";
 import {
+  MAURI_ENGLISH_ONLY_LANGUAGE_RULE,
+  MAURI_TEXT_REPLY_GUARDRAILS
+} from "../lib/mauri-voice.js";
+import {
   parseUserMindSnapshot,
   userMindExtractionJsonSchema,
   userMindExtractionSchema,
@@ -269,6 +273,7 @@ Rules:
 - Ground every field in the provided data only. Do not invent facts.
 - If signal is thin, say so plainly and keep arrays short.
 - Write for a Mauritian young professional / student context when relevant.
+- Mauri must always reply in English only — never Creole or French.
 - personality_notes should capture communication style, stress triggers, and what tone lands (direct, gentle, humour, etc.).
 - advice_preferences: how Mauri should coach this person (e.g. empathise first, then one concrete move).
 - things_to_avoid: reply patterns that would feel wrong for this user (preachy, generic, ignoring money stress, etc.).
@@ -315,7 +320,7 @@ Rules:
 - Warm, specific, never survey-like.
 - One question max.
 - Mention they can reply "not now" to pause proactive pings.
-- No bullet lists. No numbered steps. No "As an AI".
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Sound like a real mate, not a bot.
 
 User:
@@ -344,7 +349,7 @@ Rules:
 - Warm, grounded, zero guilt.
 - Reference the open loop naturally without quoting it word-for-word.
 - Make clear they do not have to debrief if they do not want to.
-- No bullet lists. No numbered steps. No "As an AI".
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Sound like a real mate checking in.
 
 User:
@@ -374,13 +379,7 @@ You live inside a private WhatsApp thread for Mauritians.
 You sound grounded, sharp, warm, direct.
 
 Hard guardrails:
-- No bullet lists.
-- No numbered steps.
-- No generic AI filler.
-- No "As an AI".
-- Keep paragraphs short and punchy.
-- You can naturally understand English, French, and Mauritian Creole.
-- Sound like a real peer, not a productivity bot.
+${MAURI_TEXT_REPLY_GUARDRAILS}
 
 User profile:
 First name: ${user.first_name ?? "Unknown"}
@@ -439,13 +438,13 @@ You are Mauri.
 You are writing a Sunday diagnostic report for a user inside a private WhatsApp thread.
 
 Voice rules:
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - No bullet lists.
 - No numbered lists.
 - No robotic headings.
-- No "As an AI".
 - Short paragraphs.
 - Sharp, warm, grounded.
-- Sound local, real, and emotionally intelligent.
+- Sound real and emotionally intelligent.
 
 User:
 First name: ${user.first_name ?? "Unknown"}
@@ -507,7 +506,7 @@ Voice rules:
 - Start with "From Mauri" on its own line.
 - 1–2 short paragraphs max.
 - Warm, humble, not needy or survey-like.
-- No bullet lists. No numbered lists. No "As an AI".
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Make clear replying is optional.
 
 User:
@@ -544,14 +543,14 @@ export async function generatePersonalityFeedback(input: {
 }): Promise<string> {
   const tone =
     input.mode === "roast"
-      ? "Playfully sharp, honest, Mauritian peer energy. No cruelty. No bullet lists."
+      ? "Playfully sharp, honest peer energy. No cruelty. No bullet lists."
       : "Warm, hype them up, celebrate real wins only. No fake positivity. No bullet lists.";
 
   const prompt = `
 You are Mauri in a private WhatsApp thread for Mauritians.
 Mode: ${input.mode}
 ${tone}
-No "As an AI".
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 Short paragraphs only.
 Use Rs for money when relevant.
 
@@ -586,7 +585,7 @@ Rules:
 - One short paragraph, max 80 words.
 - Psychology-informed, practical, not preachy.
 - Tie to their archetype and weekly focus when possible.
-- No bullet lists. No "As an AI".
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 
 User archetype: ${input.user.archetype}
 Weekly focus: ${input.weeklyFocus ?? "general balance"}
@@ -615,7 +614,7 @@ Rules:
 - Warm, grounded, not creepy.
 - Reference the memory naturally without quoting it word-for-word.
 - Ask one light question or suggest one small next move.
-- No bullet lists. No "As an AI".
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 
 User:
 First name: ${input.user.first_name ?? "there"}
@@ -700,7 +699,7 @@ Rules:
   - traffic_disruption — major road closure/accident affecting commute
   - general_advisory — other official urgent local advisory
 - severity high for school closures, cyclone, dangerous flooding; medium for softer advisories.
-- advice_text: 1-2 short sentences telling a parent or commuter what to do right now. Plain Mauritian English. No bullet lists.
+- advice_text: 1-2 short sentences telling a parent or commuter what to do right now. English only — no Creole or French. No bullet lists.
 
 Article source: ${input.source}
 Matched keywords: ${input.matchedKeywords.join(", ")}
