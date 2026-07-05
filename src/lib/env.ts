@@ -44,7 +44,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   GOOGLE_AI_API_KEY: z.string().min(1),
-  GEMINI_MODEL: z.string().default("gemini-1.5-flash"),
+  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   WHATSAPP_VERIFY_TOKEN: z.string().min(1),
   WHATSAPP_ACCESS_TOKEN: optionalSecret,
   WHATSAPP_PHONE_NUMBER_ID: optionalSecret,
