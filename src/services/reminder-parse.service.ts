@@ -17,7 +17,6 @@ export type ReminderParseResult =
   | { type: "skip" }
   | { type: "snooze"; minutes: number };
 
-const REMIND_PREFIX = /^remind(?:\s+me)?\s+to\s+(.+)$/i;
 const SET_REMINDER_PREFIX = /^set\s+reminder\s+(?:to\s+)?(.+)$/i;
 
 function normalize(message: string): string {
@@ -47,8 +46,15 @@ function parseSnoozeMinutes(text: string): number | null {
   return amount * 60;
 }
 
+function extractRemindBody(message: string): string | null {
+  const normalized = normalize(message).replace(/\n+/g, " ");
+  const match = normalized.match(/remind(?:\s+me)?\s+to\s+(.+)$/i);
+  return match?.[1]?.trim() ?? null;
+}
+
 function parseCreateBody(body: string): Extract<ReminderParseResult, { type: "create" }> | null {
-  const atMatch = body.match(/^(.+?)\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*$/i);
+  const cleanedBody = body.replace(/\s+today$/i, "").replace(/\s+tonight$/i, "").trim();
+  const atMatch = cleanedBody.match(/^(.+?)\s+at\s+(\d{1,2}(?:(?::|\.)\d{2})?\s*(?:am|pm)?)\s*$/i);
   const labelCapture = atMatch?.[1];
   const timeCapture = atMatch?.[2];
   if (!labelCapture || !timeCapture) {
@@ -135,8 +141,7 @@ export function parseReminderCommand(message: string): ReminderParseResult | nul
     return { type: "snooze", minutes: snoozeMinutes };
   }
 
-  const remindMatch = trimmed.match(REMIND_PREFIX);
-  const remindBody = remindMatch?.[1];
+  const remindBody = extractRemindBody(trimmed);
   if (remindBody) {
     return parseCreateBody(remindBody);
   }

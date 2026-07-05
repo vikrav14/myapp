@@ -71,7 +71,11 @@ export function addDaysToLocal(local: MauritiusLocalParts, days: number): Maurit
 }
 
 export function parseClockTime(token: string): { hour: number; minute: number } | null {
-  const normalized = token.trim().toLowerCase().replace(/\s+/g, " ");
+  const normalized = token
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/(\d{1,2})\.(\d{2})/g, "$1:$2");
   const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
   if (!match) {
     return null;
