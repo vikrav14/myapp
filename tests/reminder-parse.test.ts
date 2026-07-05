@@ -140,6 +140,28 @@ describe("parseReminderCommand", () => {
       label: "drink water",
       delayMinutes: 60
     });
+
+    expect(parseReminderCommand("remind me to eat in 2 mins")).toEqual({
+      type: "create_relative",
+      label: "eat",
+      delayMinutes: 2
+    });
+
+    expect(parseReminderCommand("Reminder close door in 5 mins")).toEqual({
+      type: "create_relative",
+      label: "close door",
+      delayMinutes: 5
+    });
+  });
+
+  it("parses shorthand reminder phrasing and 24-hour clock times", () => {
+    expect(parseReminderCommand("Reminder to close door 00:50")).toEqual({
+      type: "create",
+      label: "close door",
+      repeatKind: "once",
+      hour: 0,
+      minute: 50
+    });
   });
 
   it("detects reminder-shaped messages for guardrail", () => {

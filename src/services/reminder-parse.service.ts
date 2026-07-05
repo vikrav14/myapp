@@ -61,6 +61,15 @@ function parseSnoozeMinutes(text: string): number | null {
   return amount * 60;
 }
 
+function isBareTrailingTimeUsable(timeToken: string): boolean {
+  const normalized = normalizeTimeToken(timeToken).trim();
+  if (/(?:am|pm)/i.test(normalized)) {
+    return true;
+  }
+
+  return /^\d{1,2}:\d{2}$/i.test(normalized);
+}
+
 function extractRemindBody(message: string): string | null {
   const normalized = normalize(message)
     .replace(/\n+/g, " ")
@@ -80,6 +89,11 @@ function extractRemindBody(message: string): string | null {
   const reminderForMatch = normalized.match(/reminder\s+(?:for|to)\s+(.+)/i);
   if (reminderForMatch?.[1]) {
     return reminderForMatch[1].trim();
+  }
+
+  const reminderBareMatch = normalized.match(/^reminder\s+(.+)/i);
+  if (reminderBareMatch?.[1]) {
+    return reminderBareMatch[1].trim();
   }
 
   return null;
@@ -132,7 +146,10 @@ function parseCreateBody(
 
   const atMatch = cleanedBody.match(new RegExp(`^(.+?)\\s+at\\s+(${TIME_TOKEN_PATTERN})\\s*$`, "i"));
   const bareTimeMatch = cleanedBody.match(new RegExp(`^(.+?)\\s+(${TIME_TOKEN_PATTERN})\\s*$`, "i"));
-  const match = atMatch ?? (bareTimeMatch?.[2]?.match(/(?:am|pm)/i) ? bareTimeMatch : null);
+  const bareTimeToken = bareTimeMatch?.[2];
+  const match =
+    atMatch ??
+    (bareTimeToken && isBareTrailingTimeUsable(bareTimeToken) ? bareTimeMatch : null);
 
   const labelCapture = match?.[1];
   const timeCapture = match?.[2];
@@ -207,8 +224,8 @@ export function buildReminderParseFailureReply(): string {
   return [
     "I didn't save that reminder — I couldn't read the time clearly from your message.",
     "",
-    "Try: remind me to drink water at 11:55pm",
-    "Or: remind me to drink water in 15 minutes",
+    "Try: remind me to close door at 00:50",
+    "Or: reminder close door in 5 mins",
     "Reply my reminders to check what's scheduled."
   ].join("\n");
 }
