@@ -1,6 +1,7 @@
 import { env } from "../lib/env.js";
 import { sanitizeGeminiResponseSchema } from "../lib/gemini-schema.js";
 import {
+  finalizeMauriTextReply,
   MAURI_ENGLISH_ONLY_LANGUAGE_RULE,
   MAURI_TEXT_REPLY_GUARDRAILS
 } from "../lib/mauri-voice.js";
@@ -419,10 +420,12 @@ If they implicitly logged progress, acknowledge it naturally.
 If they seem scattered, help them narrow to the next move without sounding robotic.
 `;
 
-  return callGemini({
+  const rawReply = await callGemini({
     prompt: replyPrompt,
     responseMimeType: "text/plain"
   });
+
+  return finalizeMauriTextReply({ message, reply: rawReply });
 }
 
 export async function generateWeeklyDiagnosticCopy(input: {

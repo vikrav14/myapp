@@ -86,8 +86,10 @@ describe("morning brief personalization", () => {
     });
 
     expect(message).toContain("Morning Ava");
-    expect(message).toContain("Weather:");
-    expect(message).toContain("Port Louis bottleneck");
+    expect(message).toContain("☁️");
+    expect(message).toContain("🚗");
+    expect(message).toContain("#Traffic · Port Louis bottleneck");
     expect(message).not.toContain("coworking space");
+    expect(message).not.toContain("Your brief:");
   });
 });

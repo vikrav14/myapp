@@ -142,24 +142,25 @@ export function buildPersonalizedMorningBriefMessage(input: {
   const topicSet = new Set(input.topics);
   const stories = input.curated.stories
     .filter((story) => topicSet.has(story.topic as MorningBriefTopicKey))
-    .slice(0, 5);
+    .slice(0, 3);
 
   const lines = [
-    `Morning ${name}. Mauri vibe check.`,
+    `Morning ${name}`,
     "",
-    `Weather: ${input.curated.weather_line}`,
-    `Traffic: ${input.curated.traffic_line}`
+    `☁️ ${input.curated.weather_line}`,
+    `🚗 ${input.curated.traffic_line}`
   ];
 
   if (stories.length > 0) {
-    lines.push("", "Your brief:");
+    lines.push("");
     for (const story of stories) {
-      lines.push(`- #${story.topic}: ${story.headline} — ${story.summary}`);
+      const headline = story.headline.length > 72 ? `${story.headline.slice(0, 69).trim()}…` : story.headline;
+      lines.push(`#${story.topic} · ${headline}`);
     }
   } else {
-    lines.push("", "No strong story matches for your tags today. Weather and traffic are the main signal.");
+    lines.push("", "Quiet news day for your tags — weather and traffic are the main signal.");
   }
 
-  lines.push("", "Reply anytime to log spend, tasks, or voice dump your day.");
+  lines.push("", "Reply anytime — log spend, tasks, or vent.");
   return lines.join("\n");
 }
