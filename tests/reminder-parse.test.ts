@@ -75,6 +75,9 @@ describe("parseReminderCommand", () => {
     expect(parseReminderCommand("skip")).toEqual({ type: "skip" });
     expect(parseReminderCommand("snooze 1h")).toEqual({ type: "snooze", minutes: 60 });
     expect(parseReminderCommand("snooze 30m")).toEqual({ type: "snooze", minutes: 30 });
+    expect(parseReminderCommand("snooze 15m")).toEqual({ type: "snooze", minutes: 15 });
+    expect(parseReminderCommand("snooze 3h")).toEqual({ type: "snooze", minutes: 180 });
+    expect(parseReminderCommand("snooze tomorrow")?.type).toBe("snooze");
     expect(parseReminderCommand("snooze")).toEqual({ type: "snooze", minutes: 60 });
   });
 

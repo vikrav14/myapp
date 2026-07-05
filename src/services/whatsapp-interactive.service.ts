@@ -26,6 +26,9 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   feedback_prompt: "mauri feedback",
   reminder_done: "done",
   reminder_snooze: "snooze 1h",
+  reminder_snooze_15m: "snooze 15m",
+  reminder_snooze_3h: "snooze 3h",
+  reminder_snooze_tomorrow: "snooze tomorrow",
   reminder_skip: "skip"
 };
 
@@ -191,11 +194,22 @@ export function buildSundayContextInteractive(): WhatsAppInteractiveOutbound {
 
 export function buildReminderDeliveryInteractive(label: string): WhatsAppInteractiveOutbound {
   return {
-    body: `⏰ Reminder: ${label}`,
-    buttons: [
-      { id: "reminder_done", title: "Done" },
-      { id: "reminder_snooze", title: "Snooze 1h" },
-      { id: "reminder_skip", title: "Skip" }
+    header: "Reminder",
+    body: `⏰ ${label}`,
+    footer: "Tap an action",
+    listButtonLabel: "Respond",
+    sections: [
+      {
+        title: "Actions",
+        rows: [
+          { id: "reminder_done", title: "Done", description: "Mark complete" },
+          { id: "reminder_snooze_15m", title: "Snooze 15 min", description: "Ping again shortly" },
+          { id: "reminder_snooze", title: "Snooze 1 hour", description: "Check back later" },
+          { id: "reminder_snooze_3h", title: "Snooze 3 hours", description: "Later today" },
+          { id: "reminder_snooze_tomorrow", title: "Tomorrow 9am", description: "Remind me tomorrow morning" },
+          { id: "reminder_skip", title: "Skip", description: "Skip this ping" }
+        ]
+      }
     ]
   };
 }

@@ -16,6 +16,8 @@ describe("resolveInteractiveReplyId", () => {
     expect(resolveInteractiveReplyId("help_focus")).toBe("my focus");
     expect(resolveInteractiveReplyId("reminder_done")).toBe("done");
     expect(resolveInteractiveReplyId("reminder_snooze")).toBe("snooze 1h");
+    expect(resolveInteractiveReplyId("reminder_snooze_15m")).toBe("snooze 15m");
+    expect(resolveInteractiveReplyId("reminder_snooze_tomorrow")).toBe("snooze tomorrow");
     expect(resolveInteractiveReplyId("reminder_skip")).toBe("skip");
   });
 
@@ -37,11 +39,13 @@ describe("interactive builders", () => {
     expect(rating.sections?.[0]?.rows?.[4]?.id).toBe("rate_5");
   });
 
-  it("builds reminder delivery buttons", () => {
+  it("builds reminder delivery actions as a list", () => {
     const reminder = buildReminderDeliveryInteractive("call mum");
     expect(reminder.body).toContain("call mum");
-    expect(reminder.buttons).toHaveLength(3);
-    expect(reminder.buttons?.[0]?.id).toBe("reminder_done");
+    expect(reminder.listButtonLabel).toBe("Respond");
+    expect(reminder.sections?.[0]?.rows).toHaveLength(6);
+    expect(reminder.sections?.[0]?.rows?.[0]?.id).toBe("reminder_done");
+    expect(reminder.sections?.[0]?.rows?.[4]?.id).toBe("reminder_snooze_tomorrow");
   });
 });
 

@@ -1,4 +1,4 @@
-import { parseClockTime, parseWeekdayTokens } from "./reminder-time.service.js";
+import { parseClockTime, parseWeekdayTokens, computeSnoozeMinutesUntilTomorrowMorning } from "./reminder-time.service.js";
 
 export type ReminderRepeatKind = "once" | "daily" | "weekdays" | "weekly";
 
@@ -24,7 +24,13 @@ function normalize(message: string): string {
 }
 
 function parseSnoozeMinutes(text: string): number | null {
-  const match = text.match(/^snooze(?:\s+(\d+)\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes)?)?$/i);
+  const normalized = text.trim().toLowerCase().replace(/\s+/g, " ");
+
+  if (normalized === "snooze tomorrow") {
+    return computeSnoozeMinutesUntilTomorrowMorning();
+  }
+
+  const match = normalized.match(/^snooze(?:\s+(\d+)\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes)?)?$/i);
   if (!match) {
     return null;
   }
