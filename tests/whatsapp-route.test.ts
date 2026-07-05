@@ -29,7 +29,8 @@ vi.mock("../src/services/context.service.js", () => ({
 }));
 
 vi.mock("../src/services/inbound-event.service.js", () => ({
-  registerInboundEvent: mockRegisterInboundEvent
+  registerInboundEvent: mockRegisterInboundEvent,
+  completeInboundEvent: vi.fn().mockResolvedValue(undefined)
 }));
 
 vi.mock("../src/services/logging.service.js", () => ({
@@ -94,7 +95,7 @@ const baseUser = {
 describe("WhatsApp webhook route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRegisterInboundEvent.mockResolvedValue({ duplicate: false });
+    mockRegisterInboundEvent.mockResolvedValue({ duplicate: false, reclaim: false });
     mockHandleSquadMessage.mockResolvedValue({ handled: false });
     mockSendMauriReply.mockResolvedValue(undefined);
     mockSendWhatsAppMessage.mockResolvedValue(undefined);
@@ -270,7 +271,7 @@ describe("WhatsApp webhook route", () => {
   });
 
   it("ignores a duplicate inbound WhatsApp message before processing", async () => {
-    mockRegisterInboundEvent.mockResolvedValue({ duplicate: true });
+    mockRegisterInboundEvent.mockResolvedValue({ duplicate: true, reclaim: false });
 
     const app = createApp();
     const response = await request(app)

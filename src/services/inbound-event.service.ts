@@ -1,21 +1,26 @@
 import { supabase } from "../lib/supabase.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 
+export interface InboundEventRegistration {
+  duplicate: boolean;
+  reclaim: boolean;
+}
+
 export async function registerInboundEvent(input: {
   provider: string;
   eventId: string;
   eventKind?: string | undefined;
   rawPayload?: unknown;
   requestId?: string | undefined;
-}): Promise<{ duplicate: boolean }> {
+}): Promise<InboundEventRegistration> {
   const trimmedEventId = input.eventId.trim();
   if (!trimmedEventId) {
-    return { duplicate: false };
+    return { duplicate: false, reclaim: false };
   }
 
   const { data: existing, error: existingError } = await supabase
     .from("processed_inbound_events")
-    .select("id, duplicate_count")
+    .select("id, duplicate_count, status")
     .eq("provider", input.provider)
     .eq("event_id", trimmedEventId)
     .maybeSingle();
@@ -38,28 +43,47 @@ export async function registerInboundEvent(input: {
       throw new Error(`Failed to update duplicate inbound event: ${updateError.message}`);
     }
 
+    if (existing.status === "processed") {
+      await recordAuditEventBestEffort({
+        requestId: input.requestId,
+        eventType: "inbound_event_duplicate_ignored",
+        severity: "warning",
+        actorType: input.provider,
+        entityType: "inbound_event",
+        entityId: trimmedEventId,
+        message: "Duplicate inbound event was ignored.",
+        metadata: {
+          provider: input.provider,
+          eventKind: input.eventKind
+        }
+      });
+
+      return { duplicate: true, reclaim: false };
+    }
+
     await recordAuditEventBestEffort({
       requestId: input.requestId,
-      eventType: "inbound_event_duplicate_ignored",
-      severity: "warning",
+      eventType: "inbound_event_retry_reclaimed",
+      severity: "info",
       actorType: input.provider,
       entityType: "inbound_event",
       entityId: trimmedEventId,
-      message: "Duplicate inbound event was ignored.",
+      message: "Reclaimed inbound event retry after incomplete processing.",
       metadata: {
         provider: input.provider,
-        eventKind: input.eventKind
+        eventKind: input.eventKind,
+        priorStatus: existing.status
       }
     });
 
-    return { duplicate: true };
+    return { duplicate: true, reclaim: true };
   }
 
   const { error: insertError } = await supabase.from("processed_inbound_events").insert({
     provider: input.provider,
     event_id: trimmedEventId,
     event_kind: input.eventKind ?? null,
-    status: "processed",
+    status: "processing",
     raw_payload: input.rawPayload ?? null
   });
 
@@ -67,5 +91,30 @@ export async function registerInboundEvent(input: {
     throw new Error(`Failed to register inbound event: ${insertError.message}`);
   }
 
-  return { duplicate: false };
+  return { duplicate: false, reclaim: false };
+}
+
+export async function completeInboundEvent(input: {
+  provider: string;
+  eventId: string;
+  requestId?: string | undefined;
+}): Promise<void> {
+  const trimmedEventId = input.eventId.trim();
+  if (!trimmedEventId) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("processed_inbound_events")
+    .update({
+      status: "processed",
+      updated_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString()
+    })
+    .eq("provider", input.provider)
+    .eq("event_id", trimmedEventId);
+
+  if (error) {
+    throw new Error(`Failed to complete inbound event: ${error.message}`);
+  }
 }
