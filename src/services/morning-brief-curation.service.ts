@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { env } from "../lib/env.js";
 import { sanitizeGeminiResponseSchema } from "../lib/gemini-schema.js";
+import { MAURI_ENGLISH_ONLY_LANGUAGE_RULE } from "../lib/mauri-voice.js";
 import { parseStructuredJson } from "../schemas/extraction.js";
 import type { CuratedMorningBrief, MorningBriefTopicKey } from "../types.js";
 import type { MorningBriefScrapeResult } from "./morning-brief-scraper.service.js";
@@ -99,7 +100,7 @@ Curate a clean morning brief for Mauritius using the raw inputs below.
 Rules:
 - Filter political noise, toxicity, and low-signal gossip.
 - Keep summaries short, sharp, and useful for students and young professionals.
-- Use natural Mauritian English. Light Creole is fine when it feels local.
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - weather_line: one sentence about today's weather in Mauritius.
 - traffic_line: one sentence about commute pressure using the traffic snapshot when available.
 - stories: up to 8 high-signal stories tagged with one topic each from: Traffic, Tech, Money, LocalBuzz, Entertainment.
