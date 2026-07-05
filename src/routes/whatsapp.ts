@@ -305,6 +305,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         {
           userId: onboardingResult.user.id,
           requestId,
+          sendTextBeforeInteractive: onboardingResult.sendTextBeforeInteractive,
           metadata: {
             sourceType: inboundMessage.kind,
             flow: "onboarding"

@@ -118,6 +118,7 @@ describe("handleOnboardingMessage", () => {
     );
     expect(result.reply).toContain("printing shop");
     expect(result.interactive?.listButtonLabel).toBe("Pick vibe");
+    expect(result.sendTextBeforeInteractive).toBe(true);
   });
 
   it("moves custom lane users to tag selection with no preset OK path", async () => {

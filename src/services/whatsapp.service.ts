@@ -446,9 +446,20 @@ export async function sendMauriReply(
     userId?: string | null | undefined;
     requestId?: string | undefined;
     metadata?: Record<string, unknown> | undefined;
+    sendTextBeforeInteractive?: boolean | undefined;
   }
 ): Promise<void> {
   if (payload.interactive && env.WHATSAPP_INTERACTIVE_ENABLED) {
+    if (options?.sendTextBeforeInteractive && payload.text?.trim()) {
+      await sendWhatsAppMessage(to, payload.text.trim(), {
+        ...options,
+        metadata: {
+          ...options?.metadata,
+          pairedWithInteractive: true
+        }
+      });
+    }
+
     await sendWhatsAppInteractive(to, payload.interactive, options);
     return;
   }

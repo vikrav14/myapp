@@ -70,6 +70,7 @@ export interface OnboardingResult {
   handled: boolean;
   reply?: string | undefined;
   interactive?: WhatsAppInteractiveOutbound | undefined;
+  sendTextBeforeInteractive?: boolean | undefined;
   user: MauriUser;
 }
 
@@ -281,7 +282,8 @@ export async function handleOnboardingMessage(input: {
         interactive: buildArchetypePickerInteractive({
           firstName: updatedUser.first_name,
           isNewUser
-        })
+        }),
+        sendTextBeforeInteractive: true
       };
     }
 
@@ -317,7 +319,8 @@ export async function handleOnboardingMessage(input: {
       interactive: buildArchetypePickerInteractive({
         firstName: updatedUser.first_name,
         isNewUser: false
-      })
+      }),
+      sendTextBeforeInteractive: true
     };
   }
 
