@@ -81,8 +81,8 @@ describe("handleEngagementCommandMessage", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Tap what you need");
     expect(result.interactive?.listButtonLabel).toBe("Open menu");
+    expect(result.reply).toBeUndefined();
   });
 
   it("returns weekly focus", async () => {

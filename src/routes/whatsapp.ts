@@ -260,7 +260,7 @@ whatsappRouter.post("/", async (request, response, next) => {
       requestId
     });
 
-    if (engagementResult.handled && engagementResult.reply) {
+    if (engagementResult.handled && (engagementResult.reply || engagementResult.interactive)) {
       await sendMauriReply(
         inboundMessage.from,
         {
@@ -284,7 +284,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         onboardingState: accessPolicyResult.user.onboarding_state,
         subscriptionStatus: accessPolicyResult.user.subscription_status,
         transcriptPreview,
-        replyPreview: engagementResult.reply
+        replyPreview: engagementResult.reply ?? engagementResult.interactive?.body
       });
       return;
     }
@@ -295,7 +295,7 @@ whatsappRouter.post("/", async (request, response, next) => {
       message: normalizedMessageText
     });
 
-    if (onboardingResult.handled && onboardingResult.reply) {
+    if (onboardingResult.handled && (onboardingResult.reply || onboardingResult.interactive)) {
       await sendMauriReply(
         inboundMessage.from,
         {
@@ -312,28 +312,6 @@ whatsappRouter.post("/", async (request, response, next) => {
         }
       );
 
-      if (onboardingResult.followUpReply) {
-        await sendWhatsAppMessage(inboundMessage.from, onboardingResult.followUpReply, {
-          userId: onboardingResult.user.id,
-          requestId,
-          metadata: {
-            sourceType: inboundMessage.kind,
-            flow: "onboarding_preview"
-          }
-        });
-      }
-
-      if (onboardingResult.discoveryReply) {
-        await sendWhatsAppMessage(inboundMessage.from, onboardingResult.discoveryReply, {
-          userId: onboardingResult.user.id,
-          requestId,
-          metadata: {
-            sourceType: inboundMessage.kind,
-            flow: "onboarding_discovery"
-          }
-        });
-      }
-
       await respondOk({
         ok: true,
         userId: onboardingResult.user.id,
@@ -341,7 +319,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         onboardingState: onboardingResult.user.onboarding_state,
         subscriptionStatus: onboardingResult.user.subscription_status,
         transcriptPreview,
-        replyPreview: onboardingResult.reply
+        replyPreview: onboardingResult.reply ?? onboardingResult.interactive?.body
       });
       return;
     }

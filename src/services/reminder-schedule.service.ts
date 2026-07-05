@@ -511,6 +511,7 @@ export async function markReminderDelivered(reminder: ScheduledReminderRecord): 
 
   if (reminder.repeat_kind === "once") {
     return updateReminder(reminder.id, {
+      status: "completed",
       last_fired_at: now.toISOString()
     });
   }

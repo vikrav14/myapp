@@ -8,7 +8,10 @@ import {
   markReminderDelivered,
   type ScheduledReminderRecord
 } from "./reminder-schedule.service.js";
-import { sendWhatsAppMessage } from "./whatsapp.service.js";
+import {
+  buildReminderDeliveryInteractive
+} from "./whatsapp-interactive.service.js";
+import { sendWhatsAppInteractive, sendWhatsAppMessage } from "./whatsapp.service.js";
 
 function mapReminder(row: Record<string, unknown>): ScheduledReminderRecord {
   return {
@@ -31,10 +34,8 @@ function mapReminder(row: Record<string, unknown>): ScheduledReminderRecord {
   };
 }
 
-export function buildReminderDeliveryMessage(reminder: ScheduledReminderRecord): string {
-  return `⏰ Reminder: ${reminder.label}
-
-Reply done · skip · snooze 1h`;
+export function buildReminderDeliveryMessage(input: { label: string }): string {
+  return `⏰ Reminder: ${input.label}`;
 }
 
 export async function listDueReminders(now: Date = new Date()): Promise<
@@ -88,18 +89,29 @@ export async function deliverDueReminders(requestId?: string): Promise<{
   let failed = 0;
 
   for (const item of dueItems) {
-    const message = buildReminderDeliveryMessage(item.reminder);
-
     try {
-      await sendWhatsAppMessage(item.user.phone_number, message, {
-        userId: item.user.id,
-        requestId,
-        metadata: {
-          flow: "scheduled_reminder",
-          reminderId: item.reminder.id,
-          repeatKind: item.reminder.repeat_kind
-        }
-      });
+      if (env.WHATSAPP_INTERACTIVE_ENABLED) {
+        await sendWhatsAppInteractive(item.user.phone_number, buildReminderDeliveryInteractive(item.reminder.label), {
+          userId: item.user.id,
+          requestId,
+          metadata: {
+            flow: "scheduled_reminder",
+            reminderId: item.reminder.id,
+            repeatKind: item.reminder.repeat_kind,
+            interactive: true
+          }
+        });
+      } else {
+        await sendWhatsAppMessage(item.user.phone_number, buildReminderDeliveryMessage({ label: item.reminder.label }), {
+          userId: item.user.id,
+          requestId,
+          metadata: {
+            flow: "scheduled_reminder",
+            reminderId: item.reminder.id,
+            repeatKind: item.reminder.repeat_kind
+          }
+        });
+      }
 
       await markReminderDelivered(item.reminder);
       sent += 1;
