@@ -17,10 +17,14 @@ export type ReminderParseResult =
   | { type: "skip" }
   | { type: "snooze"; minutes: number };
 
-const SET_REMINDER_PREFIX = /^set\s+reminder\s+(?:to\s+)?(.+)$/i;
+const TIME_TOKEN_PATTERN = String.raw`\d{1,2}(?:(?::|\.)\d{2}|\s+\d{2})?\s*(?:am|pm)?`;
 
 function normalize(message: string): string {
   return message.trim().replace(/\s+/g, " ");
+}
+
+function normalizeTimeToken(token: string): string {
+  return token.trim().replace(/(\d{1,2})\s+(\d{2})\b/i, "$1:$2");
 }
 
 function parseSnoozeMinutes(text: string): number | null {
@@ -53,21 +57,47 @@ function parseSnoozeMinutes(text: string): number | null {
 }
 
 function extractRemindBody(message: string): string | null {
-  const normalized = normalize(message).replace(/\n+/g, " ");
-  const match = normalized.match(/remind(?:\s+me)?\s+to\s+(.+)$/i);
-  return match?.[1]?.trim() ?? null;
+  const normalized = normalize(message)
+    .replace(/\n+/g, " ")
+    .replace(/[?.!,]+$/g, "")
+    .trim();
+
+  const remindMatch = normalized.match(/remind(?:\s+me)?\s+to\s+(.+)/i);
+  if (remindMatch?.[1]) {
+    return remindMatch[1].trim();
+  }
+
+  const setMatch = normalized.match(/set\s+(?:a\s+)?reminder(?:\s+(?:for|to))?\s+(.+)/i);
+  if (setMatch?.[1]) {
+    return setMatch[1].trim();
+  }
+
+  const reminderForMatch = normalized.match(/reminder\s+(?:for|to)\s+(.+)/i);
+  if (reminderForMatch?.[1]) {
+    return reminderForMatch[1].trim();
+  }
+
+  return null;
 }
 
 function parseCreateBody(body: string): Extract<ReminderParseResult, { type: "create" }> | null {
-  const cleanedBody = body.replace(/\s+today$/i, "").replace(/\s+tonight$/i, "").trim();
-  const atMatch = cleanedBody.match(/^(.+?)\s+at\s+(\d{1,2}(?:(?::|\.)\d{2})?\s*(?:am|pm)?)\s*$/i);
-  const labelCapture = atMatch?.[1];
-  const timeCapture = atMatch?.[2];
+  const cleanedBody = body
+    .replace(/\s+today$/i, "")
+    .replace(/\s+tonight$/i, "")
+    .replace(/[?.!,]+$/g, "")
+    .trim();
+
+  const atMatch = cleanedBody.match(new RegExp(`^(.+?)\\s+at\\s+(${TIME_TOKEN_PATTERN})\\s*$`, "i"));
+  const bareTimeMatch = cleanedBody.match(new RegExp(`^(.+?)\\s+(${TIME_TOKEN_PATTERN})\\s*$`, "i"));
+  const match = atMatch ?? (bareTimeMatch?.[2]?.match(/(?:am|pm)/i) ? bareTimeMatch : null);
+
+  const labelCapture = match?.[1];
+  const timeCapture = match?.[2];
   if (!labelCapture || !timeCapture) {
     return null;
   }
 
-  const time = parseClockTime(timeCapture);
+  const time = parseClockTime(normalizeTimeToken(timeCapture));
   if (!time) {
     return null;
   }
@@ -116,6 +146,26 @@ function parseCreateBody(body: string): Extract<ReminderParseResult, { type: "cr
   };
 }
 
+export function looksLikeReminderAttempt(message: string): boolean {
+  const normalized = normalize(message).toLowerCase();
+
+  if (!/(?:\bremind(?:er)?\b|\bset\s+(?:a\s+)?reminder\b)/i.test(normalized)) {
+    return false;
+  }
+
+  return new RegExp(String.raw`\b(?:at\s+)?${TIME_TOKEN_PATTERN}\b`, "i").test(normalized);
+}
+
+export function buildReminderParseFailureReply(): string {
+  return [
+    "I didn't save that reminder — I couldn't read the time clearly from your message.",
+    "",
+    "Try: remind me to drink water at 11:55pm",
+    "Or type it right after a voice note.",
+    "Reply my reminders to check what's scheduled."
+  ].join("\n");
+}
+
 export function parseReminderCommand(message: string): ReminderParseResult | null {
   const trimmed = normalize(message);
   const lowered = trimmed.toLowerCase();
@@ -150,12 +200,6 @@ export function parseReminderCommand(message: string): ReminderParseResult | nul
   const remindBody = extractRemindBody(trimmed);
   if (remindBody) {
     return parseCreateBody(remindBody);
-  }
-
-  const setReminderMatch = trimmed.match(SET_REMINDER_PREFIX);
-  const setReminderBody = setReminderMatch?.[1];
-  if (setReminderBody) {
-    return parseCreateBody(setReminderBody);
   }
 
   return null;

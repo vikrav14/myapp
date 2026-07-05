@@ -2,7 +2,11 @@ import { env } from "../lib/env.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser } from "../types.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
-import { parseReminderCommand } from "./reminder-parse.service.js";
+import {
+  buildReminderParseFailureReply,
+  looksLikeReminderAttempt,
+  parseReminderCommand
+} from "./reminder-parse.service.js";
 import type { ReminderRepeatKind } from "./reminder-parse.service.js";
 import {
   computeNextDailyFireAt,
@@ -345,6 +349,13 @@ export async function handleReminderMessage(input: {
 
   const command = parseReminderCommand(input.message);
   if (!command) {
+    if (looksLikeReminderAttempt(input.message)) {
+      return {
+        handled: true,
+        reply: buildReminderParseFailureReply()
+      };
+    }
+
     return { handled: false };
   }
 

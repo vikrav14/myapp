@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { parseReminderCommand } from "../src/services/reminder-parse.service.js";
+import {
+  looksLikeReminderAttempt,
+  parseReminderCommand
+} from "../src/services/reminder-parse.service.js";
 
 describe("parseReminderCommand", () => {
   it("parses a one-time reminder", () => {
@@ -97,5 +100,37 @@ describe("parseReminderCommand", () => {
       hour: 21,
       minute: 50
     });
+  });
+
+  it("parses conversational voice-style reminder requests", () => {
+    expect(parseReminderCommand("Can you remind me to drink water at 11:55 PM tonight?")).toEqual({
+      type: "create",
+      label: "drink water",
+      repeatKind: "once",
+      hour: 23,
+      minute: 55
+    });
+
+    expect(parseReminderCommand("Set a reminder to drink water at 11:55 PM")).toEqual({
+      type: "create",
+      label: "drink water",
+      repeatKind: "once",
+      hour: 23,
+      minute: 55
+    });
+
+    expect(parseReminderCommand("remind me to drink water at 11 55 pm")).toEqual({
+      type: "create",
+      label: "drink water",
+      repeatKind: "once",
+      hour: 23,
+      minute: 55
+    });
+  });
+
+  it("detects reminder-shaped messages for guardrail", () => {
+    expect(looksLikeReminderAttempt("Can you remind me to drink water at 11:55 PM tonight?")).toBe(true);
+    expect(looksLikeReminderAttempt("Set a reminder to drink water at 11:55 PM")).toBe(true);
+    expect(looksLikeReminderAttempt("I spent 150 on mine frite")).toBe(false);
   });
 });
