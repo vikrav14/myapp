@@ -72,7 +72,6 @@ export async function handleEngagementCommandMessage(input: {
   if (parseHelpCommand(input.message)) {
     return {
       handled: true,
-      reply: "Tap what you need below — or just talk normally anytime.",
       interactive: buildHelpMenuInteractive()
     };
   }

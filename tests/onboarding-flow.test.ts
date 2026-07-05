@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockBuildLockedReplyForUser = vi.fn();
 const mockUpdateUserState = vi.fn();
-const mockBuildOnboardingPreviewBrief = vi.fn();
 const mockAssignWeeklyFocusForUser = vi.fn();
 
 vi.mock("../src/services/paywall.service.js", () => ({
@@ -11,10 +10,6 @@ vi.mock("../src/services/paywall.service.js", () => ({
 
 vi.mock("../src/services/user.service.js", () => ({
   updateUserState: mockUpdateUserState
-}));
-
-vi.mock("../src/services/morning-brief-preview.service.js", () => ({
-  buildOnboardingPreviewBrief: mockBuildOnboardingPreviewBrief
 }));
 
 vi.mock("../src/services/weekly-focus.service.js", () => ({
@@ -61,7 +56,6 @@ const awaitingTopicsUser = {
 describe("handleOnboardingMessage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockBuildOnboardingPreviewBrief.mockResolvedValue("Preview of your 7:00 vibe check.");
     mockAssignWeeklyFocusForUser.mockImplementation(async (user: { id: string }) => ({
       ...user,
       weekly_focus_habit: "45 minutes deep study before noon",
@@ -122,7 +116,8 @@ describe("handleOnboardingMessage", () => {
       awaitingTopicsUser.id,
       expect.objectContaining({ onboarding_state: "awaiting_archetype" })
     );
-    expect(result.reply).toContain("Student Grind");
+    expect(result.reply).toContain("printing shop");
+    expect(result.interactive?.listButtonLabel).toBe("Pick vibe");
   });
 
   it("moves custom lane users to tag selection with no preset OK path", async () => {
@@ -142,8 +137,8 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("My Own Mix");
-    expect(result.reply).toContain("Send your own 3 to 5");
+    expect(result.interactive?.listButtonLabel).toBe("Pick tags");
+    expect(result.interactive?.body).toContain("My Own Mix");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
@@ -185,9 +180,8 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Student Grind");
-    expect(result.reply).toContain("#Traffic #Money #LocalBuzz");
-    expect(result.reply).toContain("Reply OK to use these");
+    expect(result.interactive?.listButtonLabel).toBe("Pick tags");
+    expect(result.interactive?.body).toContain("Student Grind");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
@@ -219,19 +213,12 @@ describe("handleOnboardingMessage", () => {
 
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("exam pressure");
-    expect(result.reply).toContain("one habit");
-    expect(result.followUpReply).toContain("Preview");
+    expect(result.reply).toContain("habit");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
         onboarding_state: "active",
         topic_preferences: ["Traffic", "Money", "LocalBuzz"]
-      })
-    );
-    expect(mockBuildOnboardingPreviewBrief).toHaveBeenCalledWith(
-      expect.objectContaining({
-        archetype: "Student Grind",
-        topics: ["Traffic", "Money", "LocalBuzz"]
       })
     );
   });
@@ -262,8 +249,6 @@ describe("handleOnboardingMessage", () => {
         topic_preferences: ["Traffic", "Tech", "Money"]
       })
     );
-    expect(result.followUpReply).toBeTruthy();
-    expect(result.discoveryReply).toContain("help");
   });
 
   it("re-prompts when topic selection is invalid", async () => {
@@ -274,7 +259,7 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Reply OK to use these");
+    expect(result.interactive?.listButtonLabel).toBe("Pick tags");
     expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 });

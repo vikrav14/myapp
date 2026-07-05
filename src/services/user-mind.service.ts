@@ -156,10 +156,15 @@ export function buildKnowYouAcknowledgement(input: {
   user: MauriUser;
   facts: UserMindFact[];
   skipped: boolean;
+  compact?: boolean;
 }): string {
   const name = input.user.first_name?.trim() || "there";
 
   if (input.skipped || input.facts.length === 0) {
+    if (input.compact) {
+      return `No stress, ${name}. We'll build this as we go.`;
+    }
+
     return `No stress, ${name}. We'll build this as we go.
 
 Pick a starting lane for your 7 AM pulse — closest fit is fine, or build your own.
@@ -187,6 +192,12 @@ Reply with the exact one, or send 1, 2, 3, 4, or 5.`;
     highlights.length > 0
       ? highlights.slice(0, 4).join(". ")
       : "I've got the basics saved.";
+
+  if (input.compact) {
+    return `Got it, ${name}. ${summary}
+
+I'll hold that as *you*, not just your logs.`;
+  }
 
   return `Got it, ${name}. ${summary}
 

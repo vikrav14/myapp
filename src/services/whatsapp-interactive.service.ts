@@ -23,7 +23,10 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   help_reminders: "my reminders",
   help_squad: "my squad",
   help_full: "show full menu",
-  feedback_prompt: "mauri feedback"
+  feedback_prompt: "mauri feedback",
+  reminder_done: "done",
+  reminder_snooze: "snooze 1h",
+  reminder_skip: "skip"
 };
 
 export function resolveInteractiveReplyId(replyId: string): string | null {
@@ -183,5 +186,16 @@ export function buildSundayContextInteractive(): WhatsAppInteractiveOutbound {
   return {
     body: "If I'm missing how you work, tell me what to fix.",
     buttons: [{ id: "feedback_prompt", title: "Give context" }]
+  };
+}
+
+export function buildReminderDeliveryInteractive(label: string): WhatsAppInteractiveOutbound {
+  return {
+    body: `⏰ Reminder: ${label}`,
+    buttons: [
+      { id: "reminder_done", title: "Done" },
+      { id: "reminder_snooze", title: "Snooze 1h" },
+      { id: "reminder_skip", title: "Skip" }
+    ]
   };
 }

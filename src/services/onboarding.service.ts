@@ -2,8 +2,6 @@ import type { MauriArchetype, MauriUser, MorningBriefTopicKey, WhatsAppInteracti
 import { CUSTOM_LANE_ARCHETYPE } from "../types.js";
 
 import { buildLockedReplyForUser } from "./paywall.service.js";
-import { buildOnboardingPreviewBrief } from "./morning-brief-preview.service.js";
-import { buildQuickStartMenu } from "./help-menu.service.js";
 import {
   buildArchetypePickerInteractive,
   buildTopicsPickerInteractive
@@ -71,8 +69,6 @@ const archetypeCatalog: Array<{
 export interface OnboardingResult {
   handled: boolean;
   reply?: string | undefined;
-  followUpReply?: string | undefined;
-  discoveryReply?: string | undefined;
   interactive?: WhatsAppInteractiveOutbound | undefined;
   user: MauriUser;
 }
@@ -135,25 +131,27 @@ ${buildArchetypeLaneList()}
 None fit perfectly? Pick closest, or My Own Mix (5) — your tags and how you talk define the rest.`;
 }
 
-function buildActivationReply(archetype: MauriArchetype, topics: MorningBriefTopicKey[]): string {
+function buildActivationReply(
+  archetype: MauriArchetype,
+  topics: MorningBriefTopicKey[],
+  weeklyFocus: string
+): string {
   const hook = archetypeActivationHooks[archetype] ?? archetypeActivationHooks["Life & Habit Tracking"];
   const laneLine = isCustomLaneArchetype(archetype)
-    ? `You're on ${CUSTOM_LANE_ARCHETYPE} — your lane, your tags.`
-    : `Perfect. You're in on ${archetype}.`;
+    ? `You're in on ${CUSTOM_LANE_ARCHETYPE}.`
+    : `You're in on ${archetype}.`;
 
-  return `${laneLine}
-
-${hook}
-
-Your 7-day trial starts now.
-Morning vibe check tags: ${formatTopicList(topics)}.
-I'll send your Mauritian brief at 7:00 with weather, traffic, and stories matched to those tags.
-
-Send me your messy brain dump exactly as it is. Spending. Tasks. Wins. Stress. Random thoughts. I'll sort the signal from the chaos.
-
-Squads are live on your trial — reply create squad Study Crew and invite mates before Sunday showdown.
-
-Reply help anytime for the full command menu.`;
+  return [
+    laneLine,
+    hook,
+    "",
+    "Your 7-day trial starts now.",
+    `Morning brief tags: ${formatTopicList(topics)} — first brief tomorrow at 7:00.`,
+    `This week's habit: ${weeklyFocus}`,
+    "",
+    "Try: \"remind me to drink water at 3pm\" or send a brain dump anytime.",
+    "Reply help for all commands."
+  ].join("\n");
 }
 
 async function activateUserWithTopics(
@@ -176,20 +174,11 @@ async function activateUserWithTopics(
 
   const updatedUser = await assignWeeklyFocusForUser(activatedUser);
   const archetype = updatedUser.archetype as MauriArchetype;
-  const preview = await buildOnboardingPreviewBrief({
-    firstName: updatedUser.first_name,
-    archetype,
-    topics
-  });
 
   return {
     handled: true,
     user: updatedUser,
-    reply: `${buildActivationReply(archetype, topics)}
-
-This week's one habit: ${updatedUser.weekly_focus_habit}`,
-    followUpReply: preview,
-    discoveryReply: buildQuickStartMenu()
+    reply: buildActivationReply(archetype, topics, updatedUser.weekly_focus_habit ?? "one small win each day")
   };
 }
 
@@ -286,7 +275,12 @@ export async function handleOnboardingMessage(input: {
         reply: buildKnowYouAcknowledgement({
           user: updatedUser,
           facts: [],
-          skipped: true
+          skipped: true,
+          compact: true
+        }),
+        interactive: buildArchetypePickerInteractive({
+          firstName: updatedUser.first_name,
+          isNewUser
         })
       };
     }
@@ -317,7 +311,12 @@ export async function handleOnboardingMessage(input: {
       reply: buildKnowYouAcknowledgement({
         user: updatedUser,
         facts,
-        skipped: false
+        skipped: false,
+        compact: true
+      }),
+      interactive: buildArchetypePickerInteractive({
+        firstName: updatedUser.first_name,
+        isNewUser: false
       })
     };
   }
@@ -346,11 +345,13 @@ For My Own Mix, send your tags — OK won't apply here.`
       return {
         handled: true,
         user,
-        reply: `${buildSuggestedTopicsPrompt(user.archetype)}
+        reply: customLane
+          ? `${buildSuggestedTopicsPrompt(user.archetype)}
 
-Pick tags below, reply OK, or type your own (3–5 tags).
+Pick tags below or type your own (3–5 tags).
 
-Example: Traffic Money Tech`,
+Example: Traffic Money Tech`
+          : "",
         interactive: buildTopicsPickerInteractive(user.archetype)
       };
     }
@@ -371,7 +372,6 @@ Example: Traffic Money Tech`,
     return {
       handled: true,
       user,
-      reply: buildArchetypePrompt(user),
       interactive: buildArchetypePickerInteractive({
         firstName: user.first_name,
         isNewUser
@@ -387,7 +387,6 @@ Example: Traffic Money Tech`,
   return {
     handled: true,
     user: updatedUser,
-    reply: buildSuggestedTopicsPrompt(archetype),
     interactive: buildTopicsPickerInteractive(archetype)
   };
 }

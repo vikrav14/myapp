@@ -13,7 +13,9 @@ vi.mock("../src/services/audit.service.js", () => ({
   recordAuditEventBestEffort: mockRecordAuditEventBestEffort
 }));
 
-const { handleReminderMessage, buildReminderListReply } = await import("../src/services/reminder-schedule.service.js");
+const { handleReminderMessage, buildReminderListReply, markReminderDelivered } = await import(
+  "../src/services/reminder-schedule.service.js"
+);
 
 const activeUser = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -162,5 +164,40 @@ describe("handleReminderMessage", () => {
 describe("buildReminderListReply", () => {
   it("shows an empty-state prompt", () => {
     expect(buildReminderListReply([])).toContain("No active reminders");
+  });
+});
+
+describe("markReminderDelivered", () => {
+  it("marks one-time reminders completed after delivery", async () => {
+    const reminder = {
+      id: "22222222-2222-4222-8222-222222222222",
+      user_id: activeUser.id,
+      label: "call mum",
+      next_fire_at: "2026-06-23T14:00:00.000Z",
+      repeat_kind: "once" as const,
+      repeat_hour: 18,
+      repeat_minute: 0,
+      repeat_weekdays: null,
+      timezone: "Indian/Mauritius",
+      status: "active",
+      last_fired_at: null,
+      created_at: "2026-06-22T00:00:00.000Z",
+      updated_at: "2026-06-22T00:00:00.000Z"
+    };
+
+    mockSupabaseFrom.mockImplementation(() =>
+      buildSelectChain({
+        data: {
+          ...reminder,
+          status: "completed",
+          last_fired_at: "2026-06-23T14:01:00.000Z"
+        }
+      })
+    );
+
+    const updated = await markReminderDelivered(reminder);
+
+    expect(updated.status).toBe("completed");
+    expect(updated.last_fired_at).toBeTruthy();
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseInboundMessage } from "../src/services/whatsapp.service.js";
 import {
   buildArchetypePickerInteractive,
+  buildReminderDeliveryInteractive,
   buildSundayRatingInteractive,
   resolveInteractiveReplyId
 } from "../src/services/whatsapp-interactive.service.js";
@@ -13,6 +14,9 @@ describe("resolveInteractiveReplyId", () => {
     expect(resolveInteractiveReplyId("rate_4")).toBe("rate 4");
     expect(resolveInteractiveReplyId("topics_ok")).toBe("OK");
     expect(resolveInteractiveReplyId("help_focus")).toBe("my focus");
+    expect(resolveInteractiveReplyId("reminder_done")).toBe("done");
+    expect(resolveInteractiveReplyId("reminder_snooze")).toBe("snooze 1h");
+    expect(resolveInteractiveReplyId("reminder_skip")).toBe("skip");
   });
 
   it("returns null for unknown ids", () => {
@@ -31,6 +35,13 @@ describe("interactive builders", () => {
     const rating = buildSundayRatingInteractive();
     expect(rating.sections?.[0]?.rows).toHaveLength(5);
     expect(rating.sections?.[0]?.rows?.[4]?.id).toBe("rate_5");
+  });
+
+  it("builds reminder delivery buttons", () => {
+    const reminder = buildReminderDeliveryInteractive("call mum");
+    expect(reminder.body).toContain("call mum");
+    expect(reminder.buttons).toHaveLength(3);
+    expect(reminder.buttons?.[0]?.id).toBe("reminder_done");
   });
 });
 
