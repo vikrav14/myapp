@@ -3,7 +3,12 @@ import { CUSTOM_LANE_ARCHETYPE } from "../types.js";
 
 import { buildLockedReplyForUser } from "./paywall.service.js";
 import {
+  buildArchetypeLaneList,
+  inferArchetypeFromMessage
+} from "./archetype-catalog.js";
+import {
   buildArchetypePickerInteractive,
+  buildHeavyShareArchetypePickerInteractive,
   buildTopicsPickerInteractive
 } from "./whatsapp-interactive.service.js";
 import {
@@ -26,7 +31,6 @@ import {
   resolveKnowYouAcknowledgement
 } from "./user-mind.service.js";
 import {
-  buildHeavyShareLanePrompt,
   buildLifeThreadActivationNote,
   isHeavyKnowYouShare
 } from "./life-thread.service.js";
@@ -36,45 +40,6 @@ import {
 } from "./open-loop-follow-up.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
-
-function isCustomLaneSelection(normalized: string): boolean {
-  if (["5", "mix", "custom"].includes(normalized)) {
-    return true;
-  }
-
-  return [
-    "my own mix",
-    "custom lane",
-    "something else",
-    "none of these",
-    "none fit",
-    "own mix",
-    "my lane",
-    "my own lane"
-  ].some((alias) => normalized === alias);
-}
-
-const archetypeCatalog: Array<{
-  archetype: MauriArchetype;
-  aliases: string[];
-}> = [
-  {
-    archetype: "Student Grind",
-    aliases: ["student", "student grind", "uom", "utm", "uni", "university", "study", "exams", "1"]
-  },
-  {
-    archetype: "Corporate / Career",
-    aliases: ["corporate", "career", "job", "office", "work", "professional", "2"]
-  },
-  {
-    archetype: "Entrepreneur Mode",
-    aliases: ["entrepreneur", "business", "startup", "founder", "side hustle", "3"]
-  },
-  {
-    archetype: "Life & Habit Tracking",
-    aliases: ["habit", "life", "wellness", "balance", "routine", "tracking", "4"]
-  }
-];
 
 export interface OnboardingResult {
   handled: boolean;
@@ -92,45 +57,6 @@ const archetypeActivationHooks: Record<MauriArchetype, string> = {
   [CUSTOM_LANE_ARCHETYPE]:
     "No preset box — I'll follow your know-you profile, your tags, and how you actually talk."
 };
-
-function buildArchetypeLaneList(): string {
-  return `Student Grind.
-Corporate / Career.
-Entrepreneur Mode.
-Life & Habit Tracking.
-My Own Mix — your tags, your mix, no preset box.
-
-Reply with the exact one. Or send 1, 2, 3, 4, or 5.
-Pick My Own Mix (or 5) if none of the presets fit.`;
-}
-
-function normalize(text: string): string {
-  return text.trim().toLowerCase();
-}
-
-function inferArchetype(message: string): MauriArchetype | null {
-  const normalized = normalize(message);
-
-  if (isCustomLaneSelection(normalized)) {
-    return CUSTOM_LANE_ARCHETYPE;
-  }
-
-  for (const entry of archetypeCatalog) {
-    if (
-      entry.aliases.some((alias) => {
-        if (/^\d+$/.test(alias)) {
-          return normalized === alias;
-        }
-
-        return normalized.includes(alias);
-      })
-    ) {
-      return entry.archetype;
-    }
-  }
-
-  return null;
-}
 
 function buildArchetypePrompt(user: MauriUser): string {
   const name = user.first_name?.trim() || "there";
@@ -342,11 +268,14 @@ export async function handleOnboardingMessage(input: {
     });
 
     if (heavyShare) {
-      const name = updatedUser.first_name?.trim() || "there";
       return {
         handled: true,
         user: updatedUser,
-        reply: `${ack}\n\n${buildHeavyShareLanePrompt(name)}`
+        reply: ack,
+        interactive: buildHeavyShareArchetypePickerInteractive({
+          firstName: updatedUser.first_name
+        }),
+        sendTextBeforeInteractive: true
       };
     }
 
@@ -408,7 +337,7 @@ Example: Traffic Money Tech`
     };
   }
 
-  const archetype = inferArchetype(message);
+  const archetype = inferArchetypeFromMessage(message);
   if (!archetype) {
     return {
       handled: true,

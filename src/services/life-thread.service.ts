@@ -153,12 +153,6 @@ export function isHeavyKnowYouShare(message: string, facts: UserMindFact[]): boo
   return facts.some((fact) => fact.category === "stressors" || fact.category === "relationships");
 }
 
-export function buildHeavyShareLanePrompt(name: string): string {
-  return `When you're ready: for your morning brief (7am pulse), what's closest — Corporate / Career, Life & Habits, Student Grind, Entrepreneur Mode, or your own mix?
-
-That's just the brief lane — the rest of what you shared stays with me separately. Reply with the name or send 1–5.`;
-}
-
 export function buildLifeThreadActivationNote(threads: Array<{ loop_text: string }>): string | null {
   if (threads.length === 0) {
     return null;

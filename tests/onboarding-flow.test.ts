@@ -191,9 +191,40 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(mockSeedLifeThreadsFromOnboarding).toHaveBeenCalled();
-    expect(result.reply).toContain("morning brief");
-    expect(result.reply).toContain("separately");
-    expect(result.interactive).toBeUndefined();
+    expect(result.reply).toContain("Jeshna");
+    expect(result.interactive?.listButtonLabel).toBe("Pick brief lane");
+    expect(result.interactive?.body).toContain("separately");
+    expect(result.sendTextBeforeInteractive).toBe(true);
+  });
+
+  it("maps entrepreneur selection when user replies 4", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...awaitingTopicsUser,
+      onboarding_state: "awaiting_topics",
+      archetype: "Entrepreneur Mode"
+    });
+    mockListPendingFollowUpsForUser.mockResolvedValue([
+      { loop_text: "Jeshna — awaiting biopsy results", scheduled_for: "2026-06-25T06:00:00.000Z" }
+    ]);
+
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        onboarding_state: "awaiting_archetype"
+      },
+      isNewUser: false,
+      message: "4"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Entrepreneur Mode");
+    expect(mockUpdateUserState).toHaveBeenCalledWith(
+      awaitingTopicsUser.id,
+      expect.objectContaining({
+        onboarding_state: "awaiting_topics",
+        archetype: "Entrepreneur Mode"
+      })
+    );
   });
 
   it("moves custom lane users to tag selection with no preset OK path", async () => {

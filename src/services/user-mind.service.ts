@@ -2,6 +2,7 @@ import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
 import type { UserMindExtraction } from "../schemas/user-mind.js";
 import type { MauriUser, UserMindFact, UserMindSource } from "../types.js";
+import { buildArchetypeLaneList } from "./archetype-catalog.js";
 import { extractUserMindProfile, generateKnowYouAcknowledgement } from "./ai.service.js";
 
 function slugifyKey(value: string): string {
@@ -286,13 +287,7 @@ export function buildKnowYouAcknowledgement(input: {
 
 Pick a starting lane for your 7 AM pulse — closest fit is fine, or build your own.
 
-Student Grind.
-Corporate / Career.
-Entrepreneur Mode.
-Life & Habit Tracking.
-My Own Mix — your tags, your mix, no preset box.
-
-Reply with the exact one, or send 1, 2, 3, 4, or 5.`;
+${buildArchetypeLaneList()}`;
   }
 
   const summary = summarizeKnowYouFactsForAck(input.facts);
@@ -313,13 +308,7 @@ I'll hold that as *you*, not just your logs. Wrong or missing something? Just co
 
 Now pick a starting lane for your 7 AM pulse — closest fit is fine, or build your own.
 
-Student Grind.
-Corporate / Career.
-Entrepreneur Mode.
-Life & Habit Tracking.
-My Own Mix — your tags, your mix, no preset box.
-
-Reply with the exact one, or send 1, 2, 3, 4, or 5.`;
+${buildArchetypeLaneList()}`;
 }
 
 export async function upsertUserMindFacts(input: {

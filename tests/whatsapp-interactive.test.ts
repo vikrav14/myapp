@@ -27,10 +27,12 @@ describe("resolveInteractiveReplyId", () => {
 });
 
 describe("interactive builders", () => {
-  it("builds archetype list with five rows including My Own Mix", () => {
+  it("maps numeric replies to the documented 1–5 order", () => {
     const picker = buildArchetypePickerInteractive({ firstName: "Ava", isNewUser: true });
     expect(picker.sections?.[0]?.rows).toHaveLength(5);
     expect(picker.listButtonLabel).toBe("Pick vibe");
+    expect(picker.sections?.[0]?.rows?.[0]?.title).toBe("Corporate / Career");
+    expect(picker.sections?.[0]?.rows?.[3]?.title).toBe("Entrepreneur Mode");
   });
 
   it("builds sunday rating list with five scores", () => {
