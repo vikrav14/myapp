@@ -22,6 +22,10 @@ import { handleUserModuleMessage } from "../services/user-module-command.service
 import { handleProactiveCheckInMessage } from "../services/proactive-checkin.service.js";
 import { handleQuietHoursCommandMessage } from "../services/quiet-hours-command.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
+import {
+  deliverActivationReactionAck,
+  handleActivationReactionMessage
+} from "../services/activation-reaction.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
 import { handleReminderMessage } from "../services/reminder-schedule.service.js";
@@ -143,6 +147,35 @@ whatsappRouter.post("/", async (request, response, next) => {
         onboardingState: accessPolicyResult.user.onboarding_state,
         subscriptionStatus: accessPolicyResult.user.subscription_status,
         replyPreview: accessPolicyResult.reply
+      });
+      return;
+    }
+
+    if (inboundMessage.kind === "reaction" && inboundMessage.reaction) {
+      const reactionResult = await handleActivationReactionMessage({
+        user: accessPolicyResult.user,
+        emoji: inboundMessage.reaction.emoji,
+        targetMessageId: inboundMessage.reaction.targetMessageId,
+        requestId
+      });
+
+      if (reactionResult.handled && reactionResult.reply) {
+        await deliverActivationReactionAck({
+          user: accessPolicyResult.user,
+          phoneNumber: inboundMessage.from,
+          reply: reactionResult.reply,
+          requestId
+        });
+      }
+
+      await respondOk({
+        ok: true,
+        userId: accessPolicyResult.user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: accessPolicyResult.user.onboarding_state,
+        subscriptionStatus: accessPolicyResult.user.subscription_status,
+        reactionAcknowledged: Boolean(reactionResult.reply),
+        replyPreview: reactionResult.reply
       });
       return;
     }
@@ -312,7 +345,7 @@ whatsappRouter.post("/", async (request, response, next) => {
           sendTextBeforeInteractive: onboardingResult.sendTextBeforeInteractive,
           metadata: {
             sourceType: inboundMessage.kind,
-            flow: "onboarding"
+            flow: onboardingResult.outboundFlow ?? "onboarding"
           }
         }
       );

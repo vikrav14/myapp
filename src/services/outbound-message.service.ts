@@ -344,3 +344,76 @@ export async function discardOutboundMessage(messageId: string): Promise<Outboun
 
   return mapOutboundMessage(data as Record<string, unknown>);
 }
+
+export function isActivationOutboundMessage(record: OutboundMessageRecord): boolean {
+  const flow = record.metadata?.flow;
+  if (flow === "express_activation") {
+    return true;
+  }
+
+  return record.body.startsWith("You're in,");
+}
+
+export async function appendOutboundMessageMetadata(
+  messageId: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  const current = await getOutboundMessageById(messageId);
+  if (!current) {
+    throw new Error(`Failed to load outbound message for metadata update: ${messageId}`);
+  }
+
+  const metadata = {
+    ...(current.metadata ?? {}),
+    ...patch
+  };
+
+  const { error } = await supabase
+    .from("outbound_messages")
+    .update({
+      metadata,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", messageId);
+
+  if (error) {
+    throw new Error(`Failed to update outbound message metadata: ${error.message}`);
+  }
+}
+
+export async function findOutboundByProviderMessageId(
+  userId: string,
+  providerMessageId: string
+): Promise<OutboundMessageRecord | null> {
+  const { data, error } = await supabase
+    .from("outbound_messages")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("metadata->>provider_message_id", providerMessageId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to find outbound message by provider id: ${error.message}`);
+  }
+
+  return data ? mapOutboundMessage(data as Record<string, unknown>) : null;
+}
+
+export async function findRecentActivationOutboundForUser(userId: string): Promise<OutboundMessageRecord | null> {
+  const { data, error } = await supabase
+    .from("outbound_messages")
+    .select("*")
+    .eq("user_id", userId)
+    .like("body", "You're in,%")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to find recent activation outbound: ${error.message}`);
+  }
+
+  return data ? mapOutboundMessage(data as Record<string, unknown>) : null;
+}

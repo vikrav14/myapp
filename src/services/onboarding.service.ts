@@ -39,6 +39,7 @@ export interface OnboardingResult {
   reply?: string | undefined;
   interactive?: WhatsAppInteractiveOutbound | undefined;
   sendTextBeforeInteractive?: boolean | undefined;
+  outboundFlow?: string | undefined;
   user: MauriUser;
 }
 
@@ -90,7 +91,8 @@ async function activateUserExpress(
   return {
     handled: true,
     user: updatedUser,
-    reply: replyParts.join("\n")
+    reply: replyParts.join("\n"),
+    outboundFlow: "express_activation"
   };
 }
 

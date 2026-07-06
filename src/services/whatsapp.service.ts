@@ -2,6 +2,7 @@ import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import type { InboundMessage, WhatsAppInteractiveOutbound } from "../types.js";
 import {
+  appendOutboundMessageMetadata,
   createOutboundMessage,
   markOutboundMessageFailed,
   markOutboundMessageSending,
@@ -171,8 +172,34 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
       ? contacts[0].profile.name
       : undefined;
 
-  if (messageType === "reaction") {
-    return null;
+  if (messageType === "reaction" && isObject(firstMessage.reaction)) {
+    const targetMessageId =
+      typeof firstMessage.reaction.message_id === "string" ? firstMessage.reaction.message_id : undefined;
+    const emoji = typeof firstMessage.reaction.emoji === "string" ? firstMessage.reaction.emoji.trim() : "";
+
+    if (!targetMessageId || !emoji) {
+      return null;
+    }
+
+    const inboundMessage: InboundMessage = {
+      from: firstMessage.from,
+      kind: "reaction",
+      reaction: {
+        emoji,
+        targetMessageId
+      },
+      rawPayload: payload
+    };
+
+    if (profileName) {
+      inboundMessage.profileName = profileName;
+    }
+
+    if (messageId) {
+      inboundMessage.messageId = messageId;
+    }
+
+    return inboundMessage;
   }
 
   if (messageType === "interactive" && isObject(firstMessage.interactive)) {
@@ -289,8 +316,8 @@ export function parseInboundMessage(payload: unknown): InboundMessage | null {
   return null;
 }
 
-export async function deliverWhatsAppText(to: string, body: string): Promise<void> {
-  await postWhatsAppMessage({
+export async function deliverWhatsAppText(to: string, body: string): Promise<string | undefined> {
+  return postWhatsAppMessage({
     to,
     payload: {
       type: "text",
@@ -304,7 +331,7 @@ export async function deliverWhatsAppText(to: string, body: string): Promise<voi
 async function postWhatsAppMessage(input: {
   to: string;
   payload: Record<string, unknown>;
-}): Promise<void> {
+}): Promise<string | undefined> {
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error("WhatsApp credentials are not configured for delivery.");
   }
@@ -329,6 +356,9 @@ async function postWhatsAppMessage(input: {
     const errorText = await response.text();
     throw new Error(`Failed to send WhatsApp message: ${errorText}`);
   }
+
+  const payload = (await response.json()) as { messages?: Array<{ id?: string }> };
+  return payload.messages?.[0]?.id;
 }
 
 export async function markWhatsAppMessageRead(messageId: string): Promise<void> {
@@ -528,9 +558,14 @@ export async function sendWhatsAppMessage(
   let delivered = false;
   try {
     await markOutboundMessageSending(outbound.id);
-    await deliverWhatsAppText(to, body);
+    const providerMessageId = await deliverWhatsAppText(to, body);
     delivered = true;
     await markOutboundMessageSent(outbound.id);
+    if (providerMessageId) {
+      await appendOutboundMessageMetadata(outbound.id, {
+        provider_message_id: providerMessageId
+      });
+    }
   } catch (error) {
     if (delivered) {
       logger.error(
