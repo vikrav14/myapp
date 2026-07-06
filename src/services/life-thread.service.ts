@@ -153,6 +153,18 @@ export function isHeavyKnowYouShare(message: string, facts: UserMindFact[]): boo
   return facts.some((fact) => fact.category === "stressors" || fact.category === "relationships");
 }
 
+export function buildHeavyShareTrustBridge(firstName?: string | null): string {
+  const name = firstName?.trim() || "there";
+
+  return `I'm not just logging this and moving on, ${name}.
+
+What you shared stays between us 🔒 — not in your 7am brief, not shared anywhere.
+
+I'll check in gently on the live stuff and we'll work toward better direction in small steps — no guilt trips, no "fix yourself" lectures.
+
+When you're ready, tap below for one quick setup step. It only shapes your *morning pulse*; everything personal stays with me separately.`;
+}
+
 export function buildLifeThreadActivationNote(threads: Array<{ loop_text: string }>): string | null {
   if (threads.length === 0) {
     return null;

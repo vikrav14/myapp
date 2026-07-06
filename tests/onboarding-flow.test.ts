@@ -198,8 +198,10 @@ describe("handleOnboardingMessage", () => {
 
     expect(mockSeedLifeThreadsFromOnboarding).toHaveBeenCalled();
     expect(result.reply).toContain("Jeshna");
+    expect(result.reply).toContain("check in gently");
+    expect(result.reply).toContain("stays between us");
     expect(result.interactive?.listButtonLabel).toBe("Pick brief lane");
-    expect(result.interactive?.body).toContain("separately");
+    expect(result.interactive?.body).toContain("when you're ready");
     expect(result.sendTextBeforeInteractive).toBe(true);
   });
 
