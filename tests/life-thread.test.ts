@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildHeavyShareLanePrompt,
   buildLifeThreadActivationNote,
   buildLifeThreadCandidatesFromFacts,
   isHeavyKnowYouShare
 } from "../src/services/life-thread.service.js";
+import { buildHeavyShareArchetypePickerInteractive } from "../src/services/whatsapp-interactive.service.js";
 import type { UserMindFact } from "../src/types.js";
 
 function fact(overrides: Partial<UserMindFact> & Pick<UserMindFact, "category" | "fact_value">): UserMindFact {
@@ -79,11 +79,6 @@ describe("heavy know-you detection", () => {
 });
 
 describe("life thread copy helpers", () => {
-  it("builds a lane prompt that separates brief from personal context", () => {
-    expect(buildHeavyShareLanePrompt("Vik")).toContain("morning brief");
-    expect(buildHeavyShareLanePrompt("Vik")).toContain("separately");
-  });
-
   it("builds activation notes for queued follow-ups", () => {
     expect(buildLifeThreadActivationNote([{ loop_text: "Jeshna — awaiting biopsy results" }])).toContain(
       "gentle check-in"
@@ -94,5 +89,13 @@ describe("life thread copy helpers", () => {
         { loop_text: "Mum — not doing great" }
       ])
     ).toContain("check-ins");
+  });
+
+  it("builds heavy-share picker with brief-lane button", () => {
+    const picker = buildHeavyShareArchetypePickerInteractive({ firstName: "Vik" });
+    expect(picker.listButtonLabel).toBe("Pick brief lane");
+    expect(picker.body).toContain("separately");
+    expect(picker.sections?.[0]?.rows?.[0]?.title).toBe("Corporate / Career");
+    expect(picker.sections?.[0]?.rows?.[3]?.title).toBe("Entrepreneur Mode");
   });
 });

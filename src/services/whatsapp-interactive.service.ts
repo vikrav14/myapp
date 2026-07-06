@@ -1,4 +1,5 @@
 import type { WhatsAppInteractiveOutbound } from "../types.js";
+import { buildArchetypePickerRows } from "./archetype-catalog.js";
 
 export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   archetype_student: "Student Grind",
@@ -43,43 +44,36 @@ export function buildArchetypePickerInteractive(input: {
   const name = input.firstName?.trim() || "there";
   const opener = input.isNewUser
     ? `Hey ${name}. I'm Mauri — your week in WhatsApp, tuned to how you live.`
-    : `Almost in, ${name}. Pick a starting lane — you'll shape the rest.`;
+    : `Almost in, ${name}. Pick a starting lane for your 7 AM pulse — closest fit is fine.`;
 
   return {
     header: "Welcome to Mauri",
     body: opener,
-    footer: "Closest fit is fine · custom tags on the next step",
+    footer: "Personal stuff stays separate · custom tags on the next step",
     listButtonLabel: "Pick vibe",
     sections: [
       {
-        title: "Archetypes",
-        rows: [
-          {
-            id: "archetype_student",
-            title: "Student Grind",
-            description: "Exams, uni, student spending"
-          },
-          {
-            id: "archetype_corporate",
-            title: "Corporate / Career",
-            description: "Work wins, salary, commute"
-          },
-          {
-            id: "archetype_entrepreneur",
-            title: "Entrepreneur Mode",
-            description: "Cashflow, hustle, focus blocks"
-          },
-          {
-            id: "archetype_life",
-            title: "Life & Habits",
-            description: "Mood, routines, balance"
-          },
-          {
-            id: "archetype_custom",
-            title: "My Own Mix",
-            description: "Your tags, no preset box"
-          }
-        ]
+        title: "Brief lanes",
+        rows: buildArchetypePickerRows()
+      }
+    ]
+  };
+}
+
+export function buildHeavyShareArchetypePickerInteractive(input: {
+  firstName?: string | null;
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+
+  return {
+    header: "Your 7am brief",
+    body: `${name} — pick the closest lane for your morning pulse only. Everything else you shared stays with me separately.`,
+    footer: "Tap a lane below · My Own Mix is option 5",
+    listButtonLabel: "Pick brief lane",
+    sections: [
+      {
+        title: "Brief lanes",
+        rows: buildArchetypePickerRows()
       }
     ]
   };
