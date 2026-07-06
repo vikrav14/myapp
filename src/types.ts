@@ -23,9 +23,21 @@ export type MauriArchetype =
   | "Student Grind"
   | "Corporate / Career"
   | "Entrepreneur Mode"
-  | "My Own Mix";
+  | "Custom";
 
-export const CUSTOM_LANE_ARCHETYPE = "My Own Mix" as const satisfies MauriArchetype;
+/** Stored on users who pick the free-form lane at onboarding. */
+export const CUSTOM_LANE_ARCHETYPE = "Custom" as const satisfies MauriArchetype;
+
+/** Legacy value — still recognised when loading existing users. */
+export const LEGACY_CUSTOM_LANE_ARCHETYPE = "My Own Mix";
+
+export function isCustomLaneArchetype(archetype: string): boolean {
+  return archetype === CUSTOM_LANE_ARCHETYPE || archetype === LEGACY_CUSTOM_LANE_ARCHETYPE;
+}
+
+export function canonicalArchetypeKey(archetype: string): string {
+  return isCustomLaneArchetype(archetype) ? CUSTOM_LANE_ARCHETYPE : archetype;
+}
 
 export interface MauriUser {
   id: string;

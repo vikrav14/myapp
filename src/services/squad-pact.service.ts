@@ -1,4 +1,5 @@
 import type { SquadRecord } from "./squad.service.js";
+import { canonicalArchetypeKey } from "../types.js";
 
 export type SquadPactKey = "study" | "save" | "hustle" | "balance" | "custom";
 
@@ -489,9 +490,9 @@ const ARCHETYPE_PACT: Record<string, Exclude<SquadPactKey, "custom">> = {
   "Corporate / Career": "balance",
   "Entrepreneur Mode": "hustle",
   "Life & Habit Tracking": "balance",
-  "My Own Mix": "balance"
+  "Custom": "balance"
 };
 
 export function suggestedPactKeyForArchetype(archetype: string): Exclude<SquadPactKey, "custom"> {
-  return ARCHETYPE_PACT[archetype] ?? "balance";
+  return ARCHETYPE_PACT[canonicalArchetypeKey(archetype)] ?? "balance";
 }

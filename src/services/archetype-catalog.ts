@@ -54,6 +54,7 @@ export const ARCHETYPE_CATALOG: ArchetypeCatalogEntry[] = [
 export const CUSTOM_LANE_NUMBER = 5;
 
 const CUSTOM_LANE_ALIASES = [
+  "custom",
   "my own mix",
   "custom lane",
   "something else",
@@ -76,9 +77,9 @@ export function buildArchetypeLaneList(): string {
   const presetLines = ARCHETYPE_CATALOG.map((entry) => `${entry.number}. ${entry.shortTitle}`).join("\n");
 
   return `${presetLines}
-${CUSTOM_LANE_NUMBER}. My Own Mix — your tags, your mix, no preset box.
+${CUSTOM_LANE_NUMBER}. Custom — type your own brief tags, no preset box.
 
-Tap Pick brief lane below, or reply with the name or number.`;
+Tap Pick brief lane below, then tap your choice.`;
 }
 
 export function inferArchetypeFromMessage(message: string): MauriArchetype | null {
@@ -122,8 +123,8 @@ export function buildArchetypePickerRows(): Array<{
     })),
     {
       id: "archetype_custom",
-      title: "My Own Mix",
-      description: "Your tags, no preset box"
+      title: "Custom",
+      description: "Type your own brief tags"
     }
   ];
 }
