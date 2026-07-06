@@ -10,8 +10,17 @@ import { registerSquadJobs } from "./jobs/squad-jobs.js";
 import { registerTrialEngagementJobs } from "./jobs/trial-engagement-jobs.js";
 import { registerUserMindJobs } from "./jobs/user-mind-jobs.js";
 import { env } from "./lib/env.js";
+import { scheduleCronJobSafely } from "./lib/cron-safe.js";
 import { logger } from "./lib/logger.js";
 import { logSecurityPostureWarnings } from "./lib/network-security.js";
+
+process.on("unhandledRejection", (error) => {
+  logger.error({ error }, "Unhandled promise rejection.");
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error({ error }, "Uncaught exception.");
+});
 
 const app = createApp();
 

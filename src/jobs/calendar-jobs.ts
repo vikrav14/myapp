@@ -1,5 +1,6 @@
 import cron from "node-cron";
 
+import { scheduleCronJobSafely } from "../lib/cron-safe.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { deliverCalendarNotifications } from "../services/calendar-delivery.service.js";
@@ -34,17 +35,13 @@ export function registerCalendarJobs(): void {
 
   cron.schedule(
     env.CALENDAR_SYNC_CRON,
-    () => {
-      void runCalendarSync();
-    },
+    scheduleCronJobSafely("calendar_sync", runCalendarSync),
     { timezone }
   );
 
   cron.schedule(
     env.CALENDAR_DELIVERY_CRON,
-    () => {
-      void runCalendarDelivery();
-    },
+    scheduleCronJobSafely("calendar_delivery", runCalendarDelivery),
     { timezone }
   );
 

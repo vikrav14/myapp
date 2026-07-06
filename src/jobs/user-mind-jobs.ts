@@ -1,5 +1,6 @@
 import cron from "node-cron";
 
+import { scheduleCronJobSafely } from "../lib/cron-safe.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { runUserMindReflectionBatch } from "../services/user-mind-snapshot.service.js";
@@ -20,9 +21,7 @@ export function registerUserMindJobs(): void {
 
   cron.schedule(
     env.USER_MIND_REFLECT_CRON,
-    () => {
-      void runUserMindReflectionJob();
-    },
+    scheduleCronJobSafely("user_mind_reflection", runUserMindReflectionJob),
     { timezone: env.MORNING_BRIEF_TIMEZONE }
   );
 

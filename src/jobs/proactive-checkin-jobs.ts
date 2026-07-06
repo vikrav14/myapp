@@ -1,5 +1,6 @@
 import cron from "node-cron";
 
+import { scheduleCronJobSafely } from "../lib/cron-safe.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { runProactiveCheckInDeliveries } from "../services/proactive-checkin.service.js";
@@ -20,9 +21,7 @@ export function registerProactiveCheckInJobs(): void {
 
   cron.schedule(
     env.PROACTIVE_CHECKIN_CRON,
-    () => {
-      void runProactiveCheckInJob();
-    },
+    scheduleCronJobSafely("proactive_checkins", runProactiveCheckInJob),
     { timezone: env.MORNING_BRIEF_TIMEZONE }
   );
 

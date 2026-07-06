@@ -1,5 +1,6 @@
 import cron from "node-cron";
 
+import { scheduleCronJobSafely } from "../lib/cron-safe.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { runMemoryResurfacingDeliveries } from "../services/memory-resurfacing.service.js";
@@ -20,9 +21,7 @@ export function registerMemoryResurfacingJobs(): void {
 
   cron.schedule(
     env.MEMORY_RESURFACING_CRON,
-    () => {
-      void runMemoryResurfacing();
-    },
+    scheduleCronJobSafely("memory_resurfacing", runMemoryResurfacing),
     { timezone: env.MORNING_BRIEF_TIMEZONE }
   );
 

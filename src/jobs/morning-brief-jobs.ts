@@ -1,5 +1,6 @@
 import cron from "node-cron";
 
+import { scheduleCronJobSafely } from "../lib/cron-safe.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { curateMorningBrief } from "../services/morning-brief-curation.service.js";
@@ -149,25 +150,19 @@ export function registerMorningBriefJobs(): void {
 
   cron.schedule(
     env.MORNING_BRIEF_SCRAPE_CRON,
-    () => {
-      void runMorningBriefScrape();
-    },
+    scheduleCronJobSafely("morning_brief_scrape", runMorningBriefScrape),
     { timezone }
   );
 
   cron.schedule(
     env.MORNING_BRIEF_CURATE_CRON,
-    () => {
-      void runMorningBriefCuration();
-    },
+    scheduleCronJobSafely("morning_brief_curate", runMorningBriefCuration),
     { timezone }
   );
 
   cron.schedule(
     env.MORNING_BRIEF_DELIVER_CRON,
-    () => {
-      void runMorningBriefDelivery();
-    },
+    scheduleCronJobSafely("morning_brief_delivery", runMorningBriefDelivery),
     { timezone }
   );
 

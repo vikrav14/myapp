@@ -1,5 +1,6 @@
 import cron from "node-cron";
 
+import { scheduleCronJobSafely } from "../lib/cron-safe.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { runLocalAlertPipeline } from "../services/local-alerts-delivery.service.js";
@@ -20,9 +21,7 @@ export function registerLocalAlertsJobs(): void {
 
   cron.schedule(
     env.LOCAL_ALERTS_CRON,
-    () => {
-      void runLocalAlerts();
-    },
+    scheduleCronJobSafely("local_alerts", runLocalAlerts),
     { timezone: env.MORNING_BRIEF_TIMEZONE }
   );
 

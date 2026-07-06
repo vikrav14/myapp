@@ -1,5 +1,6 @@
 import cron from "node-cron";
 
+import { scheduleCronJobSafely } from "../lib/cron-safe.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { runOpenLoopFollowUpDeliveries } from "../services/open-loop-follow-up.service.js";
@@ -20,9 +21,7 @@ export function registerOpenLoopFollowUpJobs(): void {
 
   cron.schedule(
     env.OPEN_LOOP_FOLLOWUP_CRON,
-    () => {
-      void runOpenLoopFollowUpJob();
-    },
+    scheduleCronJobSafely("open_loop_followups", runOpenLoopFollowUpJob),
     { timezone: env.MORNING_BRIEF_TIMEZONE }
   );
 

@@ -1,5 +1,6 @@
 import cron from "node-cron";
 
+import { scheduleCronJobSafely } from "../lib/cron-safe.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { deliverDueReminders } from "../services/reminder-delivery.service.js";
@@ -20,9 +21,7 @@ export function registerReminderJobs(): void {
 
   cron.schedule(
     env.REMINDER_DELIVERY_CRON,
-    () => {
-      void runReminderDelivery();
-    },
+    scheduleCronJobSafely("reminder_delivery", runReminderDelivery),
     { timezone: env.MORNING_BRIEF_TIMEZONE }
   );
 
