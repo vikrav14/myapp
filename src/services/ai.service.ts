@@ -4,6 +4,7 @@ import {
   finalizeMauriGeneratedReply,
   finalizeMauriTextReply,
   MAURI_ENGLISH_ONLY_LANGUAGE_RULE,
+  MAURI_REPLY_MAX_WORDS_EMOTIONAL,
   MAURI_REPLY_MAX_WORDS_MICRO_LESSON,
   MAURI_REPLY_MAX_WORDS_PROACTIVE,
   MAURI_REPLY_MAX_WORDS_ROAST_HYPE,
@@ -271,6 +272,12 @@ Boundaries — capture explicit "don't" rules:
 
 Tone — how Mauri should show up: gentle, direct, short, banter ok, no fluff, etc.
 
+Emotional / family context (critical — do not skip for work facts):
+- Wife/partner illness, biopsy waiting, fertility on hold → relationships + stressors
+- Parent ageing, sibling crisis, kids affected, gambling in family → relationships + stressors
+- "So much going on", burnout, things on hold → stressors[] and richer life_situation
+- Prefer several specific stressors over one vague line
+
 Message:
 ${message}
 `;
@@ -283,6 +290,45 @@ ${message}
   const parsed = parseStructuredJson(rawJson);
 
   return userMindExtractionSchema.parse(parsed);
+}
+
+export async function generateKnowYouAcknowledgement(input: {
+  firstName: string;
+  message: string;
+  factsSummary: string;
+}): Promise<string> {
+  const prompt = `You are Mauri on WhatsApp — a grounded mate for Mauritians, not a CRM bot.
+
+The user just shared personal context during onboarding. Write a warm acknowledgement.
+
+Rules:
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
+- Lead with empathy when they shared anything heavy: health scares, waiting on results, family crisis, ageing parents, fertility on hold, burnout. Name people they mentioned (wife, mum, partner, kids).
+- Then ONE short human sentence on their life context (work, area, interests) — prose only, never "39 yrs · based X · Developer" bullet dumps.
+- End with one brief line that they can correct you if you missed something.
+- Max ${MAURI_REPLY_MAX_WORDS_EMOTIONAL} words. Max 3 short paragraphs.
+- No bullet lists. No middle dots. No "pick a lane" or archetype menu.
+- Do not invent facts not in their message or extracted facts below.
+
+User: ${input.firstName}
+
+What they wrote:
+${input.message}
+
+Extracted facts (ground your reply here):
+${input.factsSummary}
+
+Reply in plain text only.`;
+
+  const rawReply = await callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+
+  return finalizeMauriGeneratedReply({
+    reply: rawReply,
+    maxWords: MAURI_REPLY_MAX_WORDS_EMOTIONAL
+  });
 }
 
 export async function generateUserMindSnapshot(
@@ -303,6 +349,7 @@ Rules:
 - advice_preferences: how Mauri should coach this person (e.g. empathise first, then one concrete move).
 - things_to_avoid: reply patterns that would feel wrong for this user (preachy, generic, ignoring money stress, etc.).
 - active_goals, recent_wins, open_loops: short phrase items only.
+- open_loops should include unresolved life threads from user_mind_facts (health waits, family care, stressors) when still relevant.
 - Merge useful signal from previous_mind_snapshot when still valid; drop stale items.
 
 Reflection data:

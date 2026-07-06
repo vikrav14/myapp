@@ -4,6 +4,7 @@ import {
   buildFollowUpDeliveryKey,
   buildLoopFingerprint,
   nextOpenLoopFollowUpTime,
+  openLoopFollowUpTimeAfterDays,
   parseMyFollowUpsCommand,
   parseOpenLoopFollowUpToggle
 } from "../src/services/open-loop-follow-up.service.js";
@@ -47,5 +48,12 @@ describe("open loop follow-up scheduling helpers", () => {
     const slot = nextOpenLoopFollowUpTime(new Date("2026-06-22T22:00:00.000Z"));
     expect(slot).toContain("T");
     expect(new Date(slot).getTime()).toBeGreaterThan(new Date("2026-06-22T22:00:00.000Z").getTime());
+  });
+
+  it("schedules follow-ups N days out at the configured slot", () => {
+    const inThreeDays = openLoopFollowUpTimeAfterDays(3, new Date("2026-06-22T06:00:00.000Z"));
+    const inOneDay = openLoopFollowUpTimeAfterDays(1, new Date("2026-06-22T06:00:00.000Z"));
+
+    expect(new Date(inThreeDays).getTime()).toBeGreaterThan(new Date(inOneDay).getTime());
   });
 });

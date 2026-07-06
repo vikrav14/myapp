@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase.js";
-import type { MauriUser } from "../types.js";
+import type { MauriUser, UserMindFact } from "../types.js";
 import { DEFAULT_USER_MIND_CONVERSATION_SAMPLE, DEFAULT_USER_MIND_LOOKBACK_DAYS } from "./user-mind.constants.js";
+import { loadUserMindFacts } from "./user-mind.service.js";
 
 export interface UserMindReflectionWindow {
   start: string;
@@ -51,6 +52,11 @@ export interface UserMindReflectionInput {
     starts_at: string;
     location: string | null;
   }>;
+  userMindFacts: Array<{
+    category: string;
+    fact_key: string;
+    fact_value: string;
+  }>;
   previousMindSnapshot: Record<string, unknown> | null;
 }
 
@@ -86,7 +92,8 @@ export async function loadUserMindReflectionInput(input: {
     emotionResult,
     conversationResult,
     reminderResult,
-    calendarResult
+    calendarResult,
+    userMindFacts
   ] = await Promise.all([
     supabase
       .from("finance_logs")
@@ -143,7 +150,8 @@ export async function loadUserMindReflectionInput(input: {
       .gte("starts_at", nowIso)
       .lte("starts_at", upcomingCutoff.toISOString())
       .order("starts_at", { ascending: true })
-      .limit(8)
+      .limit(8),
+    loadUserMindFacts(input.user.id)
   ]);
 
   const failures = [
@@ -204,6 +212,11 @@ export async function loadUserMindReflectionInput(input: {
       starts_at: String(row.starts_at),
       location: row.location ? String(row.location) : null
     })),
+    userMindFacts: userMindFacts.map((fact: UserMindFact) => ({
+      category: fact.category,
+      fact_key: fact.fact_key,
+      fact_value: fact.fact_value
+    })),
     previousMindSnapshot: input.previousMindSnapshot ?? null
   };
 }
@@ -214,6 +227,7 @@ export function hasReflectionSignal(input: UserMindReflectionInput): boolean {
     input.habitLogs.length > 0 ||
     input.todos.length > 0 ||
     input.emotionLogs.length > 0 ||
-    input.conversationSamples.length > 0
+    input.conversationSamples.length > 0 ||
+    input.userMindFacts.length > 0
   );
 }

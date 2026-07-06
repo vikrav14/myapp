@@ -37,6 +37,7 @@ export function buildReflectionPayloadSummary(reflectionInput: UserMindReflectio
     conversation_samples: reflectionInput.conversationSamples,
     active_reminders: reflectionInput.activeReminders,
     upcoming_calendar_events: reflectionInput.upcomingCalendarEvents,
+    user_mind_facts: reflectionInput.userMindFacts,
     previous_mind_snapshot: reflectionInput.previousMindSnapshot
   };
 }

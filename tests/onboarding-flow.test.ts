@@ -18,6 +18,9 @@ vi.mock("../src/services/weekly-focus.service.js", () => ({
 
 const mockIngestUserMindMessage = vi.fn();
 const mockLoadUserMindFacts = vi.fn();
+const mockResolveKnowYouAcknowledgement = vi.fn();
+const mockSeedLifeThreadsFromOnboarding = vi.fn();
+const mockListPendingFollowUpsForUser = vi.fn();
 
 vi.mock("../src/services/user-mind.service.js", async () => {
   const actual = await vi.importActual<typeof import("../src/services/user-mind.service.js")>(
@@ -27,7 +30,20 @@ vi.mock("../src/services/user-mind.service.js", async () => {
   return {
     ...actual,
     ingestUserMindMessage: mockIngestUserMindMessage,
-    loadUserMindFacts: mockLoadUserMindFacts
+    loadUserMindFacts: mockLoadUserMindFacts,
+    resolveKnowYouAcknowledgement: mockResolveKnowYouAcknowledgement
+  };
+});
+
+vi.mock("../src/services/open-loop-follow-up.service.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/services/open-loop-follow-up.service.js")>(
+    "../src/services/open-loop-follow-up.service.js"
+  );
+
+  return {
+    ...actual,
+    seedLifeThreadsFromOnboarding: mockSeedLifeThreadsFromOnboarding,
+    listPendingFollowUpsForUser: mockListPendingFollowUpsForUser
   };
 });
 
@@ -63,6 +79,12 @@ describe("handleOnboardingMessage", () => {
     }));
     mockIngestUserMindMessage.mockResolvedValue([]);
     mockLoadUserMindFacts.mockResolvedValue([]);
+    mockResolveKnowYouAcknowledgement.mockImplementation(async (input: { user: { first_name?: string | null } }) => {
+      const name = input.user.first_name?.trim() || "there";
+      return `${name} — thanks for sharing that with me.`;
+    });
+    mockSeedLifeThreadsFromOnboarding.mockResolvedValue(0);
+    mockListPendingFollowUpsForUser.mockResolvedValue([]);
   });
 
   it("prompts know-you first for awaiting_know_you users with short replies", async () => {
@@ -112,13 +134,66 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(mockIngestUserMindMessage).toHaveBeenCalled();
+    expect(mockSeedLifeThreadsFromOnboarding).toHaveBeenCalled();
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({ onboarding_state: "awaiting_archetype" })
     );
-    expect(result.reply).toContain("printing shop");
+    expect(result.reply).toContain("thanks for sharing");
     expect(result.interactive?.listButtonLabel).toBe("Pick vibe");
     expect(result.sendTextBeforeInteractive).toBe(true);
+  });
+
+  it("delays archetype picker for heavy know-you shares and reframes the lane ask", async () => {
+    mockLoadUserMindFacts.mockResolvedValue([
+      {
+        id: "fact-1",
+        user_id: awaitingTopicsUser.id,
+        category: "relationships",
+        fact_key: "wife",
+        fact_value: "Jeshna — awaiting biopsy results",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      },
+      {
+        id: "fact-2",
+        user_id: awaitingTopicsUser.id,
+        category: "relationships",
+        fact_key: "mum",
+        fact_value: "Mum — not doing great",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      }
+    ]);
+    mockResolveKnowYouAcknowledgement.mockResolvedValue(
+      "Vik — that's a lot at once. Jeshna's health and waiting on results, your mum… I hear you."
+    );
+    mockUpdateUserState.mockResolvedValue({
+      ...awaitingTopicsUser,
+      first_name: "Vik",
+      onboarding_state: "awaiting_archetype"
+    });
+
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        onboarding_state: "awaiting_know_you"
+      },
+      isNewUser: true,
+      message:
+        "I'm 39, Lower Vale, Tech Lead at Deel. Jeshna's health — waiting on biopsy results. Mum's not great. So much at once. No guilt trips."
+    });
+
+    expect(mockSeedLifeThreadsFromOnboarding).toHaveBeenCalled();
+    expect(result.reply).toContain("morning brief");
+    expect(result.reply).toContain("separately");
+    expect(result.interactive).toBeUndefined();
   });
 
   it("moves custom lane users to tag selection with no preset OK path", async () => {

@@ -1,7 +1,8 @@
 import { supabase } from "../lib/supabase.js";
+import { logger } from "../lib/logger.js";
 import type { UserMindExtraction } from "../schemas/user-mind.js";
 import type { MauriUser, UserMindFact, UserMindSource } from "../types.js";
-import { extractUserMindProfile } from "./ai.service.js";
+import { extractUserMindProfile, generateKnowYouAcknowledgement } from "./ai.service.js";
 
 function slugifyKey(value: string): string {
   return value
@@ -145,58 +146,112 @@ Reply skip to jump in — I'll learn as we go.`;
 }
 
 function summarizeKnowYouFactsForAck(facts: UserMindFact[]): string {
-  const parts: string[] = [];
+  const paragraphs: string[] = [];
 
+  const relationships = facts.filter((fact) => fact.category === "relationships");
+  const stressors = facts.filter((fact) => fact.category === "stressors");
+  const heavyBits = [
+    ...stressors.map((fact) => fact.fact_value),
+    ...relationships.map((fact) => fact.fact_value)
+  ].slice(0, 4);
+
+  if (heavyBits.length > 0) {
+    paragraphs.push(`I hear you on ${heavyBits.join(", ")} — that's a lot to carry.`);
+  }
+
+  const contextParts: string[] = [];
   const ageFact = facts.find((fact) => fact.category === "identity" && fact.fact_key === "age");
   const ageBandFact = facts.find((fact) => fact.category === "identity" && fact.fact_key === "age_band");
   if (ageFact) {
-    parts.push(`${ageFact.fact_value} yrs`);
+    contextParts.push(`${ageFact.fact_value}`);
   } else if (ageBandFact) {
-    parts.push(ageBandFact.fact_value);
+    contextParts.push(ageBandFact.fact_value);
   }
 
   const areaFact = facts.find((fact) => fact.category === "location" && fact.fact_key === "area");
   if (areaFact) {
-    parts.push(`based ${areaFact.fact_value}`);
+    contextParts.push(`in ${areaFact.fact_value}`);
   }
 
   const workFact = facts.find((fact) => fact.category === "life_context" && fact.fact_key === "work");
   const lifeFact = facts.find((fact) => fact.category === "life_context" && fact.fact_key === "life_situation");
   if (workFact) {
-    parts.push(workFact.fact_value);
+    contextParts.push(workFact.fact_value);
   } else if (lifeFact) {
-    parts.push(lifeFact.fact_value);
+    contextParts.push(lifeFact.fact_value);
   }
 
-  for (const interest of facts.filter((fact) => fact.category === "interests").slice(0, 2)) {
-    parts.push(interest.fact_value);
+  const interests = facts
+    .filter((fact) => fact.category === "interests")
+    .map((fact) => fact.fact_value)
+    .slice(0, 2);
+  if (interests.length > 0) {
+    contextParts.push(`into ${interests.join(" and ")}`);
   }
 
   const goalFact = facts.find((fact) => fact.category === "goals");
   if (goalFact) {
-    parts.push(`chasing: ${goalFact.fact_value}`);
+    contextParts.push(`working toward ${goalFact.fact_value}`);
   }
 
-  const stressorFact = facts.find((fact) => fact.category === "stressors");
-  if (stressorFact) {
-    parts.push(`heavy: ${stressorFact.fact_value}`);
+  if (contextParts.length > 0) {
+    const opener = heavyBits.length > 0 ? "I've also got" : "I've got";
+    paragraphs.push(`${opener} you as ${contextParts.join(", ")}.`);
   }
 
-  const toneFact = facts.find((fact) => fact.category === "preferences" && fact.fact_key === "tone");
-  if (toneFact) {
-    parts.push(`tone: ${toneFact.fact_value}`);
-  }
-
-  const boundaryFact = facts.find((fact) => fact.category === "boundaries");
-  if (boundaryFact) {
-    parts.push(`avoid: ${boundaryFact.fact_value}`);
-  }
-
-  if (parts.length === 0) {
+  if (paragraphs.length === 0) {
     return "I've got the basics saved.";
   }
 
-  return parts.slice(0, 6).join(" · ");
+  return paragraphs.join("\n\n");
+}
+
+function shouldUseKnowYouAiAcknowledgement(message: string, facts: UserMindFact[]): boolean {
+  if (message.trim().length >= 100) {
+    return true;
+  }
+
+  return facts.some((fact) => fact.category === "stressors" || fact.category === "relationships");
+}
+
+export async function resolveKnowYouAcknowledgement(input: {
+  user: MauriUser;
+  message: string;
+  facts: UserMindFact[];
+  skipped: boolean;
+  compact?: boolean;
+}): Promise<string> {
+  if (input.skipped || input.facts.length === 0) {
+    return buildKnowYouAcknowledgement({
+      user: input.user,
+      facts: input.facts,
+      skipped: true,
+      ...(input.compact !== undefined ? { compact: input.compact } : {})
+    });
+  }
+
+  const name = input.user.first_name?.trim() || "there";
+
+  if (shouldUseKnowYouAiAcknowledgement(input.message, input.facts)) {
+    try {
+      const aiReply = await generateKnowYouAcknowledgement({
+        firstName: name,
+        message: input.message,
+        factsSummary: formatUserMindForPrompt(input.facts)
+      });
+
+      return `${aiReply}\n\nWrong or missing something? Just correct me in chat.`;
+    } catch (error) {
+      logger.warn({ error, userId: input.user.id }, "Know-you AI acknowledgement failed; using template.");
+    }
+  }
+
+  return buildKnowYouAcknowledgement({
+    user: input.user,
+    facts: input.facts,
+    skipped: false,
+    ...(input.compact !== undefined ? { compact: input.compact } : {})
+  });
 }
 
 export function isKnowYouSkipMessage(message: string): boolean {
@@ -243,14 +298,18 @@ Reply with the exact one, or send 1, 2, 3, 4, or 5.`;
   const summary = summarizeKnowYouFactsForAck(input.facts);
 
   if (input.compact) {
-    return `Got it, ${name}. ${summary}
+    return `${name} — thanks for sharing that with me.
 
-I'll hold that as *you*, not just your logs. Wrong? Just correct me in chat.`;
+${summary}
+
+I'll hold that as *you*, not just your logs. Wrong or missing something? Just correct me in chat.`;
   }
 
-  return `Got it, ${name}. ${summary}
+  return `${name} — thanks for sharing that with me.
 
-I'll hold that as *you*, not just your logs. Wrong? Just correct me in chat.
+${summary}
+
+I'll hold that as *you*, not just your logs. Wrong or missing something? Just correct me in chat.
 
 Now pick a starting lane for your 7 AM pulse — closest fit is fine, or build your own.
 

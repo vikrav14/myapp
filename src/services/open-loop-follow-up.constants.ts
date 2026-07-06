@@ -1,3 +1,5 @@
 export const OPEN_LOOP_FOLLOWUP_COOLDOWN_DAYS = 14;
 export const OPEN_LOOP_FOLLOWUP_DEFAULT_HOUR = 10;
 export const OPEN_LOOP_FOLLOWUP_DEFAULT_MINUTE = 0;
+
+export { LIFE_THREAD_MAX_ONBOARDING, OPEN_LOOP_MAX_PER_REFLECTION } from "./life-thread.constants.js";
