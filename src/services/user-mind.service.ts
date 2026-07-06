@@ -146,7 +146,14 @@ export function buildKnowYouPrompt(user: MauriUser): string {
 
   return `Hey ${name}. I'm Mauri — your week in WhatsApp.
 
-Before I track anything, I want to know you like a friend would — so I don't talk to you like a generic bot.
+Before I track anything, I want to know you like a friend would — not like a blank ChatGPT thread that resets tomorrow.
+
+How I'm different:
+• You tell me once — I remember *you*, not just this chat.
+• Personal stuff (family, health waits, what's heavy) stays separate from your 7am brief.
+• I follow up when something's live — not random guilt-trip habit lectures.
+
+Most AI bots give everyone the same pep talk. Mauri is built for *your* week in Mauritius — rent, commute, family load, the messy middle.
 
 30-second voice note is perfect. Rough is fine. Tell me whatever comes to mind:
 

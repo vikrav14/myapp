@@ -272,6 +272,8 @@ describe("user mind helpers", () => {
     });
 
     expect(prompt).toContain("Before I track anything");
+    expect(prompt).toContain("How I'm different");
+    expect(prompt).toContain("ChatGPT");
     expect(prompt).toContain("your age");
     expect(prompt).toContain("what to avoid");
   });
