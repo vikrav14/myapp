@@ -4,6 +4,7 @@ import {
   finalizeMauriGeneratedReply,
   finalizeMauriTextReply,
   MAURI_ENGLISH_ONLY_LANGUAGE_RULE,
+  MAURI_REPLY_MAX_WORDS,
   MAURI_REPLY_MAX_WORDS_EMOTIONAL,
   MAURI_REPLY_MAX_WORDS_MICRO_LESSON,
   MAURI_REPLY_MAX_WORDS_PROACTIVE,
@@ -331,6 +332,53 @@ Reply in plain text only.`;
   return finalizeMauriGeneratedReply({
     reply: rawReply,
     maxWords: MAURI_REPLY_MAX_WORDS_EMOTIONAL
+  });
+}
+
+export async function generateExpressSetupQuestionReply(input: {
+  firstName: string;
+  message: string;
+  factsSummary: string;
+  setupLine: string;
+  rationale: string;
+}): Promise<string> {
+  const prompt = `You are Mauri on WhatsApp — a grounded mate for Mauritians, mid-onboarding.
+
+The user asked about the setup Mauri proposed before starting their trial. Answer like a human — not a settings menu.
+
+Rules:
+${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
+- Answer their actual question first (how/why you chose this).
+- Tie each part of the setup to specific things THEY shared — morning pulse, tools, tags.
+- Plain prose only. No bullet lists. No "Corporate / Career" jargon — say commute, money, side hustle, etc.
+- Be honest if something is a sensible default they can change (update topics / my modules).
+- Max ${MAURI_REPLY_MAX_WORDS} words. Max 2 short paragraphs.
+- End by inviting correction OR starting when it feels right — not pushy.
+
+User: ${input.firstName}
+
+Their question:
+${input.message}
+
+Proposed setup:
+${input.setupLine}
+
+Why each piece (ground truth — do not invent beyond this):
+${input.rationale}
+
+Extracted facts:
+${input.factsSummary}
+
+Reply in plain text only.`;
+
+  const rawReply = await callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+
+  return finalizeMauriGeneratedReply({
+    reply: rawReply,
+    maxWords: MAURI_REPLY_MAX_WORDS
   });
 }
 

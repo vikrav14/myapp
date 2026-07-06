@@ -22,6 +22,15 @@ const mockResolveKnowYouAcknowledgement = vi.fn();
 const mockSeedLifeThreadsFromOnboarding = vi.fn();
 const mockListPendingFollowUpsForUser = vi.fn();
 const mockResetProfileForKnowYouOnboarding = vi.fn();
+const mockGenerateExpressSetupQuestionReply = vi.fn();
+
+vi.mock("../src/services/ai.service.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/services/ai.service.js")>("../src/services/ai.service.js");
+  return {
+    ...actual,
+    generateExpressSetupQuestionReply: mockGenerateExpressSetupQuestionReply
+  };
+});
 
 vi.mock("../src/services/user-mind.service.js", async () => {
   const actual = await vi.importActual<typeof import("../src/services/user-mind.service.js")>(
@@ -117,6 +126,9 @@ describe("handleOnboardingMessage express flow", () => {
     mockSeedLifeThreadsFromOnboarding.mockResolvedValue(0);
     mockListPendingFollowUpsForUser.mockResolvedValue([]);
     mockResetProfileForKnowYouOnboarding.mockResolvedValue(undefined);
+    mockGenerateExpressSetupQuestionReply.mockResolvedValue(
+      "I picked Money because you mentioned the MCB card — LocalBuzz for Triolet local context, not random templates."
+    );
   });
 
   it("prompts know-you first for short replies", async () => {
@@ -221,7 +233,22 @@ describe("handleOnboardingMessage express flow", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Morning pulse");
+    expect(result.reply).toContain("ask how I chose");
+    expect(result.interactive?.buttons?.[0]?.title).toBe("Start my trial");
+    expect(mockUpdateUserState).not.toHaveBeenCalled();
+  });
+
+  it("answers setup questions conversationally instead of replaying the card", async () => {
+    const result = await handleOnboardingMessage({
+      user: { ...baseUser, onboarding_state: "awaiting_express_start", first_name: "Vik" },
+      isNewUser: false,
+      message: "How do you know this or choose this for me?"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("MCB");
+    expect(result.reply).not.toContain("here's what I'll set up for you");
+    expect(mockGenerateExpressSetupQuestionReply).toHaveBeenCalled();
     expect(result.interactive?.buttons?.[0]?.title).toBe("Start my trial");
     expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
