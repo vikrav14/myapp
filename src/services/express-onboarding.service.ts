@@ -136,7 +136,7 @@ export function buildExpressStartSummary(input: {
 🔧 Also watching: ${watching}
 📰 Tags: ${formatTopicList(input.setup.topics)}
 
-Personal stuff stays separate. Tune anytime with my lane or help.
+Here's what makes Mauri different: the more I know you, the sharper I get on *your* next step — not generic bot advice. Personal stuff stays private (never in your 7am pulse). We build the rest together, week by week — that's the relationship other apps don't offer.
 
 Tap Start my trial below — or reply start.`;
 }
@@ -162,7 +162,7 @@ export function buildExpressActivationReply(input: {
     `Morning brief tags: ${formatTopicList(input.setup.topics)} — first brief tomorrow at 7:00.`,
     `This week's habit: ${input.weeklyFocus}`,
     "",
-    "Brain dump, remind me, help — all work now. I'll check in gently on the live stuff."
+    "Brain dump, remind me, help — all live now. The more we talk, the better I get at what's next for *you*. I'll check in gently on the live stuff."
   ].join("\n");
 }
 
