@@ -6,7 +6,9 @@ import {
   buildExpressActivationReply,
   buildExpressStartSummary,
   inferExpressSetup,
+  isExpressSetupQuestion,
   isExpressStartConfirmation,
+  resolveExpressSetupQuestionReply,
   type ExpressOnboardingSetup
 } from "./express-onboarding.service.js";
 import {
@@ -105,6 +107,44 @@ async function beginExpressStartStep(user: MauriUser, prefixReply?: string): Pro
     interactive: buildExpressStartInteractive(),
     sendTextBeforeInteractive: Boolean(prefixReply)
   };
+}
+
+async function handleExpressSetupMessage(user: MauriUser, message: string): Promise<OnboardingResult> {
+  if (isExpressStartConfirmation(message)) {
+    return completeExpressStart(user);
+  }
+
+  const facts = await loadUserMindFacts(user.id);
+  const setup = inferExpressSetup(facts);
+
+  if (isExpressSetupQuestion(message)) {
+    const explanation = await resolveExpressSetupQuestionReply({
+      userId: user.id,
+      firstName: user.first_name,
+      message,
+      facts,
+      setup
+    });
+
+    return {
+      handled: true,
+      user,
+      reply: explanation,
+      interactive: buildExpressStartInteractive(),
+      sendTextBeforeInteractive: true
+    };
+  }
+
+  if (user.onboarding_state === "awaiting_express_start") {
+    return {
+      handled: true,
+      user,
+      reply: "Still here — tap Start my trial when you're ready, or ask how I chose this setup.",
+      interactive: buildExpressStartInteractive()
+    };
+  }
+
+  return beginExpressStartStep(user);
 }
 
 async function completeExpressStart(user: MauriUser): Promise<OnboardingResult> {
@@ -269,11 +309,7 @@ export async function handleOnboardingMessage(input: {
   }
 
   if (EXPRESS_SETUP_STATES.has(user.onboarding_state)) {
-    if (!isExpressStartConfirmation(message)) {
-      return beginExpressStartStep(user);
-    }
-
-    return completeExpressStart(user);
+    return handleExpressSetupMessage(user, message);
   }
 
   return {

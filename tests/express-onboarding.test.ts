@@ -4,7 +4,9 @@ import {
   buildExpressStartSummary,
   inferArchetypeFromFacts,
   inferExpressSetup,
-  isExpressStartConfirmation
+  isExpressSetupQuestion,
+  isExpressStartConfirmation,
+  buildExpressSetupQuestionReplyTemplate
 } from "../src/services/express-onboarding.service.js";
 import { suggestModulesFromFacts } from "../src/services/user-modules.service.js";
 import type { UserMindFact } from "../src/types.js";
@@ -79,5 +81,27 @@ describe("express onboarding", () => {
     expect(isExpressStartConfirmation("start my trial")).toBe(true);
     expect(isExpressStartConfirmation("OK")).toBe(true);
     expect(isExpressStartConfirmation("maybe later")).toBe(false);
+  });
+
+  it("detects setup questions during express start", () => {
+    expect(isExpressSetupQuestion("How do you know this or choose this for me?")).toBe(true);
+    expect(isExpressSetupQuestion("why habits and founder")).toBe(true);
+    expect(isExpressSetupQuestion("start my trial")).toBe(false);
+  });
+
+  it("explains setup choices from user facts in plain language", () => {
+    const facts = [
+      fact({ category: "life_context", fact_key: "work", fact_value: "freelance logo design and airport transfers" }),
+      fact({ category: "stressors", fact_key: "sleep", fact_value: "running on empty, no sleep" }),
+      fact({ category: "stressors", fact_key: "money", fact_value: "MCB credit card maxed out" }),
+      fact({ category: "location", fact_key: "area", fact_value: "Triolet" })
+    ];
+    const setup = inferExpressSetup(facts);
+    const reply = buildExpressSetupQuestionReplyTemplate({ firstName: "Vik", setup, facts });
+
+    expect(reply).toContain("Fair question");
+    expect(reply).toContain("MCB");
+    expect(reply).toContain("logo");
+    expect(reply).not.toContain("Corporate / Career");
   });
 });

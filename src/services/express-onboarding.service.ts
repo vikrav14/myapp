@@ -1,6 +1,10 @@
 import type { MauriArchetype, MauriModuleKey, MorningBriefTopicKey, UserMindFact } from "../types.js";
+import { MODULE_CATALOG } from "./user-modules.constants.js";
 import { defaultTopicsForArchetype, formatTopicList } from "./morning-brief-topics.service.js";
 import { formatModuleLabels, suggestModulesFromFacts } from "./user-modules.service.js";
+import { generateExpressSetupQuestionReply } from "./ai.service.js";
+import { formatUserMindForPrompt } from "./user-mind.service.js";
+import { logger } from "../lib/logger.js";
 
 export interface ExpressOnboardingSetup {
   archetype: MauriArchetype;
@@ -71,8 +75,12 @@ export function inferArchetypeFromFacts(facts: UserMindFact[]): MauriArchetype {
       scores["Entrepreneur Mode"] += 2;
     }
 
-    if (/\b(habit|routine|balance|wellness|mood|gym|carer|caregiver|primary carer)\b/.test(blob)) {
+    if (/\b(habit|routine|balance|wellness|mood|gym|carer|caregiver|primary carer|running on empty|no sleep|exhausted)\b/.test(blob)) {
       scores["Life & Habit Tracking"] += 1;
+    }
+
+    if (/\b(freelance|gig|driving for|logo design|airport transfer|side hustle|three jobs|multiple jobs)\b/.test(blob)) {
+      scores["Entrepreneur Mode"] += 1;
     }
   }
 
@@ -169,4 +177,150 @@ export function buildExpressActivationReply(input: {
 export function isExpressStartConfirmation(message: string): boolean {
   const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
   return START_CONFIRMATIONS.has(normalized);
+}
+
+const EXPRESS_SETUP_QUESTION_PATTERN =
+  /\b(how (did|do) you (know|choose|pick|decide)|why (these|this|that|did you)|what does .* mean|how come|explain|what are (these|the) tags|choose this for me|do you even know|what is this|makes no sense|sounds weird|why habits|why founder|why money|why localbuzz)\b/i;
+
+export function isExpressSetupQuestion(message: string): boolean {
+  const trimmed = message.trim();
+  if (trimmed.length < 8) {
+    return false;
+  }
+
+  if (trimmed.endsWith("?")) {
+    return true;
+  }
+
+  return EXPRESS_SETUP_QUESTION_PATTERN.test(trimmed);
+}
+
+function factsMatching(facts: UserMindFact[], pattern: RegExp): string[] {
+  return facts
+    .filter((fact) => pattern.test(factBlob(fact)))
+    .map((fact) => fact.fact_value)
+    .slice(0, 2);
+}
+
+function explainMorningPulseReason(setup: ExpressOnboardingSetup, facts: UserMindFact[]): string {
+  const heavy = factsMatching(facts, /\b(stress|sleep|empty|burnout|overwhelm|panic|maxed|debt|rent|loan)\b/i);
+  const work = factsMatching(facts, /\b(job|work|freelance|gig|commute|finance|transfer|design)\b/i);
+  const bits = [`I read your life as "${setup.morningPulseLabel}" for the 7am brief only — practical pulse, not the heavy personal stuff.`];
+
+  if (work.length > 0) {
+    bits.push(`Work side: ${work[0]}.`);
+  }
+
+  if (heavy.length > 0) {
+    bits.push(`You're under load (${heavy[0]}) — brief stays useful, not another guilt trip.`);
+  }
+
+  return bits.join(" ");
+}
+
+function explainModuleReason(module: MauriModuleKey, facts: UserMindFact[], archetype: MauriArchetype): string {
+  const label = MODULE_CATALOG[module].shortLabel;
+
+  if (module === "habits") {
+    const heavy = factsMatching(facts, /\b(stress|sleep|empty|burnout|overwhelm|habit|routine|balance)\b/i);
+    return heavy.length > 0
+      ? `${label}: you flagged running on empty / stress — gentle routine check-ins, not lectures. (${heavy[0]})`
+      : `${label}: balance and routines without the guilt-trip stuff.`;
+  }
+
+  if (module === "founder") {
+    const hustle = factsMatching(facts, /\b(freelance|logo|transfer|side hustle|gig|business|startup|founder)\b/i);
+    return hustle.length > 0
+      ? `${label}: picked up side-hustle energy (${hustle[0]}) — cashflow + focus blocks behind the scenes.`
+      : `${label}: side projects and hustle tools if you're building on the side.`;
+  }
+
+  if (module === "career") {
+    return `${label}: job + money runway tools — payday check-ins, work blocks. Fits ${archetype.toLowerCase()}.`;
+  }
+
+  return `${label}: ${MODULE_CATALOG[module].description}.`;
+}
+
+function explainTopicReason(topic: MorningBriefTopicKey, facts: UserMindFact[], archetype: MauriArchetype): string {
+  if (topic === "Money") {
+    const money = factsMatching(facts, /\b(money|mcb|credit|debt|rent|loan|maxed|pay|salary|save)\b/i);
+    return money.length > 0
+      ? `#Money — you mentioned money pressure (${money[0]}). Brief pulls finance-relevant local stories.`
+      : `#Money — default for ${archetype}; keeps salary/rent/cost-of-life stuff in the brief.`;
+  }
+
+  if (topic === "Traffic") {
+    const commute = factsMatching(facts, /\b(commute|traffic|drive|hours in|road)\b/i);
+    return commute.length > 0
+      ? `#Traffic — commute showed up (${commute[0]}).`
+      : `#Traffic — Mauritius commute chaos; useful if you're moving daily.`;
+  }
+
+  if (topic === "LocalBuzz") {
+    const local = factsMatching(facts, /\b(triolet|mauritius|local|island|town|village|area)\b/i);
+    return local.length > 0
+      ? `#LocalBuzz — local context for where you are (${local[0]}).`
+      : `#LocalBuzz — what's happening around Mauritius that morning.`;
+  }
+
+  if (topic === "Tech") {
+    return `#Tech — work/tech angle in the brief. Swap anytime.`;
+  }
+
+  return `#${topic} — rounds out the brief vibe; change with update topics anytime.`;
+}
+
+export function buildExpressSetupRationale(facts: UserMindFact[], setup: ExpressOnboardingSetup): string {
+  const lines = [
+    explainMorningPulseReason(setup, facts),
+    ...setup.modules.map((module) => explainModuleReason(module, facts, setup.archetype)),
+    ...setup.topics.map((topic) => explainTopicReason(topic, facts, setup.archetype))
+  ];
+
+  return lines.join("\n");
+}
+
+export function buildExpressSetupQuestionReplyTemplate(input: {
+  firstName?: string | null;
+  setup: ExpressOnboardingSetup;
+  facts: UserMindFact[];
+}): string {
+  const name = input.firstName?.trim() || "there";
+  const rationale = buildExpressSetupRationale(input.facts, input.setup);
+
+  return `Fair question, ${name} — nothing here is random. I built it from what you told me:
+
+${rationale}
+
+Nothing's locked in. Tell me what to swap, or tap Start my trial when it feels right.`;
+}
+
+export async function resolveExpressSetupQuestionReply(input: {
+  userId: string;
+  firstName?: string | null;
+  message: string;
+  facts: UserMindFact[];
+  setup: ExpressOnboardingSetup;
+}): Promise<string> {
+  const name = input.firstName?.trim() || "there";
+  const factsSummary = formatUserMindForPrompt(input.facts);
+  const rationale = buildExpressSetupRationale(input.facts, input.setup);
+
+  try {
+    return await generateExpressSetupQuestionReply({
+      firstName: name,
+      message: input.message,
+      factsSummary,
+      setupLine: `Morning pulse: ${input.setup.morningPulseLabel}; watching: ${formatModuleLabels(input.setup.modules)}; tags: ${formatTopicList(input.setup.topics)}`,
+      rationale
+    });
+  } catch (error) {
+    logger.warn({ error, userId: input.userId }, "Express setup question AI reply failed; using template.");
+    return buildExpressSetupQuestionReplyTemplate({
+      firstName: input.firstName ?? null,
+      setup: input.setup,
+      facts: input.facts
+    });
+  }
 }
