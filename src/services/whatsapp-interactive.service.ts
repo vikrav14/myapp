@@ -78,8 +78,8 @@ export function buildHeavyShareArchetypePickerInteractive(input: {
 
   return {
     header: "Your 7am brief",
-    body: `${name} — pick the closest lane for your morning pulse only. Everything else you shared stays with me separately.`,
-    footer: "Tap a lane below · Your own mix is option 5",
+    body: `${name} — when you're ready, pick the closest lane for your morning pulse only.`,
+    footer: "Take your time · Your own mix is option 5",
     listButtonLabel: "Pick brief lane",
     sections: [
       {

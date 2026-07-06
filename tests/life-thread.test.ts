@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildHeavyShareTrustBridge,
   buildLifeThreadActivationNote,
   buildLifeThreadCandidatesFromFacts,
   isHeavyKnowYouShare
@@ -94,8 +95,16 @@ describe("life thread copy helpers", () => {
   it("builds heavy-share picker with brief-lane button", () => {
     const picker = buildHeavyShareArchetypePickerInteractive({ firstName: "Vik" });
     expect(picker.listButtonLabel).toBe("Pick brief lane");
-    expect(picker.body).toContain("separately");
+    expect(picker.body).toContain("when you're ready");
     expect(picker.sections?.[0]?.rows?.[0]?.title).toBe("Corporate / Career");
     expect(picker.sections?.[0]?.rows?.[3]?.title).toBe("Entrepreneur Mode");
+  });
+
+  it("builds a trust bridge before heavy-share setup continues", () => {
+    const bridge = buildHeavyShareTrustBridge("Vik");
+    expect(bridge).toContain("not just logging this");
+    expect(bridge).toContain("stays between us");
+    expect(bridge).toContain("check in gently");
+    expect(bridge).toContain("When you're ready");
   });
 });

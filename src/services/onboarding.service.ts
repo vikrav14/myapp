@@ -33,6 +33,7 @@ import {
   resolveKnowYouAcknowledgement
 } from "./user-mind.service.js";
 import {
+  buildHeavyShareTrustBridge,
   buildLifeThreadActivationNote,
   isHeavyKnowYouShare
 } from "./life-thread.service.js";
@@ -346,10 +347,11 @@ export async function handleOnboardingMessage(input: {
     });
 
     if (heavyShare) {
+      const bridge = buildHeavyShareTrustBridge(updatedUser.first_name);
       return {
         handled: true,
         user: updatedUser,
-        reply: ack,
+        reply: `${ack}\n\n${bridge}`,
         interactive: buildHeavyShareArchetypePickerInteractive({
           firstName: updatedUser.first_name
         }),
