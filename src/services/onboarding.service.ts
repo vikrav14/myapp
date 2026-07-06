@@ -8,6 +8,7 @@ import {
 } from "./archetype-catalog.js";
 import {
   buildArchetypePickerInteractive,
+  buildBriefFocusPickerInteractive,
   buildHeavyShareArchetypePickerInteractive,
   buildModulePickerInteractive,
   buildTopicsPickerInteractive
@@ -45,6 +46,11 @@ import {
   parseOnboardingModuleSelection,
   suggestModulesFromFacts
 } from "./user-modules.service.js";
+import {
+  buildBriefFocusPrompt,
+  displayPrimaryLaneLabel,
+  parseBriefFocusSelection
+} from "./brief-focus.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
 
@@ -62,7 +68,7 @@ const archetypeActivationHooks: Record<MauriArchetype, string> = {
   "Entrepreneur Mode": "I'll keep an eye on cashflow, focus blocks, and the messy founder week.",
   "Life & Habit Tracking": "I'll help you spot patterns in habits, mood, and daily balance.",
   [CUSTOM_LANE_ARCHETYPE]:
-    "Your tags, your brief — type what you want in the 7am pulse."
+    "Your brief focus drives what lands in the 7am pulse — tags tune the news mix."
 };
 
 function buildArchetypePrompt(user: MauriUser): string {
@@ -72,18 +78,19 @@ function buildArchetypePrompt(user: MauriUser): string {
 
 ${buildArchetypeLaneList()}
 
-None fit perfectly? Pick closest, or Custom (5) — then type your own brief tags.`;
+None fit perfectly? Pick closest, or Your own mix (5) — you'll define your brief focus next.`;
 }
 
 function buildActivationReply(
-  archetype: MauriArchetype,
+  user: MauriUser,
   topics: MorningBriefTopicKey[],
   weeklyFocus: string,
   modules: MauriModuleKey[]
 ): string {
+  const archetype = user.archetype as MauriArchetype;
   const hook = archetypeActivationHooks[archetype] ?? archetypeActivationHooks["Life & Habit Tracking"];
   const laneLine = isCustomLaneArchetype(archetype)
-    ? `You're in on ${CUSTOM_LANE_ARCHETYPE}.`
+    ? `You're in on ${displayPrimaryLaneLabel(user)}.`
     : `You're in on ${archetype}.`;
   const moduleLine =
     modules.length > 0
@@ -123,12 +130,11 @@ async function activateUserWithTopics(
   });
 
   const updatedUser = await assignWeeklyFocusForUser(activatedUser);
-  const archetype = updatedUser.archetype as MauriArchetype;
   const pendingFollowUps = await listPendingFollowUpsForUser(updatedUser.id);
   const threadNote = buildLifeThreadActivationNote(pendingFollowUps);
   const replyParts = [
     buildActivationReply(
-      archetype,
+      updatedUser,
       topics,
       updatedUser.weekly_focus_habit ?? "one small win each day",
       updatedUser.active_modules ?? user.active_modules ?? []
@@ -164,6 +170,18 @@ async function beginTopicsStep(user: MauriUser, laneConfirmation?: string): Prom
     reply: laneConfirmation,
     interactive: buildTopicsPickerInteractive(archetype),
     sendTextBeforeInteractive: Boolean(laneConfirmation)
+  };
+}
+
+async function beginBriefFocusStep(user: MauriUser, laneConfirmation?: string): Promise<OnboardingResult> {
+  const replyParts = [laneConfirmation, buildBriefFocusPrompt(user.first_name)].filter(Boolean);
+
+  return {
+    handled: true,
+    user,
+    reply: replyParts.join("\n\n"),
+    interactive: buildBriefFocusPickerInteractive({ firstName: user.first_name }),
+    sendTextBeforeInteractive: true
   };
 }
 
@@ -348,6 +366,20 @@ export async function handleOnboardingMessage(input: {
     };
   }
 
+  if (user.onboarding_state === "awaiting_brief_focus") {
+    const briefFocus = parseBriefFocusSelection(message);
+    if (!briefFocus) {
+      return beginBriefFocusStep(user);
+    }
+
+    const updatedUser = await updateUserState(user.id, {
+      brief_focus: briefFocus,
+      onboarding_state: "awaiting_modules"
+    });
+
+    return beginModulesStep(updatedUser, `Brief focus: ${briefFocus}.`);
+  }
+
   if (user.onboarding_state === "awaiting_modules") {
     const facts = await loadUserMindFacts(user.id);
     const parsed = parseOnboardingModuleSelection({
@@ -364,7 +396,7 @@ export async function handleOnboardingMessage(input: {
       return {
         handled: true,
         user,
-        reply: `${buildCustomTopicsPrompt()}\n\nCustom needs at least one module first — tap Pick modules or reply e.g. career habits.`
+        reply: `${buildCustomTopicsPrompt()}\n\nYour own mix needs at least one module first — tap Pick modules or reply e.g. career habits.`
       };
     }
 
@@ -372,7 +404,7 @@ export async function handleOnboardingMessage(input: {
       return {
         handled: true,
         user,
-        reply: "Custom lane needs at least one module — try career habits or tap Use suggested."
+        reply: "Your own mix needs at least one module — try career habits or tap Use suggested."
       };
     }
 
@@ -443,16 +475,24 @@ export async function handleOnboardingMessage(input: {
     };
   }
 
+  const nextState = isCustomLaneArchetype(archetype) ? "awaiting_brief_focus" : "awaiting_modules";
+
   const updatedUser = await updateUserState(user.id, {
-    onboarding_state: "awaiting_modules",
+    onboarding_state: nextState,
     archetype
   });
 
   const pendingFollowUps = await listPendingFollowUpsForUser(updatedUser.id);
   const laneConfirmation =
     pendingFollowUps.length > 0
-      ? `Got it — ${archetype} for your 7am brief. The personal stuff you shared stays with me separately; I'll check in when it makes sense, not in the brief.`
+      ? isCustomLaneArchetype(archetype)
+        ? `Got it — Your own mix for your 7am brief. The personal stuff you shared stays with me separately; I'll check in when it makes sense, not in the brief.`
+        : `Got it — ${archetype} for your 7am brief. The personal stuff you shared stays with me separately; I'll check in when it makes sense, not in the brief.`
       : undefined;
+
+  if (isCustomLaneArchetype(archetype)) {
+    return beginBriefFocusStep(updatedUser, laneConfirmation);
+  }
 
   return beginModulesStep(updatedUser, laneConfirmation);
 }

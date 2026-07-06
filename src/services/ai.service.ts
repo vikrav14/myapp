@@ -37,6 +37,8 @@ import type {
   WeeklyDiagnosticSummary,
   WeeklyFeedbackPromptContext
 } from "../types.js";
+import { isCustomLaneArchetype } from "../types.js";
+import { displayPrimaryLaneLabel } from "./brief-focus.service.js";
 import type { UserMindReflectionInput } from "./user-mind-data.service.js";
 import { buildReflectionPayloadSummary } from "./user-mind-prompt.js";
 
@@ -459,8 +461,8 @@ ${MAURI_TEXT_REPLY_GUARDRAILS}
 
 User profile:
 First name: ${user.first_name ?? "Unknown"}
-Primary lane (7am brief): ${user.archetype}
-Active modules: ${user.active_modules.length > 0 ? user.active_modules.join(", ") : "none"}
+Primary lane (7am brief): ${user.brief_focus?.trim() && isCustomLaneArchetype(user.archetype) ? displayPrimaryLaneLabel(user) : user.archetype}
+${user.brief_focus?.trim() && isCustomLaneArchetype(user.archetype) ? `Brief focus: ${user.brief_focus.trim()}\n` : ""}Active modules: ${user.active_modules.length > 0 ? user.active_modules.join(", ") : "none"}
 Subscription status: ${user.subscription_status}
 
 Who this person is (what they told you — stable profile):

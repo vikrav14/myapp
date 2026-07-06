@@ -77,7 +77,7 @@ export function buildArchetypeLaneList(): string {
   const presetLines = ARCHETYPE_CATALOG.map((entry) => `${entry.number}. ${entry.shortTitle}`).join("\n");
 
   return `${presetLines}
-${CUSTOM_LANE_NUMBER}. Custom — type your own brief tags, no preset box.
+${CUSTOM_LANE_NUMBER}. Your own mix — define your brief focus, then your tags.
 
 Tap Pick brief lane below, then tap your choice.`;
 }
@@ -123,8 +123,8 @@ export function buildArchetypePickerRows(): Array<{
     })),
     {
       id: "archetype_custom",
-      title: "Custom",
-      description: "Type your own brief tags"
+      title: "Your own mix",
+      description: "Define what your 7am brief focuses on"
     }
   ];
 }

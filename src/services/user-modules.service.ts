@@ -8,6 +8,7 @@ import {
 } from "./user-modules.constants.js";
 import type { MauriUser, UserMindFact } from "../types.js";
 import { CUSTOM_LANE_ARCHETYPE, isCustomLaneArchetype } from "../types.js";
+import { displayPrimaryLaneLabel } from "./brief-focus.service.js";
 import { updateUserState } from "./user.service.js";
 
 export function normalizeModuleKey(value: string): MauriModuleKey | null {
@@ -95,7 +96,7 @@ export function buildModuleStepIntro(input: {
   suggestedModules: MauriModuleKey[];
 }): string {
   const name = input.user.first_name?.trim() || "there";
-  const lane = input.user.archetype;
+  const lane = displayPrimaryLaneLabel(input.user);
   const suggestedLine =
     input.suggestedModules.length > 0
       ? `Suggested for you: ${formatModuleLabels(input.suggestedModules)}.`
@@ -285,8 +286,8 @@ export function buildLaneStatusReply(user: MauriUser): string {
       ? user.topic_preferences.map((topic) => `#${topic}`).join(" ")
       : "not set yet";
 
-  return `Brief lane: ${user.archetype}
-Morning brief tags: ${tags}
+  return `Brief lane: ${displayPrimaryLaneLabel(user)}
+${user.brief_focus?.trim() && isCustomLaneArchetype(user.archetype) ? `Brief focus: ${user.brief_focus.trim()}\n` : ""}Morning brief tags: ${tags}
 Active modules: ${formatModuleLabels(sanitizeModuleList(user.active_modules))}
 
 Change modules: add habits / remove founder
