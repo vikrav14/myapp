@@ -15,10 +15,11 @@ import { isReminderEligible } from "./reminder-schedule.service.js";
 import { findUserById, mapUser, updateUserState } from "./user.service.js";
 import { canSendProactiveOutbound, recordProactivePing } from "./outbound-pace.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
+import type { LifeThreadCandidate } from "./life-thread.service.js";
+import { buildLifeThreadCandidatesFromFacts } from "./life-thread.service.js";
 import {
   OPEN_LOOP_FOLLOWUP_COOLDOWN_DAYS,
-  OPEN_LOOP_FOLLOWUP_DEFAULT_HOUR,
-  OPEN_LOOP_FOLLOWUP_DEFAULT_MINUTE
+  OPEN_LOOP_MAX_PER_REFLECTION
 } from "./open-loop-follow-up.constants.js";
 
 export interface OpenLoopFollowUpRecord {
@@ -27,7 +28,7 @@ export interface OpenLoopFollowUpRecord {
   mind_snapshot_id: string | null;
   loop_text: string;
   loop_fingerprint: string;
-  source: "user_mind" | "user_requested";
+  source: "user_mind" | "user_requested" | "onboarding";
   status: "pending" | "sent" | "cancelled" | "skipped";
   scheduled_for: string;
   sent_at: string | null;
@@ -74,6 +75,21 @@ export function buildFollowUpDeliveryKey(userId: string, fingerprint: string, sc
   return `open_loop_followup:${userId}:${fingerprint.slice(0, 16)}:${dayKey}`;
 }
 
+export function openLoopFollowUpTimeAfterDays(days: number, reference: Date = new Date()): string {
+  const local = getMauritiusLocalParts(reference);
+  const hour = env.OPEN_LOOP_FOLLOWUP_HOUR;
+  const minute = env.OPEN_LOOP_FOLLOWUP_MINUTE;
+  const targetLocal = addDaysToLocal(local, days);
+
+  return mauritiusLocalToUtc({
+    year: targetLocal.year,
+    month: targetLocal.month,
+    day: targetLocal.day,
+    hour,
+    minute
+  }).toISOString();
+}
+
 export function nextOpenLoopFollowUpTime(reference: Date = new Date()): string {
   const local = getMauritiusLocalParts(reference);
   const hour = env.OPEN_LOOP_FOLLOWUP_HOUR;
@@ -90,6 +106,94 @@ export function nextOpenLoopFollowUpTime(reference: Date = new Date()): string {
     hour,
     minute
   }).toISOString();
+}
+
+async function insertOpenLoopFollowUp(input: {
+  userId: string;
+  loopText: string;
+  scheduledFor: string;
+  source: OpenLoopFollowUpRecord["source"];
+  mindSnapshotId?: string | null;
+}): Promise<boolean> {
+  const fingerprint = buildLoopFingerprint(input.loopText);
+  if (await hasRecentFollowUpForLoop(input.userId, fingerprint)) {
+    return false;
+  }
+
+  const deliveryKey = buildFollowUpDeliveryKey(input.userId, fingerprint, input.scheduledFor);
+  const { error } = await supabase.from("open_loop_follow_ups").insert({
+    user_id: input.userId,
+    mind_snapshot_id: input.mindSnapshotId ?? null,
+    loop_text: input.loopText,
+    loop_fingerprint: fingerprint,
+    source: input.source,
+    status: "pending",
+    scheduled_for: input.scheduledFor,
+    delivery_key: deliveryKey
+  });
+
+  if (error) {
+    if (error.message.includes("duplicate")) {
+      return false;
+    }
+
+    throw new Error(`Failed to schedule open-loop follow-up: ${error.message}`);
+  }
+
+  return true;
+}
+
+async function scheduleThreadCandidates(input: {
+  user: MauriUser;
+  candidates: LifeThreadCandidate[];
+  source: OpenLoopFollowUpRecord["source"];
+  mindSnapshotId?: string | null;
+}): Promise<number> {
+  if (!env.OPEN_LOOP_FOLLOWUPS_ENABLED || !input.user.open_loop_followups_enabled) {
+    return 0;
+  }
+
+  if (input.candidates.length === 0) {
+    return 0;
+  }
+
+  let scheduled = 0;
+
+  for (const candidate of input.candidates) {
+    const scheduledFor = openLoopFollowUpTimeAfterDays(candidate.offsetDays);
+    const inserted = await insertOpenLoopFollowUp({
+      userId: input.user.id,
+      loopText: candidate.loopText,
+      scheduledFor,
+      source: input.source,
+      mindSnapshotId: input.mindSnapshotId ?? null
+    });
+
+    if (inserted) {
+      scheduled += 1;
+    }
+  }
+
+  if (scheduled > 0) {
+    logger.info(
+      { userId: input.user.id, scheduled, source: input.source },
+      "Scheduled life-thread follow-ups."
+    );
+  }
+
+  return scheduled;
+}
+
+export async function seedLifeThreadsFromOnboarding(input: {
+  user: MauriUser;
+  facts: import("../types.js").UserMindFact[];
+}): Promise<number> {
+  const candidates = buildLifeThreadCandidatesFromFacts(input.facts);
+  return scheduleThreadCandidates({
+    user: input.user,
+    candidates,
+    source: "onboarding"
+  });
 }
 
 function buildFallbackFollowUpMessage(user: MauriUser, loopText: string): string {
@@ -165,49 +269,31 @@ export async function scheduleOpenLoopFollowUps(input: {
   const loops = input.mindRecord.snapshot.open_loops
     .map((loop) => loop.trim())
     .filter((loop) => loop.length >= 8)
-    .slice(0, 1);
+    .slice(0, OPEN_LOOP_MAX_PER_REFLECTION);
 
   if (loops.length === 0) {
     return 0;
   }
 
-  const scheduledFor = nextOpenLoopFollowUpTime();
   let scheduled = 0;
 
-  for (const loopText of loops) {
-    const fingerprint = buildLoopFingerprint(loopText);
-    if (await hasRecentFollowUpForLoop(input.user.id, fingerprint)) {
-      continue;
-    }
-
-    const deliveryKey = buildFollowUpDeliveryKey(input.user.id, fingerprint, scheduledFor);
-    const { error } = await supabase.from("open_loop_follow_ups").insert({
-      user_id: input.user.id,
-      mind_snapshot_id: input.mindRecord.id,
-      loop_text: loopText,
-      loop_fingerprint: fingerprint,
+  for (const [index, loopText] of loops.entries()) {
+    const scheduledFor = openLoopFollowUpTimeAfterDays(index === 0 ? 1 : 1 + index * 3);
+    const inserted = await insertOpenLoopFollowUp({
+      userId: input.user.id,
+      loopText,
+      scheduledFor,
       source: "user_mind",
-      status: "pending",
-      scheduled_for: scheduledFor,
-      delivery_key: deliveryKey
+      mindSnapshotId: input.mindRecord.id
     });
 
-    if (error) {
-      if (error.message.includes("duplicate")) {
-        continue;
-      }
-
-      throw new Error(`Failed to schedule open-loop follow-up: ${error.message}`);
+    if (inserted) {
+      scheduled += 1;
     }
-
-    scheduled += 1;
   }
 
   if (scheduled > 0) {
-    logger.info(
-      { userId: input.user.id, scheduled, scheduledFor },
-      "Scheduled open-loop follow-up."
-    );
+    logger.info({ userId: input.user.id, scheduled }, "Scheduled open-loop follow-up from mind snapshot.");
   }
 
   return scheduled;

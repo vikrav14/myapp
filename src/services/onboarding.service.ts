@@ -22,8 +22,18 @@ import {
   isKnowYouSkipMessage,
   isKnowYouTooShort,
   loadUserMindFacts,
-  preferredNameFromFacts
+  preferredNameFromFacts,
+  resolveKnowYouAcknowledgement
 } from "./user-mind.service.js";
+import {
+  buildHeavyShareLanePrompt,
+  buildLifeThreadActivationNote,
+  isHeavyKnowYouShare
+} from "./life-thread.service.js";
+import {
+  listPendingFollowUpsForUser,
+  seedLifeThreadsFromOnboarding
+} from "./open-loop-follow-up.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
 
@@ -175,11 +185,20 @@ async function activateUserWithTopics(
 
   const updatedUser = await assignWeeklyFocusForUser(activatedUser);
   const archetype = updatedUser.archetype as MauriArchetype;
+  const pendingFollowUps = await listPendingFollowUpsForUser(updatedUser.id);
+  const threadNote = buildLifeThreadActivationNote(pendingFollowUps);
+  const replyParts = [
+    buildActivationReply(archetype, topics, updatedUser.weekly_focus_habit ?? "one small win each day")
+  ];
+
+  if (threadNote) {
+    replyParts.push("", threadNote);
+  }
 
   return {
     handled: true,
     user: updatedUser,
-    reply: buildActivationReply(archetype, topics, updatedUser.weekly_focus_habit ?? "one small win each day")
+    reply: replyParts.join("\n")
   };
 }
 
@@ -307,15 +326,34 @@ export async function handleOnboardingMessage(input: {
       ...(preferredName ? { first_name: preferredName } : {})
     });
 
+    try {
+      await seedLifeThreadsFromOnboarding({ user: updatedUser, facts });
+    } catch {
+      // Best-effort — onboarding should not fail if follow-up scheduling fails.
+    }
+
+    const heavyShare = isHeavyKnowYouShare(message, facts);
+    const ack = await resolveKnowYouAcknowledgement({
+      user: updatedUser,
+      message,
+      facts,
+      skipped: false,
+      compact: true
+    });
+
+    if (heavyShare) {
+      const name = updatedUser.first_name?.trim() || "there";
+      return {
+        handled: true,
+        user: updatedUser,
+        reply: `${ack}\n\n${buildHeavyShareLanePrompt(name)}`
+      };
+    }
+
     return {
       handled: true,
       user: updatedUser,
-      reply: buildKnowYouAcknowledgement({
-        user: updatedUser,
-        facts,
-        skipped: false,
-        compact: true
-      }),
+      reply: ack,
       interactive: buildArchetypePickerInteractive({
         firstName: updatedUser.first_name,
         isNewUser: false
@@ -387,9 +425,17 @@ Example: Traffic Money Tech`
     archetype
   });
 
+  const pendingFollowUps = await listPendingFollowUpsForUser(updatedUser.id);
+  const laneConfirmation =
+    pendingFollowUps.length > 0
+      ? `Got it — ${archetype} for your 7am brief. The personal stuff you shared stays with me separately; I'll check in when it makes sense, not in the brief.`
+      : undefined;
+
   return {
     handled: true,
     user: updatedUser,
-    interactive: buildTopicsPickerInteractive(archetype)
+    reply: laneConfirmation,
+    interactive: buildTopicsPickerInteractive(archetype),
+    sendTextBeforeInteractive: Boolean(laneConfirmation)
   };
 }

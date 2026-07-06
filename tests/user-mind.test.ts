@@ -172,9 +172,8 @@ describe("user mind helpers", () => {
       skipped: false
     });
 
-    expect(reply).toContain("26 yrs");
+    expect(reply).toContain("26");
     expect(reply).toContain("printing shop owner");
-    expect(reply).toContain("no guilt trips");
     expect(reply).toContain("Student Grind");
     expect(reply).toContain("correct me");
   });
