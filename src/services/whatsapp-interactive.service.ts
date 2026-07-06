@@ -35,6 +35,7 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   help_reminders: "my reminders",
   help_squad: "my squad",
   help_full: "show full menu",
+  express_start: "start my trial",
   feedback_prompt: "mauri feedback",
   reminder_done: "done",
   reminder_snooze: "snooze 1h",
@@ -68,6 +69,14 @@ export function buildArchetypePickerInteractive(input: {
         rows: buildArchetypePickerRows()
       }
     ]
+  };
+}
+
+export function buildExpressStartInteractive(): WhatsAppInteractiveOutbound {
+  return {
+    header: "Ready when you are",
+    body: "One tap starts your 7-day trial with the setup above.",
+    buttons: [{ id: "express_start", title: "Start my trial" }]
   };
 }
 

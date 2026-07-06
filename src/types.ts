@@ -3,6 +3,7 @@ import type { UserMindSnapshotPayload } from "./schemas/user-mind.js";
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
 export type OnboardingState =
   | "awaiting_know_you"
+  | "awaiting_express_start"
   | "awaiting_archetype"
   | "awaiting_brief_focus"
   | "awaiting_modules"
