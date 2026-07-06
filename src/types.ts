@@ -468,11 +468,15 @@ export interface MauriReplyPayload {
 
 export interface InboundMessage {
   from: string;
-  kind: "text" | "audio" | "image" | "interactive";
+  kind: "text" | "audio" | "image" | "interactive" | "reaction";
   text?: string | undefined;
   messageId?: string | undefined;
   profileName?: string | undefined;
   interactiveReplyId?: string | undefined;
+  reaction?: {
+    emoji: string;
+    targetMessageId: string;
+  };
   audio?: {
     mediaId?: string | undefined;
     mimeType?: string | undefined;
