@@ -56,7 +56,7 @@ export function isTopicConfirmation(message: string): boolean {
 }
 
 export function buildCustomTopicsPrompt(): string {
-  return `You're on Custom — type your own morning brief tags (3 to 5).
+  return `You're on Your own mix — type your own morning brief tags (3 to 5).
 
 Available: Traffic, Tech, Money, LocalBuzz, Entertainment.
 

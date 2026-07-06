@@ -4,6 +4,7 @@ export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
 export type OnboardingState =
   | "awaiting_know_you"
   | "awaiting_archetype"
+  | "awaiting_brief_focus"
   | "awaiting_modules"
   | "awaiting_topics"
   | "active";
@@ -51,6 +52,7 @@ export interface MauriUser {
   phone_number: string;
   first_name: string | null;
   archetype: MauriArchetype | string;
+  brief_focus: string | null;
   active_modules: MauriModuleKey[];
   onboarding_state: OnboardingState;
   subscription_status: SubscriptionStatus;

@@ -29,6 +29,7 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
     phone_number: String(record.phone_number),
     first_name: record.first_name ? String(record.first_name) : null,
     archetype: String(record.archetype ?? "Life & Habit Tracking"),
+    brief_focus: record.brief_focus ? String(record.brief_focus) : null,
     active_modules: sanitizeUserModules(record.active_modules),
     onboarding_state: (record.onboarding_state ?? "active") as MauriUser["onboarding_state"],
     subscription_status: (record.subscription_status ?? "Trial_Active") as MauriUser["subscription_status"],

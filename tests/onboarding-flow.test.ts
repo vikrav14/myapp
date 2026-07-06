@@ -54,6 +54,7 @@ const awaitingTopicsUser = {
   phone_number: "23052525252",
   first_name: "Ava",
   archetype: "Student Grind",
+  brief_focus: null,
   active_modules: [] as const,
   onboarding_state: "awaiting_topics" as const,
   subscription_status: "Trial_Active" as const,
@@ -229,10 +230,10 @@ describe("handleOnboardingMessage", () => {
     );
   });
 
-  it("maps custom lane users to module step before tags", async () => {
+  it("maps custom lane users to brief focus step before modules", async () => {
     mockUpdateUserState.mockResolvedValue({
       ...awaitingTopicsUser,
-      onboarding_state: "awaiting_modules",
+      onboarding_state: "awaiting_brief_focus",
       archetype: "Custom"
     });
 
@@ -246,14 +247,43 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Custom");
-    expect(result.reply).toContain("modules");
+    expect(result.reply).toContain("7am brief focus");
+    expect(result.interactive?.listButtonLabel).toBe("Pick focus");
+    expect(mockUpdateUserState).toHaveBeenCalledWith(
+      awaitingTopicsUser.id,
+      expect.objectContaining({
+        onboarding_state: "awaiting_brief_focus",
+        archetype: "Custom"
+      })
+    );
+  });
+
+  it("moves custom lane users to modules after brief focus is set", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...awaitingTopicsUser,
+      onboarding_state: "awaiting_modules",
+      archetype: "Custom",
+      brief_focus: "Work, side app, and family"
+    });
+
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        onboarding_state: "awaiting_brief_focus",
+        archetype: "Custom"
+      },
+      isNewUser: false,
+      message: "Work, side app, and family — no fluff"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Brief focus:");
     expect(result.interactive?.listButtonLabel).toBe("Pick modules");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
         onboarding_state: "awaiting_modules",
-        archetype: "Custom"
+        brief_focus: "Work, side app, and family — no fluff"
       })
     );
   });

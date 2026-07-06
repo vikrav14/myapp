@@ -8,6 +8,10 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   archetype_entrepreneur: "Entrepreneur Mode",
   archetype_life: "Life & Habit Tracking",
   archetype_custom: "Custom",
+  brief_focus_work: "Work & money",
+  brief_focus_life: "Life & balance",
+  brief_focus_hustle: "Hustle & projects",
+  brief_focus_mix: "Mix of everything",
   module_suggested: "modules suggested",
   module_career: "modules career",
   module_habits: "modules habits",
@@ -75,12 +79,52 @@ export function buildHeavyShareArchetypePickerInteractive(input: {
   return {
     header: "Your 7am brief",
     body: `${name} — pick the closest lane for your morning pulse only. Everything else you shared stays with me separately.`,
-    footer: "Tap a lane below · Custom is option 5",
+    footer: "Tap a lane below · Your own mix is option 5",
     listButtonLabel: "Pick brief lane",
     sections: [
       {
         title: "Brief lanes",
         rows: buildArchetypePickerRows()
+      }
+    ]
+  };
+}
+
+export function buildBriefFocusPickerInteractive(input: {
+  firstName?: string | null;
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+
+  return {
+    header: "Your 7am brief",
+    body: `${name} — what should your morning pulse focus on? Pick closest or type your own.`,
+    footer: "Tap a quick pick · or reply in your own words",
+    listButtonLabel: "Pick focus",
+    sections: [
+      {
+        title: "Quick picks",
+        rows: [
+          {
+            id: "brief_focus_work",
+            title: "Work & money",
+            description: "Job, salary, commute, finances"
+          },
+          {
+            id: "brief_focus_life",
+            title: "Life & balance",
+            description: "Family, habits, mood, routines"
+          },
+          {
+            id: "brief_focus_hustle",
+            title: "Hustle & projects",
+            description: "Side app, startup, building things"
+          },
+          {
+            id: "brief_focus_mix",
+            title: "Mix of everything",
+            description: "Work, life, side projects — no single box"
+          }
+        ]
       }
     ]
   };
