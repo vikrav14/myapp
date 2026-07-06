@@ -10,6 +10,25 @@ import {
 import type { UserMindFact } from "../src/types.js";
 
 describe("user modules", () => {
+  it("does not suggest student tools when only a dependent mentions university", () => {
+    const facts: UserMindFact[] = [
+      {
+        id: "1",
+        user_id: "u1",
+        category: "goals",
+        fact_key: "daughter",
+        fact_value: "Saving for daughter's university in the UK",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z"
+      }
+    ];
+
+    expect(suggestModulesFromFacts(facts, "Corporate / Career")).toEqual(["career", "habits"]);
+  });
+
   it("suggests career + habits for corporate user with heavy load", () => {
     const facts: UserMindFact[] = [
       {

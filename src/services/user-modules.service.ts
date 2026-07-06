@@ -63,7 +63,14 @@ export function suggestModulesFromFacts(facts: UserMindFact[], primaryLane: stri
   });
   const hasStudentSignal = facts.some((fact) => {
     const blob = `${fact.fact_key} ${fact.fact_value}`.toLowerCase();
-    return /exam|uni|uom|utm|study|student|final year/.test(blob);
+    if (/\b(daughter|son|child|kid|saving for|their uni|their university)\b/.test(blob)) {
+      return false;
+    }
+
+    return (
+      /\b(i'm a student|i am a student|student at|studying|final year|my exams|uom|utm)\b/.test(blob) ||
+      (fact.category === "life_context" && /\b(student|studying|uom|utm)\b/.test(blob))
+    );
   });
 
   if (hasHeavyLoad && !modules.includes("habits")) {

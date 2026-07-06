@@ -51,14 +51,14 @@ vi.mock("../src/services/open-loop-follow-up.service.js", async () => {
 
 const { handleOnboardingMessage } = await import("../src/services/onboarding.service.js");
 
-const awaitingTopicsUser = {
+const baseUser = {
   id: "11111111-1111-4111-8111-111111111111",
   phone_number: "23052525252",
   first_name: "Ava",
-  archetype: "Student Grind",
+  archetype: "Life & Habit Tracking",
   brief_focus: null,
   active_modules: [] as const,
-  onboarding_state: "awaiting_topics" as const,
+  onboarding_state: "awaiting_express_start" as const,
   subscription_status: "Trial_Active" as const,
   onboarding_completed_at: null,
   trial_started_at: null,
@@ -73,16 +73,43 @@ const awaitingTopicsUser = {
   updated_at: "2026-01-01T00:00:00.000Z"
 };
 
-describe("handleOnboardingMessage", () => {
+const financeFacts = [
+  {
+    id: "fact-1",
+    user_id: baseUser.id,
+    category: "life_context",
+    fact_key: "work",
+    fact_value: "working in finance in Ébène",
+    source: "onboarding",
+    confidence: 1,
+    user_visible: true,
+    created_at: "2026-06-22T00:00:00.000Z",
+    updated_at: "2026-06-22T00:00:00.000Z"
+  },
+  {
+    id: "fact-2",
+    user_id: baseUser.id,
+    category: "stressors",
+    fact_key: "commute",
+    fact_value: "2 hours in traffic daily from Flic-en-Flac",
+    source: "onboarding",
+    confidence: 1,
+    user_visible: true,
+    created_at: "2026-06-22T00:00:00.000Z",
+    updated_at: "2026-06-22T00:00:00.000Z"
+  }
+];
+
+describe("handleOnboardingMessage express flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAssignWeeklyFocusForUser.mockImplementation(async (user: { id: string }) => ({
       ...user,
-      weekly_focus_habit: "45 minutes deep study before noon",
+      weekly_focus_habit: "One focused work block without scrolling",
       weekly_focus_set_at: "2026-06-22T00:00:00.000Z"
     }));
-    mockIngestUserMindMessage.mockResolvedValue([]);
-    mockLoadUserMindFacts.mockResolvedValue([]);
+    mockIngestUserMindMessage.mockResolvedValue(financeFacts);
+    mockLoadUserMindFacts.mockResolvedValue(financeFacts);
     mockResolveKnowYouAcknowledgement.mockImplementation(async (input: { user: { first_name?: string | null } }) => {
       const name = input.user.first_name?.trim() || "there";
       return `${name} — thanks for sharing that with me.`;
@@ -92,13 +119,9 @@ describe("handleOnboardingMessage", () => {
     mockResetProfileForKnowYouOnboarding.mockResolvedValue(undefined);
   });
 
-  it("prompts know-you first for awaiting_know_you users with short replies", async () => {
+  it("prompts know-you first for short replies", async () => {
     const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        onboarding_state: "awaiting_know_you",
-        archetype: "Life & Habit Tracking"
-      },
+      user: { ...baseUser, onboarding_state: "awaiting_know_you" },
       isNewUser: true,
       message: "hi"
     });
@@ -108,336 +131,109 @@ describe("handleOnboardingMessage", () => {
     expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 
-  it("stores know-you profile then moves to archetype selection", async () => {
-    mockLoadUserMindFacts.mockResolvedValue([
-      {
-        id: "fact-1",
-        user_id: awaitingTopicsUser.id,
-        category: "life_context",
-        fact_key: "work",
-        fact_value: "printing shop owner",
-        source: "onboarding",
-        confidence: 1,
-        user_visible: true,
-        created_at: "2026-06-22T00:00:00.000Z",
-        updated_at: "2026-06-22T00:00:00.000Z"
-      }
-    ]);
+  it("moves know-you submissions to express start preview", async () => {
     mockUpdateUserState.mockResolvedValue({
-      ...awaitingTopicsUser,
-      onboarding_state: "awaiting_archetype",
-      archetype: "Entrepreneur Mode"
+      ...baseUser,
+      first_name: "Vik",
+      onboarding_state: "awaiting_express_start"
     });
 
     const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        onboarding_state: "awaiting_know_you"
-      },
+      user: { ...baseUser, onboarding_state: "awaiting_know_you" },
       isNewUser: true,
-      message: "I'm 34 in Beau Bassin running a printing shop. Direct tone please."
+      message:
+        "I'm 42, working in finance in Ébène. Spend 2 hours in traffic daily from Flic-en-Flac. Running on empty with dad's dementia care on weekends."
     });
 
-    expect(mockIngestUserMindMessage).toHaveBeenCalled();
-    expect(mockResetProfileForKnowYouOnboarding).toHaveBeenCalledWith(awaitingTopicsUser.id);
-    expect(mockSeedLifeThreadsFromOnboarding).toHaveBeenCalled();
+    expect(mockResetProfileForKnowYouOnboarding).toHaveBeenCalledWith(baseUser.id);
     expect(mockUpdateUserState).toHaveBeenCalledWith(
-      awaitingTopicsUser.id,
-      expect.objectContaining({ onboarding_state: "awaiting_archetype" })
+      baseUser.id,
+      expect.objectContaining({ onboarding_state: "awaiting_express_start" })
     );
-    expect(result.reply).toContain("thanks for sharing");
-    expect(result.interactive?.listButtonLabel).toBe("Pick vibe");
-    expect(result.sendTextBeforeInteractive).toBe(true);
+    expect(result.reply).toContain("Morning pulse");
+    expect(result.reply).toContain("Start my trial");
+    expect(result.interactive?.buttons?.[0]?.title).toBe("Start my trial");
   });
 
-  it("delays archetype picker for heavy know-you shares and reframes the lane ask", async () => {
-    mockLoadUserMindFacts.mockResolvedValue([
-      {
-        id: "fact-1",
-        user_id: awaitingTopicsUser.id,
-        category: "relationships",
-        fact_key: "wife",
-        fact_value: "Jeshna — awaiting biopsy results",
-        source: "onboarding",
-        confidence: 1,
-        user_visible: true,
-        created_at: "2026-06-22T00:00:00.000Z",
-        updated_at: "2026-06-22T00:00:00.000Z"
-      },
-      {
-        id: "fact-2",
-        user_id: awaitingTopicsUser.id,
-        category: "relationships",
-        fact_key: "mum",
-        fact_value: "Mum — not doing great",
-        source: "onboarding",
-        confidence: 1,
-        user_visible: true,
-        created_at: "2026-06-22T00:00:00.000Z",
-        updated_at: "2026-06-22T00:00:00.000Z"
-      }
-    ]);
-    mockResolveKnowYouAcknowledgement.mockResolvedValue(
-      "Vik — that's a lot at once. Jeshna's health and waiting on results, your mum… I hear you."
-    );
+  it("adds trust bridge for heavy know-you shares", async () => {
+    mockResolveKnowYouAcknowledgement.mockResolvedValue("Vik — that's a lot at once. I hear you.");
     mockUpdateUserState.mockResolvedValue({
-      ...awaitingTopicsUser,
+      ...baseUser,
       first_name: "Vik",
-      onboarding_state: "awaiting_archetype"
+      onboarding_state: "awaiting_express_start"
     });
 
     const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        onboarding_state: "awaiting_know_you"
-      },
+      user: { ...baseUser, onboarding_state: "awaiting_know_you" },
       isNewUser: true,
       message:
         "I'm 39, Lower Vale, Tech Lead at Deel. Jeshna's health — waiting on biopsy results. Mum's not great. So much at once. No guilt trips."
     });
 
-    expect(mockSeedLifeThreadsFromOnboarding).toHaveBeenCalled();
-    expect(result.reply).toContain("Jeshna");
     expect(result.reply).toContain("check in gently");
-    expect(result.reply).toContain("stays between us");
-    expect(result.interactive?.listButtonLabel).toBe("Pick brief lane");
-    expect(result.interactive?.body).toContain("when you're ready");
-    expect(result.sendTextBeforeInteractive).toBe(true);
+    expect(result.reply).toContain("Morning pulse");
+    expect(result.interactive?.buttons?.[0]?.id).toBe("express_start");
   });
 
-  it("maps entrepreneur selection when user replies 4", async () => {
-    mockUpdateUserState.mockResolvedValue({
-      ...awaitingTopicsUser,
-      onboarding_state: "awaiting_modules",
-      archetype: "Entrepreneur Mode"
-    });
-    mockListPendingFollowUpsForUser.mockResolvedValue([
-      { loop_text: "Jeshna — awaiting biopsy results", scheduled_for: "2026-06-25T06:00:00.000Z" }
-    ]);
-
-    const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        onboarding_state: "awaiting_archetype"
-      },
-      isNewUser: false,
-      message: "4"
-    });
-
-    expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Entrepreneur Mode");
-    expect(result.interactive?.listButtonLabel).toBe("Pick modules");
-    expect(mockUpdateUserState).toHaveBeenCalledWith(
-      awaitingTopicsUser.id,
-      expect.objectContaining({
-        onboarding_state: "awaiting_modules",
-        archetype: "Entrepreneur Mode"
-      })
-    );
-  });
-
-  it("maps custom lane users to brief focus step before modules", async () => {
-    mockUpdateUserState.mockResolvedValue({
-      ...awaitingTopicsUser,
-      onboarding_state: "awaiting_brief_focus",
-      archetype: "Custom"
-    });
-
-    const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        onboarding_state: "awaiting_archetype"
-      },
-      isNewUser: false,
-      message: "custom"
-    });
-
-    expect(result.handled).toBe(true);
-    expect(result.reply).toContain("7am brief focus");
-    expect(result.interactive?.listButtonLabel).toBe("Pick focus");
-    expect(mockUpdateUserState).toHaveBeenCalledWith(
-      awaitingTopicsUser.id,
-      expect.objectContaining({
-        onboarding_state: "awaiting_brief_focus",
-        archetype: "Custom"
-      })
-    );
-  });
-
-  it("moves custom lane users to modules after brief focus is set", async () => {
-    mockUpdateUserState.mockResolvedValue({
-      ...awaitingTopicsUser,
-      onboarding_state: "awaiting_modules",
-      archetype: "Custom",
-      brief_focus: "Work, side app, and family"
-    });
-
-    const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        onboarding_state: "awaiting_brief_focus",
-        archetype: "Custom"
-      },
-      isNewUser: false,
-      message: "Work, side app, and family — no fluff"
-    });
-
-    expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Brief focus:");
-    expect(result.interactive?.listButtonLabel).toBe("Pick modules");
-    expect(mockUpdateUserState).toHaveBeenCalledWith(
-      awaitingTopicsUser.id,
-      expect.objectContaining({
-        onboarding_state: "awaiting_modules",
-        brief_focus: "Work, side app, and family — no fluff"
-      })
-    );
-  });
-
-  it("requires custom tags for Custom lane instead of OK", async () => {
-    const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        archetype: "Custom"
-      },
-      isNewUser: false,
-      message: "OK"
-    });
-
-    expect(result.handled).toBe(true);
-    expect(result.reply).toContain("type your own");
-    expect(result.interactive).toBeUndefined();
-    expect(mockUpdateUserState).not.toHaveBeenCalled();
-  });
-
-  it("suggests module picker after archetype selection", async () => {
-    mockUpdateUserState.mockResolvedValue({
-      ...awaitingTopicsUser,
-      onboarding_state: "awaiting_modules",
-      archetype: "Student Grind"
-    });
-
-    const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        onboarding_state: "awaiting_archetype",
-        archetype: "Life & Habit Tracking"
-      },
-      isNewUser: true,
-      message: "study"
-    });
-
-    expect(result.handled).toBe(true);
-    expect(result.interactive?.listButtonLabel).toBe("Pick modules");
-    expect(result.reply).toContain("Student Grind");
-    expect(mockUpdateUserState).toHaveBeenCalledWith(
-      awaitingTopicsUser.id,
-      expect.objectContaining({
-        onboarding_state: "awaiting_modules",
-        archetype: "Student Grind"
-      })
-    );
-  });
-
-  it("moves to topic selection after modules are chosen", async () => {
-    mockUpdateUserState.mockResolvedValue({
-      ...awaitingTopicsUser,
-      onboarding_state: "awaiting_topics",
-      archetype: "Corporate / Career",
-      active_modules: ["career", "habits"]
-    });
-
-    const result = await handleOnboardingMessage({
-      user: {
-        ...awaitingTopicsUser,
-        onboarding_state: "awaiting_modules",
-        archetype: "Corporate / Career"
-      },
-      isNewUser: false,
-      message: "modules suggested"
-    });
-
-    expect(result.handled).toBe(true);
-    expect(result.interactive?.listButtonLabel).toBe("Pick tags");
-    expect(mockUpdateUserState).toHaveBeenCalledWith(
-      awaitingTopicsUser.id,
-      expect.objectContaining({
-        onboarding_state: "awaiting_topics",
-        active_modules: ["career", "habits"]
-      })
-    );
-  });
-
-  it("activates with archetype defaults when the user replies OK", async () => {
+  it("activates on start confirmation with inferred setup", async () => {
     const activatedUser = {
-      ...awaitingTopicsUser,
+      ...baseUser,
+      first_name: "Vik",
       onboarding_state: "active" as const,
-      active_modules: ["student"] as const,
-      topic_preferences: ["Traffic", "Money", "LocalBuzz"],
+      archetype: "Corporate / Career",
+      active_modules: ["career", "habits"] as const,
+      topic_preferences: ["Traffic", "Tech", "Money"],
       trial_started_at: "2026-06-22T00:00:00.000Z",
       trial_ends_at: "2026-06-29T00:00:00.000Z"
     };
     mockUpdateUserState.mockResolvedValue(activatedUser);
     mockAssignWeeklyFocusForUser.mockResolvedValue({
       ...activatedUser,
-      weekly_focus_habit: "45 minutes deep study before noon"
+      weekly_focus_habit: "One focused work block without scrolling"
     });
 
     const result = await handleOnboardingMessage({
-      user: awaitingTopicsUser,
+      user: { ...baseUser, onboarding_state: "awaiting_express_start", first_name: "Vik" },
       isNewUser: false,
-      message: "OK"
+      message: "start my trial"
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("exam pressure");
-    expect(result.reply).toContain("habit");
+    expect(result.reply).toContain("You're in, Vik");
+    expect(result.reply).toContain("7am pulse");
+    expect(result.reply).not.toContain("Corporate / Career shapes");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
-      awaitingTopicsUser.id,
+      baseUser.id,
       expect.objectContaining({
         onboarding_state: "active",
-        topic_preferences: ["Traffic", "Money", "LocalBuzz"]
-      })
-    );
-  });
-
-  it("activates with custom topics when provided", async () => {
-    mockUpdateUserState.mockResolvedValue({
-      ...awaitingTopicsUser,
-      onboarding_state: "active",
-      topic_preferences: ["Traffic", "Tech", "Money"]
-    });
-    mockAssignWeeklyFocusForUser.mockResolvedValue({
-      ...awaitingTopicsUser,
-      onboarding_state: "active",
-      topic_preferences: ["Traffic", "Tech", "Money"],
-      weekly_focus_habit: "45 minutes deep study before noon"
-    });
-
-    const result = await handleOnboardingMessage({
-      user: awaitingTopicsUser,
-      isNewUser: false,
-      message: "Traffic Tech Money"
-    });
-
-    expect(result.handled).toBe(true);
-    expect(mockUpdateUserState).toHaveBeenCalledWith(
-      awaitingTopicsUser.id,
-      expect.objectContaining({
+        archetype: "Corporate / Career",
+        active_modules: ["career", "habits"],
         topic_preferences: ["Traffic", "Tech", "Money"]
       })
     );
   });
 
-  it("re-prompts when topic selection is invalid", async () => {
+  it("re-prompts express start when confirmation is missing", async () => {
     const result = await handleOnboardingMessage({
-      user: awaitingTopicsUser,
+      user: { ...baseUser, onboarding_state: "awaiting_express_start", first_name: "Vik" },
       isNewUser: false,
-      message: "Traffic"
+      message: "wait what"
     });
 
     expect(result.handled).toBe(true);
-    expect(result.interactive?.listButtonLabel).toBe("Pick tags");
+    expect(result.reply).toContain("Morning pulse");
+    expect(result.interactive?.buttons?.[0]?.title).toBe("Start my trial");
     expect(mockUpdateUserState).not.toHaveBeenCalled();
+  });
+
+  it("migrates legacy awaiting_archetype users to express start", async () => {
+    const result = await handleOnboardingMessage({
+      user: { ...baseUser, onboarding_state: "awaiting_archetype" },
+      isNewUser: false,
+      message: "4"
+    });
+
+    expect(result.reply).toContain("Morning pulse");
+    expect(result.interactive?.buttons?.[0]?.title).toBe("Start my trial");
   });
 });
