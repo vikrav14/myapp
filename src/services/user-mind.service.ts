@@ -126,15 +126,77 @@ export function buildKnowYouPrompt(user: MauriUser): string {
 
   return `Hey ${name}. I'm Mauri — your week in WhatsApp.
 
-Before I track anything, I want to know you a bit — like a friend would.
+Before I track anything, I want to know you like a friend would — so I don't talk to you like a generic bot.
 
-Voice note is fine. Tell me:
-what you do / what life looks like right now,
-where you're based in Mauritius (area is enough),
-what you're into,
-and how you want me to show up — gentle, direct, short, whatever fits.
+30-second voice note is perfect. Rough is fine. Tell me whatever comes to mind:
 
-Reply skip if you'd rather jump in. I'll learn as we go.`;
+• your age (or rough — "mid-20s" is fine)
+• what life looks like right now — work, study, hustle, family
+• where you're based in Mauritius (area / commute is enough)
+• what you're into or chasing this year
+• what's heavy right now (optional but helps)
+• how you want me to show up — and what to avoid
+
+Example: "I'm 26, dev in Moka, gym and football, building a side app. Grind mode. Keep it direct and short — no guilt trips about habits."
+
+This stays between us and shapes how I remember you.
+
+Reply skip to jump in — I'll learn as we go.`;
+}
+
+function summarizeKnowYouFactsForAck(facts: UserMindFact[]): string {
+  const parts: string[] = [];
+
+  const ageFact = facts.find((fact) => fact.category === "identity" && fact.fact_key === "age");
+  const ageBandFact = facts.find((fact) => fact.category === "identity" && fact.fact_key === "age_band");
+  if (ageFact) {
+    parts.push(`${ageFact.fact_value} yrs`);
+  } else if (ageBandFact) {
+    parts.push(ageBandFact.fact_value);
+  }
+
+  const areaFact = facts.find((fact) => fact.category === "location" && fact.fact_key === "area");
+  if (areaFact) {
+    parts.push(`based ${areaFact.fact_value}`);
+  }
+
+  const workFact = facts.find((fact) => fact.category === "life_context" && fact.fact_key === "work");
+  const lifeFact = facts.find((fact) => fact.category === "life_context" && fact.fact_key === "life_situation");
+  if (workFact) {
+    parts.push(workFact.fact_value);
+  } else if (lifeFact) {
+    parts.push(lifeFact.fact_value);
+  }
+
+  for (const interest of facts.filter((fact) => fact.category === "interests").slice(0, 2)) {
+    parts.push(interest.fact_value);
+  }
+
+  const goalFact = facts.find((fact) => fact.category === "goals");
+  if (goalFact) {
+    parts.push(`chasing: ${goalFact.fact_value}`);
+  }
+
+  const stressorFact = facts.find((fact) => fact.category === "stressors");
+  if (stressorFact) {
+    parts.push(`heavy: ${stressorFact.fact_value}`);
+  }
+
+  const toneFact = facts.find((fact) => fact.category === "preferences" && fact.fact_key === "tone");
+  if (toneFact) {
+    parts.push(`tone: ${toneFact.fact_value}`);
+  }
+
+  const boundaryFact = facts.find((fact) => fact.category === "boundaries");
+  if (boundaryFact) {
+    parts.push(`avoid: ${boundaryFact.fact_value}`);
+  }
+
+  if (parts.length === 0) {
+    return "I've got the basics saved.";
+  }
+
+  return parts.slice(0, 6).join(" · ");
 }
 
 export function isKnowYouSkipMessage(message: string): boolean {
@@ -178,30 +240,17 @@ My Own Mix — your tags, your mix, no preset box.
 Reply with the exact one, or send 1, 2, 3, 4, or 5.`;
   }
 
-  const highlights: string[] = [];
-  for (const fact of input.facts) {
-    if (fact.category === "identity" && fact.fact_key === "preferred_name") {
-      continue;
-    }
-    if (["identity", "location", "life_context", "preferences"].includes(fact.category)) {
-      highlights.push(fact.fact_value);
-    }
-  }
-
-  const summary =
-    highlights.length > 0
-      ? highlights.slice(0, 4).join(". ")
-      : "I've got the basics saved.";
+  const summary = summarizeKnowYouFactsForAck(input.facts);
 
   if (input.compact) {
     return `Got it, ${name}. ${summary}
 
-I'll hold that as *you*, not just your logs.`;
+I'll hold that as *you*, not just your logs. Wrong? Just correct me in chat.`;
   }
 
   return `Got it, ${name}. ${summary}
 
-I'll hold that as *you*, not just your logs.
+I'll hold that as *you*, not just your logs. Wrong? Just correct me in chat.
 
 Now pick a starting lane for your 7 AM pulse — closest fit is fine, or build your own.
 

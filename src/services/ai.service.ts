@@ -241,16 +241,35 @@ ${message}
 
 export async function extractUserMindProfile(message: string): Promise<UserMindExtraction> {
   const extractionPrompt = `
-You are Mauri's person-profile parser.
-Extract stable facts about who this person is from their message.
-Do not invent facts that are not clearly supported.
-Omit fields that are absent.
-Return only JSON.
+You are Mauri's person-profile parser for a Mauritian lifestyle companion on WhatsApp.
+Extract every stable fact you can from the message — this profile powers how Mauri talks to them for months.
 
-Valid fields:
-preferred_name, age, age_band, area, work, life_situation,
-interests[], goals[], stressors[], tone_preference, boundaries[],
-relationships[{label, note}]
+Rules:
+- Do not invent facts that are not clearly supported.
+- Omit fields that are absent.
+- Capture generously when the user volunteers detail.
+- Return only JSON.
+
+Priority fields (extract when present or clearly inferable):
+- age (integer) OR age_band (e.g. "early 20s", "mid-30s", "late 40s")
+- preferred_name, area (Mauritius town/region), work, life_situation
+- interests[], goals[], stressors[], tone_preference, boundaries[]
+- relationships[{label, note}] — partner, kids, mum, co-founder, etc.
+
+Age guidance:
+- If they state a number ("I'm 26", "34 years old"), set age.
+- If they give life stage without a number ("final year UoM", "new dad", "retired"), set age_band.
+- Student / uni / exams without age → age_band "early 20s" only if clearly young adult context.
+- Never guess a specific age without support.
+
+Mauritius context:
+- area = where they live or commute from (Rose Hill, Moka, Curepipe, etc.)
+- life_situation can include family load, chomé, side hustle, night shifts, living with parents
+
+Boundaries — capture explicit "don't" rules:
+- guilt trips, long messages, money lectures, weekend work pings, etc.
+
+Tone — how Mauri should show up: gentle, direct, short, banter ok, no fluff, etc.
 
 Message:
 ${message}
