@@ -311,6 +311,7 @@ ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Max ${MAURI_REPLY_MAX_WORDS_EMOTIONAL} words. Max 3 short paragraphs.
 - No bullet lists. No middle dots. No "pick a lane" or archetype menu.
 - Do not invent facts not in their message or extracted facts below.
+- ONLY mention people, health issues, family events, and stressors that appear in What they wrote or Extracted facts. Never reference names or storylines from prior sessions or examples.
 
 User: ${input.firstName}
 

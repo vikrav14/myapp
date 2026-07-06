@@ -4,6 +4,7 @@ import type { UserMindExtraction } from "../schemas/user-mind.js";
 import type { MauriUser, UserMindFact, UserMindSource } from "../types.js";
 import { buildArchetypeLaneList } from "./archetype-catalog.js";
 import { extractUserMindProfile, generateKnowYouAcknowledgement } from "./ai.service.js";
+import { cancelPendingOpenLoopFollowUps } from "./open-loop-follow-up.service.js";
 
 function slugifyKey(value: string): string {
   return value
@@ -104,6 +105,23 @@ export async function loadUserMindFacts(userId: string): Promise<UserMindFact[]>
   }
 
   return (data ?? []).map((row) => mapFact(row as Record<string, unknown>));
+}
+
+/** Clears stale profile data when a user re-submits know-you during onboarding (e.g. test number reuse). */
+export async function resetProfileForKnowYouOnboarding(userId: string): Promise<void> {
+  const { error: factsError } = await supabase.from("user_mind_facts").delete().eq("user_id", userId);
+
+  if (factsError) {
+    throw new Error(`Failed to reset user mind facts for onboarding: ${factsError.message}`);
+  }
+
+  const { error: snapshotError } = await supabase.from("user_mind_snapshots").delete().eq("user_id", userId);
+
+  if (snapshotError) {
+    throw new Error(`Failed to reset user mind snapshot for onboarding: ${snapshotError.message}`);
+  }
+
+  await cancelPendingOpenLoopFollowUps(userId);
 }
 
 export function formatUserMindForPrompt(facts: UserMindFact[]): string {
