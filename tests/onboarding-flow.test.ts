@@ -54,6 +54,7 @@ const awaitingTopicsUser = {
   phone_number: "23052525252",
   first_name: "Ava",
   archetype: "Student Grind",
+  active_modules: [] as const,
   onboarding_state: "awaiting_topics" as const,
   subscription_status: "Trial_Active" as const,
   onboarding_completed_at: null,
@@ -200,7 +201,7 @@ describe("handleOnboardingMessage", () => {
   it("maps entrepreneur selection when user replies 4", async () => {
     mockUpdateUserState.mockResolvedValue({
       ...awaitingTopicsUser,
-      onboarding_state: "awaiting_topics",
+      onboarding_state: "awaiting_modules",
       archetype: "Entrepreneur Mode"
     });
     mockListPendingFollowUpsForUser.mockResolvedValue([
@@ -218,19 +219,20 @@ describe("handleOnboardingMessage", () => {
 
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("Entrepreneur Mode");
+    expect(result.interactive?.listButtonLabel).toBe("Pick modules");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
-        onboarding_state: "awaiting_topics",
+        onboarding_state: "awaiting_modules",
         archetype: "Entrepreneur Mode"
       })
     );
   });
 
-  it("maps custom lane users to free-text tag entry", async () => {
+  it("maps custom lane users to module step before tags", async () => {
     mockUpdateUserState.mockResolvedValue({
       ...awaitingTopicsUser,
-      onboarding_state: "awaiting_topics",
+      onboarding_state: "awaiting_modules",
       archetype: "Custom"
     });
 
@@ -245,12 +247,12 @@ describe("handleOnboardingMessage", () => {
 
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("Custom");
-    expect(result.reply).toContain("type your own");
-    expect(result.interactive).toBeUndefined();
+    expect(result.reply).toContain("modules");
+    expect(result.interactive?.listButtonLabel).toBe("Pick modules");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
-        onboarding_state: "awaiting_topics",
+        onboarding_state: "awaiting_modules",
         archetype: "Custom"
       })
     );
@@ -272,9 +274,10 @@ describe("handleOnboardingMessage", () => {
     expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 
-  it("suggests archetype-specific topics after archetype selection", async () => {
+  it("suggests module picker after archetype selection", async () => {
     mockUpdateUserState.mockResolvedValue({
       ...awaitingTopicsUser,
+      onboarding_state: "awaiting_modules",
       archetype: "Student Grind"
     });
 
@@ -289,13 +292,42 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(result.handled).toBe(true);
+    expect(result.interactive?.listButtonLabel).toBe("Pick modules");
+    expect(result.reply).toContain("Student Grind");
+    expect(mockUpdateUserState).toHaveBeenCalledWith(
+      awaitingTopicsUser.id,
+      expect.objectContaining({
+        onboarding_state: "awaiting_modules",
+        archetype: "Student Grind"
+      })
+    );
+  });
+
+  it("moves to topic selection after modules are chosen", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...awaitingTopicsUser,
+      onboarding_state: "awaiting_topics",
+      archetype: "Corporate / Career",
+      active_modules: ["career", "habits"]
+    });
+
+    const result = await handleOnboardingMessage({
+      user: {
+        ...awaitingTopicsUser,
+        onboarding_state: "awaiting_modules",
+        archetype: "Corporate / Career"
+      },
+      isNewUser: false,
+      message: "modules suggested"
+    });
+
+    expect(result.handled).toBe(true);
     expect(result.interactive?.listButtonLabel).toBe("Pick tags");
-    expect(result.interactive?.body).toContain("Student Grind");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
         onboarding_state: "awaiting_topics",
-        archetype: "Student Grind"
+        active_modules: ["career", "habits"]
       })
     );
   });
@@ -304,6 +336,7 @@ describe("handleOnboardingMessage", () => {
     const activatedUser = {
       ...awaitingTopicsUser,
       onboarding_state: "active" as const,
+      active_modules: ["student"] as const,
       topic_preferences: ["Traffic", "Money", "LocalBuzz"],
       trial_started_at: "2026-06-22T00:00:00.000Z",
       trial_ends_at: "2026-06-29T00:00:00.000Z"

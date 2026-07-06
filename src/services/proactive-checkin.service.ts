@@ -25,6 +25,7 @@ import {
 } from "./proactive-checkin.constants.js";
 import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
 import { findUserById, mapUser, updateUserState } from "./user.service.js";
+import { hasModule } from "./user-modules.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
 export type ProactiveCheckInMode = "care" | "useful" | "curious";
@@ -285,7 +286,7 @@ export async function buildCareCandidate(input: {
     return null;
   }
 
-  if (!hasEmotionalSignal(input.mind)) {
+  if (!hasEmotionalSignal(input.mind) || !hasModule(input.user, "habits")) {
     return null;
   }
 
@@ -313,7 +314,7 @@ export async function buildUsefulCandidate(input: {
     return null;
   }
 
-  if (input.user.payday_day_of_month) {
+  if (input.user.payday_day_of_month && hasModule(input.user, "career")) {
     const cycleSpend = await loadPayCycleSpend(input.user);
     const runwaySnippet = buildPaydayRunwaySnippet(input.user, cycleSpend);
     if (runwaySnippet && /tight|watch|burn|low|stretch|careful/i.test(runwaySnippet)) {
@@ -347,7 +348,7 @@ export async function buildUsefulCandidate(input: {
     };
   }
 
-  if (input.user.weekly_focus_habit) {
+  if (input.user.weekly_focus_habit && hasModule(input.user, "habits")) {
     const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     const { count, error } = await supabase
       .from("habit_logs")

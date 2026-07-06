@@ -1,5 +1,6 @@
-import type { WhatsAppInteractiveOutbound } from "../types.js";
+import type { MauriModuleKey, WhatsAppInteractiveOutbound } from "../types.js";
 import { buildArchetypePickerRows } from "./archetype-catalog.js";
+import { MODULE_CATALOG } from "./user-modules.constants.js";
 
 export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   archetype_student: "Student Grind",
@@ -7,6 +8,12 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   archetype_entrepreneur: "Entrepreneur Mode",
   archetype_life: "Life & Habit Tracking",
   archetype_custom: "Custom",
+  module_suggested: "modules suggested",
+  module_career: "modules career",
+  module_habits: "modules habits",
+  module_founder: "modules founder",
+  module_student: "modules student",
+  module_none: "modules none",
   topics_ok: "OK",
   topics_traffic_money_local: "Traffic Money LocalBuzz",
   topics_traffic_tech_money: "Traffic Tech Money",
@@ -74,6 +81,59 @@ export function buildHeavyShareArchetypePickerInteractive(input: {
       {
         title: "Brief lanes",
         rows: buildArchetypePickerRows()
+      }
+    ]
+  };
+}
+
+export function buildModulePickerInteractive(input: {
+  firstName?: string | null;
+  suggestedModules: MauriModuleKey[];
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+  const suggested =
+    input.suggestedModules.length > 0 ? input.suggestedModules.map((m) => MODULE_CATALOG[m].shortLabel).join(" + ") : "none";
+
+  return {
+    header: "Extra tools",
+    body: `${name} — optional modules unlock payday runway, habit check-ins, and more. Suggested: ${suggested}.`,
+    footer: "Tap one · or reply career habits",
+    listButtonLabel: "Pick modules",
+    sections: [
+      {
+        title: "Modules",
+        rows: [
+          {
+            id: "module_suggested",
+            title: "Use suggested",
+            description: suggested === "none" ? "Brief lane defaults only" : suggested
+          },
+          {
+            id: "module_career",
+            title: MODULE_CATALOG.career.label,
+            description: MODULE_CATALOG.career.description
+          },
+          {
+            id: "module_habits",
+            title: MODULE_CATALOG.habits.label,
+            description: MODULE_CATALOG.habits.description
+          },
+          {
+            id: "module_founder",
+            title: MODULE_CATALOG.founder.label,
+            description: MODULE_CATALOG.founder.description
+          },
+          {
+            id: "module_student",
+            title: MODULE_CATALOG.student.label,
+            description: MODULE_CATALOG.student.description
+          },
+          {
+            id: "module_none",
+            title: "Brief only",
+            description: "No extra modules — 7am brief only"
+          }
+        ]
       }
     ]
   };

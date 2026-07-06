@@ -4,6 +4,8 @@ import { mapUser } from "./user.service.js";
 import { buildPersonalizedMorningBriefMessage } from "./morning-brief-curation.service.js";
 import { parseCuratedMorningBrief } from "./morning-brief-run.service.js";
 import { appendMicroLessonToBriefMessage } from "./trial-engagement.service.js";
+import { hasModule } from "./user-modules.service.js";
+import { loadPayCycleSpend, buildPaydayRunwaySnippet } from "./payday-runway.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
 function isDigestEligible(user: MauriUser): boolean {
@@ -59,11 +61,24 @@ export async function deliverMorningBriefRun(input: {
 
   for (const user of recipients) {
     const topics = user.topic_preferences as MorningBriefTopicKey[];
-    const baseMessage = buildPersonalizedMorningBriefMessage({
+    let baseMessage = buildPersonalizedMorningBriefMessage({
       firstName: user.first_name,
       topics,
       curated
     });
+
+    if (hasModule(user, "career") && user.payday_day_of_month) {
+      try {
+        const cycleSpend = await loadPayCycleSpend(user);
+        const runwaySnippet = buildPaydayRunwaySnippet(user, cycleSpend);
+        if (runwaySnippet) {
+          baseMessage = `${baseMessage}\n\n💰 ${runwaySnippet}`;
+        }
+      } catch {
+        // Best-effort — brief still sends without runway line.
+      }
+    }
+
     const message = await appendMicroLessonToBriefMessage(user, baseMessage);
 
     try {

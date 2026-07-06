@@ -1,7 +1,12 @@
 import type { UserMindSnapshotPayload } from "./schemas/user-mind.js";
 
 export type SubscriptionStatus = "Trial_Active" | "Paid_Active" | "Locked";
-export type OnboardingState = "awaiting_know_you" | "awaiting_archetype" | "awaiting_topics" | "active";
+export type OnboardingState =
+  | "awaiting_know_you"
+  | "awaiting_archetype"
+  | "awaiting_modules"
+  | "awaiting_topics"
+  | "active";
 export type UserMindCategory =
   | "identity"
   | "location"
@@ -39,11 +44,14 @@ export function canonicalArchetypeKey(archetype: string): string {
   return isCustomLaneArchetype(archetype) ? CUSTOM_LANE_ARCHETYPE : archetype;
 }
 
+export type MauriModuleKey = "career" | "habits" | "founder" | "student";
+
 export interface MauriUser {
   id: string;
   phone_number: string;
   first_name: string | null;
   archetype: MauriArchetype | string;
+  active_modules: MauriModuleKey[];
   onboarding_state: OnboardingState;
   subscription_status: SubscriptionStatus;
   onboarding_completed_at: string | null;

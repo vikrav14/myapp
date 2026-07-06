@@ -18,6 +18,7 @@ import { handleUserMindCommandMessage } from "../services/user-mind.service.js";
 import { handleServiceFeedbackMessage } from "../services/weekly-report-feedback.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
 import { handleOpenLoopFollowUpMessage } from "../services/open-loop-follow-up.service.js";
+import { handleUserModuleMessage } from "../services/user-module-command.service.js";
 import { handleProactiveCheckInMessage } from "../services/proactive-checkin.service.js";
 import { handleQuietHoursCommandMessage } from "../services/quiet-hours-command.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
@@ -436,6 +437,33 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: openLoopFollowUpResult.reply
+      });
+      return;
+    }
+
+    const userModuleResult = await handleUserModuleMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (userModuleResult.handled && userModuleResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, userModuleResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "user_modules_command"
+        }
+      });
+
+      await respondOk({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: userModuleResult.reply
       });
       return;
     }
