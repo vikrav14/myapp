@@ -29,6 +29,7 @@ import {
   isKnowYouTooShort,
   loadUserMindFacts,
   preferredNameFromFacts,
+  resetProfileForKnowYouOnboarding,
   resolveKnowYouAcknowledgement
 } from "./user-mind.service.js";
 import {
@@ -130,7 +131,9 @@ async function activateUserWithTopics(
   });
 
   const updatedUser = await assignWeeklyFocusForUser(activatedUser);
-  const pendingFollowUps = await listPendingFollowUpsForUser(updatedUser.id);
+  const pendingFollowUps = (await listPendingFollowUpsForUser(updatedUser.id)).filter(
+    (followUp) => followUp.source === "onboarding"
+  );
   const threadNote = buildLifeThreadActivationNote(pendingFollowUps);
   const replyParts = [
     buildActivationReply(
@@ -315,12 +318,12 @@ export async function handleOnboardingMessage(input: {
       };
     }
 
-    await ingestUserMindMessage({
+    await resetProfileForKnowYouOnboarding(user.id);
+    const facts = await ingestUserMindMessage({
       userId: user.id,
       message,
       source: "onboarding"
     });
-    const facts = await loadUserMindFacts(user.id);
     const preferredName = preferredNameFromFacts(facts);
     const updatedUser = await updateUserState(user.id, {
       onboarding_state: "awaiting_archetype",

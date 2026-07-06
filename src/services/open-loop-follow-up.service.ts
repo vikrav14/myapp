@@ -184,6 +184,25 @@ async function scheduleThreadCandidates(input: {
   return scheduled;
 }
 
+export async function cancelPendingOpenLoopFollowUps(userId: string): Promise<number> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("open_loop_follow_ups")
+    .update({
+      status: "cancelled",
+      updated_at: now
+    })
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .select("id");
+
+  if (error) {
+    throw new Error(`Failed to cancel pending open-loop follow-ups: ${error.message}`);
+  }
+
+  return data?.length ?? 0;
+}
+
 export async function seedLifeThreadsFromOnboarding(input: {
   user: MauriUser;
   facts: import("../types.js").UserMindFact[];

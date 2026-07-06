@@ -21,6 +21,7 @@ const mockLoadUserMindFacts = vi.fn();
 const mockResolveKnowYouAcknowledgement = vi.fn();
 const mockSeedLifeThreadsFromOnboarding = vi.fn();
 const mockListPendingFollowUpsForUser = vi.fn();
+const mockResetProfileForKnowYouOnboarding = vi.fn();
 
 vi.mock("../src/services/user-mind.service.js", async () => {
   const actual = await vi.importActual<typeof import("../src/services/user-mind.service.js")>(
@@ -31,7 +32,8 @@ vi.mock("../src/services/user-mind.service.js", async () => {
     ...actual,
     ingestUserMindMessage: mockIngestUserMindMessage,
     loadUserMindFacts: mockLoadUserMindFacts,
-    resolveKnowYouAcknowledgement: mockResolveKnowYouAcknowledgement
+    resolveKnowYouAcknowledgement: mockResolveKnowYouAcknowledgement,
+    resetProfileForKnowYouOnboarding: mockResetProfileForKnowYouOnboarding
   };
 });
 
@@ -87,6 +89,7 @@ describe("handleOnboardingMessage", () => {
     });
     mockSeedLifeThreadsFromOnboarding.mockResolvedValue(0);
     mockListPendingFollowUpsForUser.mockResolvedValue([]);
+    mockResetProfileForKnowYouOnboarding.mockResolvedValue(undefined);
   });
 
   it("prompts know-you first for awaiting_know_you users with short replies", async () => {
@@ -136,6 +139,7 @@ describe("handleOnboardingMessage", () => {
     });
 
     expect(mockIngestUserMindMessage).toHaveBeenCalled();
+    expect(mockResetProfileForKnowYouOnboarding).toHaveBeenCalledWith(awaitingTopicsUser.id);
     expect(mockSeedLifeThreadsFromOnboarding).toHaveBeenCalled();
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
