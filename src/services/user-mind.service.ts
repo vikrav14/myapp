@@ -144,17 +144,26 @@ export function formatUserMindForPrompt(facts: UserMindFact[]): string {
 export function buildKnowYouPrompt(user: MauriUser): string {
   const name = user.first_name?.trim() || "there";
 
-  return `Hey ${name}. I'm Mauri — your week in WhatsApp.
+  return `Hey ${name} 👋 I'm Mauri — your week in WhatsApp, not another chatbot tab.
 
 Before I track anything, I want to know you like a friend would — not like a blank ChatGPT thread that resets tomorrow.
 
 How I'm different:
-• You tell me once — I remember *you*, not just this chat.
-• Personal stuff (family, health waits, what's heavy) stays separate from your 7am brief.
-• I follow up when something's live — not random guilt-trip habit lectures.
-• While you sleep, I run off-peak reflection on your week — habits, money, what you shared — so tomorrow's 7am brief and check-ins land prepared, not cold-start.
+🧠 You tell me once — I remember *you*, not just this chat.
+💬 Personal stuff (family, health waits, what's heavy) stays separate from your 7am brief.
+🔔 I follow up when something's live — not random guilt-trip habit lectures.
+🌙 While you sleep, I run off-peak reflection on your week — habits, money, what you shared — so tomorrow's 7am brief and check-ins land prepared, not cold-start.
 
 Most AI bots give everyone the same pep talk. Mauri is built for *your* week in Mauritius — rent, commute, family load, the messy middle.
+
+What you unlock (examples — reply help anytime for the full menu):
+🌅 7am brief — traffic, weather, your tags
+⏰ "remind me to call mum at 6pm" · my reminders
+📅 calendar add dentist Tue 10am · my calendar (iCal sync when you're ready)
+📊 Sunday report — roast me / hype me from your week
+👥 Squads — mates accountability, weekly pacts, no group-chat drama
+💸 Snap receipts · my runway till payday
+🗣️ Brain dumps anytime — I pull out habits, spend, stress from plain chat
 
 30-second voice note is perfect. Rough is fine. Tell me whatever comes to mind:
 
@@ -167,9 +176,9 @@ Most AI bots give everyone the same pep talk. Mauri is built for *your* week in 
 
 Example: "I'm 26, dev in Moka, gym and football, building a side app. Grind mode. Keep it direct and short — no guilt trips about habits."
 
-This stays between us and shapes how I remember you.
+This stays between us 🔒 and shapes how I remember you.
 
-Reply skip to jump in — I'll learn as we go.`;
+Reply skip to jump in — I'll learn as we go ✌️`;
 }
 
 function summarizeKnowYouFactsForAck(facts: UserMindFact[]): string {
