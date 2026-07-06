@@ -1,5 +1,27 @@
 import { supabase } from "../lib/supabase.js";
-import type { MauriUser, MorningBriefTopicKey } from "../types.js";
+import type { MauriModuleKey, MauriUser, MorningBriefTopicKey } from "../types.js";
+import { MAURI_MODULE_KEYS, MAX_ACTIVE_MODULES } from "./user-modules.constants.js";
+
+function sanitizeUserModules(value: unknown): MauriModuleKey[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const unique: MauriModuleKey[] = [];
+  for (const item of value) {
+    const key = String(item).trim().toLowerCase();
+    if (!(MAURI_MODULE_KEYS as readonly string[]).includes(key) || unique.includes(key as MauriModuleKey)) {
+      continue;
+    }
+
+    unique.push(key as MauriModuleKey);
+    if (unique.length >= MAX_ACTIVE_MODULES) {
+      break;
+    }
+  }
+
+  return unique;
+}
 
 export function mapUser(record: Record<string, unknown>): MauriUser {
   return {
@@ -7,6 +29,7 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
     phone_number: String(record.phone_number),
     first_name: record.first_name ? String(record.first_name) : null,
     archetype: String(record.archetype ?? "Life & Habit Tracking"),
+    active_modules: sanitizeUserModules(record.active_modules),
     onboarding_state: (record.onboarding_state ?? "active") as MauriUser["onboarding_state"],
     subscription_status: (record.subscription_status ?? "Trial_Active") as MauriUser["subscription_status"],
     onboarding_completed_at: record.onboarding_completed_at ? String(record.onboarding_completed_at) : null,

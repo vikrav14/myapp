@@ -1,4 +1,4 @@
-import type { MauriArchetype, MauriUser, MorningBriefTopicKey, WhatsAppInteractiveOutbound } from "../types.js";
+import type { MauriArchetype, MauriModuleKey, MauriUser, MorningBriefTopicKey, WhatsAppInteractiveOutbound } from "../types.js";
 import { CUSTOM_LANE_ARCHETYPE, isCustomLaneArchetype } from "../types.js";
 
 import { buildLockedReplyForUser } from "./paywall.service.js";
@@ -9,11 +9,11 @@ import {
 import {
   buildArchetypePickerInteractive,
   buildHeavyShareArchetypePickerInteractive,
+  buildModulePickerInteractive,
   buildTopicsPickerInteractive
 } from "./whatsapp-interactive.service.js";
 import {
   buildCustomTopicsPrompt,
-  buildSuggestedTopicsPrompt,
   defaultTopicsForArchetype,
   formatTopicList,
   isTopicConfirmation,
@@ -38,6 +38,13 @@ import {
   listPendingFollowUpsForUser,
   seedLifeThreadsFromOnboarding
 } from "./open-loop-follow-up.service.js";
+import {
+  buildModuleStepIntro,
+  finalizeOnboardingModules,
+  formatModuleLabels,
+  parseOnboardingModuleSelection,
+  suggestModulesFromFacts
+} from "./user-modules.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
 
@@ -71,23 +78,29 @@ None fit perfectly? Pick closest, or Custom (5) — then type your own brief tag
 function buildActivationReply(
   archetype: MauriArchetype,
   topics: MorningBriefTopicKey[],
-  weeklyFocus: string
+  weeklyFocus: string,
+  modules: MauriModuleKey[]
 ): string {
   const hook = archetypeActivationHooks[archetype] ?? archetypeActivationHooks["Life & Habit Tracking"];
   const laneLine = isCustomLaneArchetype(archetype)
     ? `You're in on ${CUSTOM_LANE_ARCHETYPE}.`
     : `You're in on ${archetype}.`;
+  const moduleLine =
+    modules.length > 0
+      ? `Also watching: ${formatModuleLabels(modules)}.`
+      : "Modules: brief only — add anytime with add habits / add career.";
 
   return [
     laneLine,
     hook,
+    moduleLine,
     "",
     "Your 7-day trial starts now.",
     `Morning brief tags: ${formatTopicList(topics)} — first brief tomorrow at 7:00.`,
     `This week's habit: ${weeklyFocus}`,
     "",
     "Try: \"remind me to drink water at 3pm\" or send a brain dump anytime.",
-    "Reply help for all commands."
+    "Reply my modules or help for commands."
   ].join("\n");
 }
 
@@ -114,7 +127,12 @@ async function activateUserWithTopics(
   const pendingFollowUps = await listPendingFollowUpsForUser(updatedUser.id);
   const threadNote = buildLifeThreadActivationNote(pendingFollowUps);
   const replyParts = [
-    buildActivationReply(archetype, topics, updatedUser.weekly_focus_habit ?? "one small win each day")
+    buildActivationReply(
+      archetype,
+      topics,
+      updatedUser.weekly_focus_habit ?? "one small win each day",
+      updatedUser.active_modules ?? user.active_modules ?? []
+    )
   ];
 
   if (threadNote) {
@@ -125,6 +143,45 @@ async function activateUserWithTopics(
     handled: true,
     user: updatedUser,
     reply: replyParts.join("\n")
+  };
+}
+
+async function beginTopicsStep(user: MauriUser, laneConfirmation?: string): Promise<OnboardingResult> {
+  const archetype = user.archetype;
+
+  if (isCustomLaneArchetype(archetype)) {
+    const replyParts = [laneConfirmation, buildCustomTopicsPrompt()].filter(Boolean);
+    return {
+      handled: true,
+      user,
+      reply: replyParts.join("\n\n")
+    };
+  }
+
+  return {
+    handled: true,
+    user,
+    reply: laneConfirmation,
+    interactive: buildTopicsPickerInteractive(archetype),
+    sendTextBeforeInteractive: Boolean(laneConfirmation)
+  };
+}
+
+async function beginModulesStep(user: MauriUser, laneConfirmation?: string): Promise<OnboardingResult> {
+  const facts = await loadUserMindFacts(user.id);
+  const suggested = suggestModulesFromFacts(facts, user.archetype);
+  const intro = buildModuleStepIntro({ user, suggestedModules: suggested });
+  const replyParts = [laneConfirmation, intro].filter(Boolean);
+
+  return {
+    handled: true,
+    user,
+    reply: replyParts.join("\n\n"),
+    interactive: buildModulePickerInteractive({
+      firstName: user.first_name,
+      suggestedModules: suggested
+    }),
+    sendTextBeforeInteractive: true
   };
 }
 
@@ -291,6 +348,49 @@ export async function handleOnboardingMessage(input: {
     };
   }
 
+  if (user.onboarding_state === "awaiting_modules") {
+    const facts = await loadUserMindFacts(user.id);
+    const parsed = parseOnboardingModuleSelection({
+      message,
+      primaryLane: user.archetype,
+      facts
+    });
+
+    if (parsed === null) {
+      return beginModulesStep(user);
+    }
+
+    if (parsed === "invalid_custom") {
+      return {
+        handled: true,
+        user,
+        reply: `${buildCustomTopicsPrompt()}\n\nCustom needs at least one module first — tap Pick modules or reply e.g. career habits.`
+      };
+    }
+
+    if (isCustomLaneArchetype(user.archetype) && parsed.length === 0) {
+      return {
+        handled: true,
+        user,
+        reply: "Custom lane needs at least one module — try career habits or tap Use suggested."
+      };
+    }
+
+    const modules = finalizeOnboardingModules(parsed, user.archetype);
+    const updatedUser = await updateUserState(user.id, {
+      active_modules: modules,
+      onboarding_state: "awaiting_topics"
+    });
+
+    const pendingFollowUps = await listPendingFollowUpsForUser(updatedUser.id);
+    const laneConfirmation =
+      pendingFollowUps.length > 0
+        ? `Modules set: ${formatModuleLabels(modules)}. Personal stuff stays separate — I'll check in when it makes sense.`
+        : `Modules set: ${formatModuleLabels(modules)}.`;
+
+    return beginTopicsStep(updatedUser, laneConfirmation);
+  }
+
   if (user.onboarding_state === "awaiting_topics") {
     const parsedTopics = parseTopicSelection(message);
     const customLane = isCustomLaneArchetype(user.archetype);
@@ -344,7 +444,7 @@ export async function handleOnboardingMessage(input: {
   }
 
   const updatedUser = await updateUserState(user.id, {
-    onboarding_state: "awaiting_topics",
+    onboarding_state: "awaiting_modules",
     archetype
   });
 
@@ -354,21 +454,5 @@ export async function handleOnboardingMessage(input: {
       ? `Got it — ${archetype} for your 7am brief. The personal stuff you shared stays with me separately; I'll check in when it makes sense, not in the brief.`
       : undefined;
 
-  if (isCustomLaneArchetype(archetype)) {
-    const replyParts = [laneConfirmation, buildCustomTopicsPrompt()].filter(Boolean);
-
-    return {
-      handled: true,
-      user: updatedUser,
-      reply: replyParts.join("\n\n")
-    };
-  }
-
-  return {
-    handled: true,
-    user: updatedUser,
-    reply: laneConfirmation,
-    interactive: buildTopicsPickerInteractive(archetype),
-    sendTextBeforeInteractive: Boolean(laneConfirmation)
-  };
+  return beginModulesStep(updatedUser, laneConfirmation);
 }

@@ -25,6 +25,9 @@ Discover yourself
 - rate 1–5 / mauri feedback — after Sunday report, tune how I read you
 
 Morning brief
+- my lane — brief lane, tags, and modules
+- my modules — career / habits / founder / student tools
+- add habits / remove founder — toggle modules
 - my topics — show your tags
 - update topics Traffic Money Tech
 - digest off / digest on

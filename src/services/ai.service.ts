@@ -459,7 +459,8 @@ ${MAURI_TEXT_REPLY_GUARDRAILS}
 
 User profile:
 First name: ${user.first_name ?? "Unknown"}
-Archetype: ${user.archetype}
+Primary lane (7am brief): ${user.archetype}
+Active modules: ${user.active_modules.length > 0 ? user.active_modules.join(", ") : "none"}
 Subscription status: ${user.subscription_status}
 
 Who this person is (what they told you — stable profile):
