@@ -71,6 +71,7 @@ describe("express onboarding", () => {
 
     const summary = buildExpressStartSummary({ firstName: "Ravin", setup });
     expect(summary).toContain("Morning pulse");
+    expect(summary).toContain("next step");
     expect(summary).toContain("Start my trial");
   });
 

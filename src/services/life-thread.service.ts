@@ -160,9 +160,9 @@ export function buildHeavyShareTrustBridge(firstName?: string | null): string {
 
 What you shared stays between us 🔒 — not in your 7am brief, not shared anywhere.
 
-I'll check in gently on the live stuff and we'll work toward better direction in small steps — no guilt trips, no "fix yourself" lectures.
+I'll check in gently on the live stuff and nudge you toward what's next for *you* — small steps, no guilt trips.
 
-When you're ready, tap below for one quick setup step. It only shapes your *morning pulse*; everything personal stays with me separately.`;
+When you're ready, tap below. One quick step for your morning pulse only — the real work is us getting sharper together over time.`;
 }
 
 export function buildLifeThreadActivationNote(threads: Array<{ loop_text: string }>): string | null {
