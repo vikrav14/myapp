@@ -152,6 +152,7 @@ How I'm different:
 • You tell me once — I remember *you*, not just this chat.
 • Personal stuff (family, health waits, what's heavy) stays separate from your 7am brief.
 • I follow up when something's live — not random guilt-trip habit lectures.
+• While you sleep, I run off-peak reflection on your week — habits, money, what you shared — so tomorrow's 7am brief and check-ins land prepared, not cold-start.
 
 Most AI bots give everyone the same pep talk. Mauri is built for *your* week in Mauritius — rent, commute, family load, the messy middle.
 
