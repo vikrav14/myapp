@@ -1,15 +1,11 @@
 import type { MauriArchetype } from "../types.js";
-import { CUSTOM_LANE_ARCHETYPE } from "../types.js";
+import { CUSTOM_LANE_ARCHETYPE, isCustomLaneArchetype } from "../types.js";
 import {
   ARCHETYPE_DEFAULT_TOPICS,
   MORNING_BRIEF_TOPIC_CATALOG,
   MORNING_BRIEF_TOPIC_KEYS,
   type MorningBriefTopicKey
 } from "./morning-brief.constants.js";
-
-export function isCustomLaneArchetype(archetype: string): boolean {
-  return archetype === CUSTOM_LANE_ARCHETYPE;
-}
 
 function normalize(text: string): string {
   return text.trim().toLowerCase().replace(/^#/, "");
@@ -35,7 +31,8 @@ export function parseTopicSelection(message: string): MorningBriefTopicKey[] {
 }
 
 export function defaultTopicsForArchetype(archetype: string): MorningBriefTopicKey[] {
-  return ARCHETYPE_DEFAULT_TOPICS[archetype] ?? ["Traffic", "LocalBuzz", "Money"];
+  const key = isCustomLaneArchetype(archetype) ? CUSTOM_LANE_ARCHETYPE : archetype;
+  return ARCHETYPE_DEFAULT_TOPICS[key] ?? ["Traffic", "LocalBuzz", "Money"];
 }
 
 const TOPIC_CONFIRMATION_PHRASES = new Set([
@@ -58,16 +55,20 @@ export function isTopicConfirmation(message: string): boolean {
   return TOPIC_CONFIRMATION_PHRASES.has(normalized);
 }
 
+export function buildCustomTopicsPrompt(): string {
+  return `You're on Custom — type your own morning brief tags (3 to 5).
+
+Available: Traffic, Tech, Money, LocalBuzz, Entertainment.
+
+Send them in one message — spaces or commas are fine.
+Example: Traffic Money Tech LocalBuzz
+
+Your tags, your brief. No preset combos.`;
+}
+
 export function buildSuggestedTopicsPrompt(archetype: MauriArchetype | string): string {
   if (isCustomLaneArchetype(archetype)) {
-    return `Locked in: ${CUSTOM_LANE_ARCHETYPE}.
-
-This is your lane — no preset box.
-
-Send your own 3 to 5 morning brief tags:
-Traffic, Tech, Money, LocalBuzz, Entertainment.
-
-Example: Traffic Money LocalBuzz Tech`;
+    return buildCustomTopicsPrompt();
   }
 
   const suggested = defaultTopicsForArchetype(archetype);

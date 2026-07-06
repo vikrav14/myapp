@@ -227,11 +227,11 @@ describe("handleOnboardingMessage", () => {
     );
   });
 
-  it("moves custom lane users to tag selection with no preset OK path", async () => {
+  it("maps custom lane users to free-text tag entry", async () => {
     mockUpdateUserState.mockResolvedValue({
       ...awaitingTopicsUser,
       onboarding_state: "awaiting_topics",
-      archetype: "My Own Mix"
+      archetype: "Custom"
     });
 
     const result = await handleOnboardingMessage({
@@ -240,33 +240,35 @@ describe("handleOnboardingMessage", () => {
         onboarding_state: "awaiting_archetype"
       },
       isNewUser: false,
-      message: "my own mix"
+      message: "custom"
     });
 
     expect(result.handled).toBe(true);
-    expect(result.interactive?.listButtonLabel).toBe("Pick tags");
-    expect(result.interactive?.body).toContain("My Own Mix");
+    expect(result.reply).toContain("Custom");
+    expect(result.reply).toContain("type your own");
+    expect(result.interactive).toBeUndefined();
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       awaitingTopicsUser.id,
       expect.objectContaining({
         onboarding_state: "awaiting_topics",
-        archetype: "My Own Mix"
+        archetype: "Custom"
       })
     );
   });
 
-  it("requires custom tags for My Own Mix instead of OK", async () => {
+  it("requires custom tags for Custom lane instead of OK", async () => {
     const result = await handleOnboardingMessage({
       user: {
         ...awaitingTopicsUser,
-        archetype: "My Own Mix"
+        archetype: "Custom"
       },
       isNewUser: false,
       message: "OK"
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("OK won't apply");
+    expect(result.reply).toContain("type your own");
+    expect(result.interactive).toBeUndefined();
     expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 

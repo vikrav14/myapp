@@ -55,5 +55,5 @@ export const ARCHETYPE_DEFAULT_TOPICS: Record<string, MorningBriefTopicKey[]> = 
   "Corporate / Career": ["Traffic", "Tech", "Money"],
   "Entrepreneur Mode": ["Tech", "Money", "LocalBuzz"],
   "Life & Habit Tracking": ["LocalBuzz", "Money", "Entertainment"],
-  "My Own Mix": ["Traffic", "Money", "LocalBuzz"]
+  "Custom": ["Traffic", "Money", "LocalBuzz"]
 };

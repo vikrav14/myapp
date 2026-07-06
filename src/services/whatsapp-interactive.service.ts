@@ -6,7 +6,7 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   archetype_corporate: "Corporate / Career",
   archetype_entrepreneur: "Entrepreneur Mode",
   archetype_life: "Life & Habit Tracking",
-  archetype_custom: "My Own Mix",
+  archetype_custom: "Custom",
   topics_ok: "OK",
   topics_traffic_money_local: "Traffic Money LocalBuzz",
   topics_traffic_tech_money: "Traffic Tech Money",
@@ -68,7 +68,7 @@ export function buildHeavyShareArchetypePickerInteractive(input: {
   return {
     header: "Your 7am brief",
     body: `${name} — pick the closest lane for your morning pulse only. Everything else you shared stays with me separately.`,
-    footer: "Tap a lane below · My Own Mix is option 5",
+    footer: "Tap a lane below · Custom is option 5",
     listButtonLabel: "Pick brief lane",
     sections: [
       {

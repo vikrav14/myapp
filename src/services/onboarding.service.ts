@@ -1,5 +1,5 @@
 import type { MauriArchetype, MauriUser, MorningBriefTopicKey, WhatsAppInteractiveOutbound } from "../types.js";
-import { CUSTOM_LANE_ARCHETYPE } from "../types.js";
+import { CUSTOM_LANE_ARCHETYPE, isCustomLaneArchetype } from "../types.js";
 
 import { buildLockedReplyForUser } from "./paywall.service.js";
 import {
@@ -12,10 +12,10 @@ import {
   buildTopicsPickerInteractive
 } from "./whatsapp-interactive.service.js";
 import {
+  buildCustomTopicsPrompt,
   buildSuggestedTopicsPrompt,
   defaultTopicsForArchetype,
   formatTopicList,
-  isCustomLaneArchetype,
   isTopicConfirmation,
   isValidTopicSelection,
   parseTopicSelection
@@ -55,7 +55,7 @@ const archetypeActivationHooks: Record<MauriArchetype, string> = {
   "Entrepreneur Mode": "I'll keep an eye on cashflow, focus blocks, and the messy founder week.",
   "Life & Habit Tracking": "I'll help you spot patterns in habits, mood, and daily balance.",
   [CUSTOM_LANE_ARCHETYPE]:
-    "No preset box — I'll follow your know-you profile, your tags, and how you actually talk."
+    "Your tags, your brief — type what you want in the 7am pulse."
 };
 
 function buildArchetypePrompt(user: MauriUser): string {
@@ -65,7 +65,7 @@ function buildArchetypePrompt(user: MauriUser): string {
 
 ${buildArchetypeLaneList()}
 
-None fit perfectly? Pick closest, or My Own Mix (5) — your tags and how you talk define the rest.`;
+None fit perfectly? Pick closest, or Custom (5) — then type your own brief tags.`;
 }
 
 function buildActivationReply(
@@ -299,9 +299,7 @@ export async function handleOnboardingMessage(input: {
       return {
         handled: true,
         user,
-        reply: `${buildSuggestedTopicsPrompt(user.archetype)}
-
-For My Own Mix, send your tags — OK won't apply here.`
+        reply: buildCustomTopicsPrompt()
       };
     }
 
@@ -316,13 +314,9 @@ For My Own Mix, send your tags — OK won't apply here.`
         handled: true,
         user,
         reply: customLane
-          ? `${buildSuggestedTopicsPrompt(user.archetype)}
-
-Pick tags below or type your own (3–5 tags).
-
-Example: Traffic Money Tech`
+          ? `${buildCustomTopicsPrompt()}\n\nNeed 3–5 tags — try again.`
           : "",
-        interactive: buildTopicsPickerInteractive(user.archetype)
+        interactive: customLane ? undefined : buildTopicsPickerInteractive(user.archetype)
       };
     }
 
@@ -359,6 +353,16 @@ Example: Traffic Money Tech`
     pendingFollowUps.length > 0
       ? `Got it — ${archetype} for your 7am brief. The personal stuff you shared stays with me separately; I'll check in when it makes sense, not in the brief.`
       : undefined;
+
+  if (isCustomLaneArchetype(archetype)) {
+    const replyParts = [laneConfirmation, buildCustomTopicsPrompt()].filter(Boolean);
+
+    return {
+      handled: true,
+      user: updatedUser,
+      reply: replyParts.join("\n\n")
+    };
+  }
 
   return {
     handled: true,

@@ -1,6 +1,7 @@
 import { env } from "../lib/env.js";
 import { generateMicroLesson } from "./ai.service.js";
 import type { MauriUser } from "../types.js";
+import { CUSTOM_LANE_ARCHETYPE, canonicalArchetypeKey } from "../types.js";
 import { hasEngagementDelivery, recordEngagementDelivery } from "./engagement-delivery.service.js";
 
 const FALLBACK_LESSONS: Record<string, string> = {
@@ -12,7 +13,7 @@ const FALLBACK_LESSONS: Record<string, string> = {
     "Founder chaos calms when cashflow gets a daily glance. Five minutes on money saves five hours of anxiety.",
   "Life & Habit Tracking":
     "Balance isn't equal hours in every lane. It's noticing which lane is leaking energy before the week ends.",
-  "My Own Mix":
+  [CUSTOM_LANE_ARCHETYPE]:
     "Your lane doesn't need a label. One honest log today beats a perfect system you never start."
 };
 
@@ -33,7 +34,7 @@ export async function buildDailyMicroLesson(user: MauriUser): Promise<string> {
     });
     return lesson.trim();
   } catch {
-    return FALLBACK_LESSONS[user.archetype] ?? FALLBACK_LESSONS["Life & Habit Tracking"]!;
+    return FALLBACK_LESSONS[canonicalArchetypeKey(user.archetype)] ?? FALLBACK_LESSONS["Life & Habit Tracking"]!;
   }
 }
 

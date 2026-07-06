@@ -1,16 +1,18 @@
 import type { MauriArchetype, MauriUser } from "../types.js";
+import { CUSTOM_LANE_ARCHETYPE, canonicalArchetypeKey } from "../types.js";
 import { updateUserState } from "./user.service.js";
 
-const ARCHETYPE_WEEKLY_FOCUS: Record<MauriArchetype, string> = {
+const ARCHETYPE_WEEKLY_FOCUS: Record<string, string> = {
   "Student Grind": "45 minutes deep study before noon",
   "Corporate / Career": "One focused work block without scrolling",
   "Entrepreneur Mode": "Review cash in and out before lunch",
   "Life & Habit Tracking": "Morning check-in: mood plus one small win",
-  "My Own Mix": "One small win you choose — log it when it happens"
+  [CUSTOM_LANE_ARCHETYPE]: "One small win you choose — log it when it happens"
 };
 
 export function defaultWeeklyFocusForArchetype(archetype: string): string {
-  return ARCHETYPE_WEEKLY_FOCUS[archetype as MauriArchetype] ?? ARCHETYPE_WEEKLY_FOCUS["Life & Habit Tracking"];
+  const key = canonicalArchetypeKey(archetype);
+  return ARCHETYPE_WEEKLY_FOCUS[key] ?? ARCHETYPE_WEEKLY_FOCUS["Life & Habit Tracking"]!;
 }
 
 export async function assignWeeklyFocusForUser(user: MauriUser): Promise<MauriUser> {
