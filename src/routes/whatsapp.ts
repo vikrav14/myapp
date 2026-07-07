@@ -371,23 +371,25 @@ whatsappRouter.post("/", async (request, response, next) => {
       message: normalizedMessageText
     });
 
-    if (onboardingResult.handled && (onboardingResult.reply || onboardingResult.interactive)) {
-      await sendMauriReply(
-        inboundMessage.from,
-        {
-          text: onboardingResult.reply,
-          interactive: onboardingResult.interactive
-        },
-        {
-          userId: onboardingResult.user.id,
-          requestId,
-          sendTextBeforeInteractive: onboardingResult.sendTextBeforeInteractive,
-          metadata: {
-            sourceType: inboundMessage.kind,
-            flow: onboardingResult.outboundFlow ?? "onboarding"
+    if (onboardingResult.handled) {
+      if (onboardingResult.reply || onboardingResult.interactive) {
+        await sendMauriReply(
+          inboundMessage.from,
+          {
+            text: onboardingResult.reply,
+            interactive: onboardingResult.interactive
+          },
+          {
+            userId: onboardingResult.user.id,
+            requestId,
+            sendTextBeforeInteractive: onboardingResult.sendTextBeforeInteractive,
+            metadata: {
+              sourceType: inboundMessage.kind,
+              flow: onboardingResult.outboundFlow ?? "onboarding"
+            }
           }
-        }
-      );
+        );
+      }
 
       await respondOk({
         ok: true,
@@ -396,7 +398,8 @@ whatsappRouter.post("/", async (request, response, next) => {
         onboardingState: onboardingResult.user.onboarding_state,
         subscriptionStatus: onboardingResult.user.subscription_status,
         transcriptPreview,
-        replyPreview: onboardingResult.reply ?? onboardingResult.interactive?.body
+        replyPreview: onboardingResult.reply ?? onboardingResult.interactive?.body,
+        suppressed: !onboardingResult.reply && !onboardingResult.interactive
       });
       return;
     }

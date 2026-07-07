@@ -24,7 +24,7 @@ export interface LifeThreadCandidate {
 const HEALTH_WAIT_PATTERN =
   /\b(waiting on|awaiting|biopsy|scan result|test result|results back|hospital|appointment|diagnosis|fertility)\b/i;
 const FAMILY_CARE_PATTERN =
-  /\b(mum|mom|dad|father|mother|parent|sister|brother|family|unwell|not great|struggling|ageing|aging)\b/i;
+  /\b(mum|mom|dad|father|mother|parent|sister|brother|family|family drama|granddaughter|grandson|grandchild|unwell|not great|struggling|ageing|aging|controlling|overbearing)\b/i;
 const SUBSTANCE_PATTERN =
   /\b(drink(ing)? a lot|drink too much|drinking too much|heavy drink|too much alcohol|alcohol problem)\b/i;
 const CROSSROADS_PATTERN =
@@ -99,8 +99,31 @@ function buildCandidate(loopText: string): LifeThreadCandidate | null {
   };
 }
 
-function factText(fact: UserMindFact): string {
+function buildCandidateFromFact(fact: UserMindFact): LifeThreadCandidate | null {
+  const loopText = factLoopText(fact);
+  if (loopText.length < 8) {
+    return null;
+  }
+
+  const kind = classifyThreadText(factClassificationBlob(fact));
+  if (kind === "generic") {
+    return null;
+  }
+
+  return {
+    loopText,
+    kind,
+    priority: KIND_PRIORITY[kind],
+    offsetDays: LIFE_THREAD_SCHEDULE_DAYS[kind]
+  };
+}
+
+function factClassificationBlob(fact: UserMindFact): string {
   return `${fact.fact_key} ${fact.fact_value}`.replace(/\s+/g, " ").trim();
+}
+
+function factLoopText(fact: UserMindFact): string {
+  return fact.fact_value.replace(/\s+/g, " ").trim();
 }
 
 export function buildLifeThreadCandidatesFromExtraction(
@@ -140,7 +163,7 @@ export function buildLifeThreadCandidatesFromFacts(facts: UserMindFact[]): LifeT
       continue;
     }
 
-    const candidate = buildCandidate(factText(fact));
+    const candidate = buildCandidateFromFact(fact);
     if (candidate) {
       candidates.push(candidate);
     }

@@ -9,6 +9,7 @@ import {
 import type { MauriUser, UserMindFact } from "../types.js";
 import { CUSTOM_LANE_ARCHETYPE, isCustomLaneArchetype } from "../types.js";
 import { displayPrimaryLaneLabel } from "./brief-focus.service.js";
+import { hasPrivateFinanceSignal, isRetiredOrElderProfile } from "./profile-inference.service.js";
 import { updateUserState } from "./user.service.js";
 
 export function normalizeModuleKey(value: string): MauriModuleKey | null {
@@ -49,7 +50,12 @@ export function defaultModuleForPrimaryLane(primaryLane: string): MauriModuleKey
 export function suggestModulesFromFacts(facts: UserMindFact[], primaryLane: string): MauriModuleKey[] {
   const modules: MauriModuleKey[] = [];
   const primaryDefault = defaultModuleForPrimaryLane(primaryLane);
-  if (primaryDefault) {
+  const elderProfile = isRetiredOrElderProfile(facts);
+  const privateFinance = hasPrivateFinanceSignal(facts);
+
+  if (elderProfile && privateFinance) {
+    modules.push("career");
+  } else if (primaryDefault) {
     modules.push(primaryDefault);
   }
 
@@ -73,9 +79,13 @@ export function suggestModulesFromFacts(facts: UserMindFact[], primaryLane: stri
     );
   });
 
-  if (hasHeavyLoad && !modules.includes("habits")) {
+  if (privateFinance && !modules.includes("career")) {
+    modules.push("career");
+  }
+
+  if (hasHeavyLoad && !modules.includes("habits") && !elderProfile && !privateFinance) {
     modules.push("habits");
-  } else if (extra && !modules.includes(extra)) {
+  } else if (extra && !modules.includes(extra) && !(elderProfile && privateFinance && extra === "habits")) {
     modules.push(extra);
   }
 

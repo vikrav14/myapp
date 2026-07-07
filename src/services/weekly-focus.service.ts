@@ -1,5 +1,6 @@
-import type { MauriArchetype, MauriUser } from "../types.js";
+import type { MauriArchetype, MauriUser, UserMindFact } from "../types.js";
 import { CUSTOM_LANE_ARCHETYPE, canonicalArchetypeKey } from "../types.js";
+import { hasPrivateFinanceSignal, isRetiredOrElderProfile } from "./profile-inference.service.js";
 import { updateUserState } from "./user.service.js";
 
 const ARCHETYPE_WEEKLY_FOCUS: Record<string, string> = {
@@ -15,8 +16,35 @@ export function defaultWeeklyFocusForArchetype(archetype: string): string {
   return ARCHETYPE_WEEKLY_FOCUS[key] ?? ARCHETYPE_WEEKLY_FOCUS["Life & Habit Tracking"]!;
 }
 
-export async function assignWeeklyFocusForUser(user: MauriUser): Promise<MauriUser> {
-  const focus = defaultWeeklyFocusForArchetype(user.archetype);
+export function inferWeeklyFocusFromFacts(facts: UserMindFact[], archetype: string): string {
+  const blob = facts.map((fact) => `${fact.fact_key} ${fact.fact_value}`.toLowerCase()).join(" ");
+  const elder = isRetiredOrElderProfile(facts);
+  const privateFinance = hasPrivateFinanceSignal(facts);
+
+  if (elder && privateFinance) {
+    return "Log one private savings move — just for you";
+  }
+
+  if (elder) {
+    return "One small calm win today — log it when it happens";
+  }
+
+  if (privateFinance) {
+    return "Log one money move you want kept private";
+  }
+
+  if (/\b(widow|grief|grieving|lost my husband|lost my wife)\b/.test(blob)) {
+    return "One small calm win today — no pressure";
+  }
+
+  return defaultWeeklyFocusForArchetype(archetype);
+}
+
+export async function assignWeeklyFocusForUser(
+  user: MauriUser,
+  facts: UserMindFact[] = []
+): Promise<MauriUser> {
+  const focus = facts.length > 0 ? inferWeeklyFocusFromFacts(facts, user.archetype) : defaultWeeklyFocusForArchetype(user.archetype);
   return updateUserState(user.id, {
     weekly_focus_habit: focus,
     weekly_focus_set_at: new Date().toISOString()

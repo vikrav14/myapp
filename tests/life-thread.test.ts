@@ -85,6 +85,20 @@ describe("life thread classification", () => {
       true
     );
   });
+
+  it("uses human-readable fact values for life thread loop text", () => {
+    const candidates = buildLifeThreadCandidatesFromFacts([
+      fact({
+        category: "stressors",
+        fact_key: "potential_family_drama_over_helping_granddaughter",
+        fact_value: "Potential family drama over helping granddaughter"
+      })
+    ]);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.loopText).toBe("Potential family drama over helping granddaughter");
+    expect(candidates[0]?.loopText).not.toContain("potential_family_drama");
+  });
 });
 
 describe("heavy know-you detection", () => {

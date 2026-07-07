@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildExpressActivationReply,
   buildExpressStartSummary,
   inferArchetypeFromFacts,
   inferExpressSetup,
+  isExpressCardEchoMessage,
   isExpressSetupQuestion,
   isExpressStartConfirmation,
-  buildExpressSetupQuestionReplyTemplate
+  buildExpressSetupQuestionReplyTemplate,
+  shouldSuppressPostActivationNoise
 } from "../src/services/express-onboarding.service.js";
+import { inferHelpFocusFromFacts } from "../src/services/help-focus-inference.service.js";
 import { suggestModulesFromFacts } from "../src/services/user-modules.service.js";
-import type { UserMindFact } from "../src/types.js";
+import { inferWeeklyFocusFromFacts } from "../src/services/weekly-focus.service.js";
+import type { MauriUser, UserMindFact } from "../src/types.js";
 
 function fact(overrides: Partial<UserMindFact> & Pick<UserMindFact, "category" | "fact_value">): UserMindFact {
   return {
@@ -103,5 +108,64 @@ describe("express onboarding", () => {
     expect(reply).toContain("MCB");
     expect(reply).toContain("logo");
     expect(reply).not.toContain("Corporate / Career");
+  });
+
+  it("infers finance-first setup for retired elder with private savings tracking", () => {
+    const facts = [
+      fact({ category: "life_context", fact_key: "age", fact_value: "64, retired primary school teacher in Rose Hill" }),
+      fact({ category: "life_context", fact_key: "status", fact_value: "Widow, grieving" }),
+      fact({
+        category: "goals",
+        fact_key: "granddaughter_tuition",
+        fact_value: "Secret Rs 3,000/month for granddaughter tuition"
+      }),
+      fact({
+        category: "stressors",
+        fact_key: "family",
+        fact_value: "Controlling son — potential family drama over helping granddaughter"
+      }),
+      fact({
+        category: "goals",
+        fact_key: "private_funds",
+        fact_value: "Wants a private safe space to track my little funds"
+      })
+    ];
+
+    const setup = inferExpressSetup(facts);
+
+    expect(setup.archetype).toBe("Life & Habit Tracking");
+    expect(setup.modules).toEqual(["career"]);
+    expect(setup.morningPulseLabel).toBe("quiet money + local life");
+    expect(setup.topics).toEqual(["LocalBuzz", "Money", "Traffic"]);
+    expect(inferWeeklyFocusFromFacts(facts, setup.archetype)).toContain("private savings");
+    expect(inferHelpFocusFromFacts(facts).primary).toBe("personal_finance");
+    expect(inferHelpFocusFromFacts(facts).secondary).toBe("relationship");
+
+    const activation = buildExpressActivationReply({
+      firstName: "Vik",
+      setup,
+      weeklyFocus: inferWeeklyFocusFromFacts(facts, setup.archetype),
+      facts
+    });
+    expect(activation).toContain("private money notes stay between us");
+  });
+
+  it("detects express card echo messages", () => {
+    expect(
+      isExpressCardEchoMessage(
+        "Vik — here's what I'll set up for you:\n\nMorning pulse: balance + routines\nTags: #LocalBuzz #Money\nTap Start my trial below"
+      )
+    ).toBe(true);
+    expect(isExpressCardEchoMessage("start my trial")).toBe(false);
+  });
+
+  it("suppresses post-activation noise within the quiet window", () => {
+    const user = {
+      onboarding_state: "active",
+      onboarding_completed_at: new Date().toISOString()
+    } as MauriUser;
+
+    expect(shouldSuppressPostActivationNoise(user, "start my trial")).toBe(true);
+    expect(shouldSuppressPostActivationNoise(user, "hey can you remind me tomorrow?")).toBe(false);
   });
 });
