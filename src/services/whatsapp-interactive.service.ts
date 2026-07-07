@@ -37,6 +37,12 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   help_full: "show full menu",
   express_start: "start my trial",
   feedback_prompt: "mauri feedback",
+  morning_mood_1: "mood 1",
+  morning_mood_2: "mood 2",
+  morning_mood_3: "mood 3",
+  morning_mood_4: "mood 4",
+  morning_mood_5: "mood 5",
+  morning_mood_skip: "skip mood",
   reminder_done: "done",
   reminder_snooze: "snooze 1h",
   reminder_snooze_15m: "snooze 15m",
@@ -296,6 +302,28 @@ export function buildSundayContextInteractive(): WhatsAppInteractiveOutbound {
   return {
     body: "If I'm missing how you work, tell me what to fix.",
     buttons: [{ id: "feedback_prompt", title: "Give context" }]
+  };
+}
+
+export function buildMorningMoodCheckInteractive(): WhatsAppInteractiveOutbound {
+  return {
+    header: "Quick check",
+    body: "How's today feeling?",
+    footer: "Private — never in your 7am news",
+    listButtonLabel: "Rate 1–5",
+    sections: [
+      {
+        title: "Today vs yesterday",
+        rows: [
+          { id: "morning_mood_1", title: "1 — Rough", description: "Heavier than yesterday" },
+          { id: "morning_mood_2", title: "2 — Low", description: "Not great" },
+          { id: "morning_mood_3", title: "3 — OK", description: "About the same" },
+          { id: "morning_mood_4", title: "4 — Good", description: "Better" },
+          { id: "morning_mood_5", title: "5 — Solid", description: "Much better" },
+          { id: "morning_mood_skip", title: "Skip", description: "Not today" }
+        ]
+      }
+    ]
   };
 }
 

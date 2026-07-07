@@ -29,6 +29,10 @@ import {
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
 import { handleQuantumPickMessage } from "../services/quantum-pick.service.js";
 import { handleReminderMessage } from "../services/reminder-schedule.service.js";
+import {
+  handleMorningMoodMessage,
+  handleTierOneDeepenMessage
+} from "../services/relationship-engagement.service.js";
 import { runSquadRelayAfterExtraction } from "../services/squad-relay.service.js";
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
@@ -634,6 +638,60 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: user.subscription_status,
         transcriptPreview,
         replyPreview: reminderResult.reply
+      });
+      return;
+    }
+
+    const morningMoodResult = await handleMorningMoodMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (morningMoodResult.handled && morningMoodResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, morningMoodResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "morning_mood_check"
+        }
+      });
+
+      await respondOk({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: morningMoodResult.reply
+      });
+      return;
+    }
+
+    const tierOneDeepenResult = await handleTierOneDeepenMessage({
+      user,
+      message: normalizedMessageText
+    });
+
+    if (tierOneDeepenResult.handled && tierOneDeepenResult.reply) {
+      await sendWhatsAppMessage(inboundMessage.from, tierOneDeepenResult.reply, {
+        userId: user.id,
+        requestId,
+        metadata: {
+          sourceType: inboundMessage.kind,
+          flow: "tier1_deepen"
+        }
+      });
+
+      await respondOk({
+        ok: true,
+        userId: user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: user.onboarding_state,
+        subscriptionStatus: user.subscription_status,
+        transcriptPreview,
+        replyPreview: tierOneDeepenResult.reply
       });
       return;
     }

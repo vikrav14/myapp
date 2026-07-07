@@ -545,6 +545,7 @@ Reply in plain text only.
 If the user shared stress, respond with empathy first.
 If they implicitly logged progress, acknowledge it naturally.
 If they seem scattered, help them narrow to the next move without sounding robotic.
+Never reference details that are not in their profile facts, snapshot, or recent logs. Do not invent work hours, family members, or struggles they did not mention.
 `;
 
   const rawReply = await callGemini({
@@ -553,6 +554,45 @@ If they seem scattered, help them narrow to the next move without sounding robot
   });
 
   return finalizeMauriTextReply({ message, reply: rawReply });
+}
+
+export async function generateTierOneDeepenReply(input: {
+  firstName?: string | null;
+  message: string;
+  facts: import("../types.js").UserMindFact[];
+}): Promise<string> {
+  const name = input.firstName?.trim() || "there";
+  const factLines = input.facts
+    .slice(0, 12)
+    .map((fact) => `- ${fact.category}: ${fact.fact_key} — ${fact.fact_value}`)
+    .join("\n");
+
+  const prompt = `
+You are Mauri in a private WhatsApp thread.
+
+Voice rules:
+${MAURI_TEXT_REPLY_GUARDRAILS}
+
+The user just sent a brief thank-you or relief message after sharing something heavy earlier:
+"${input.message}"
+
+Known facts (ONLY cite from this list — never invent):
+${factLines || "No stored facts yet."}
+
+Write ONE short reply that:
+1. Acknowledges their thanks warmly (one sentence).
+2. Asks ONE gentle follow-up question tied to a fact above — what's still heaviest or what's live for them.
+3. Makes clear they can ignore it ("one word is fine" or similar).
+
+Hard limit: ${MAURI_REPLY_MAX_WORDS} words. Plain text only. No lists.
+`;
+
+  const rawReply = await callGemini({
+    prompt,
+    responseMimeType: "text/plain"
+  });
+
+  return finalizeMauriGeneratedReply({ reply: rawReply, message: input.message });
 }
 
 export async function generateWeeklyDiagnosticCopy(input: {

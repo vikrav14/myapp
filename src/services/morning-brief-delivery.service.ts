@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase.js";
+import { logger } from "../lib/logger.js";
 import type { CuratedMorningBrief, DailyBriefRunRecord, MauriUser, MorningBriefTopicKey } from "../types.js";
 import { mapUser } from "./user.service.js";
 import { buildPersonalizedMorningBriefMessage } from "./morning-brief-curation.service.js";
@@ -6,6 +7,7 @@ import { parseCuratedMorningBrief } from "./morning-brief-run.service.js";
 import { appendMicroLessonToBriefMessage } from "./trial-engagement.service.js";
 import { hasModule } from "./user-modules.service.js";
 import { loadPayCycleSpend, buildPaydayRunwaySnippet } from "./payday-runway.service.js";
+import { deliverMorningMoodCheck } from "./relationship-engagement.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
 function isDigestEligible(user: MauriUser): boolean {
@@ -98,6 +100,13 @@ export async function deliverMorningBriefRun(input: {
         message_text: message,
         sent_at: new Date().toISOString()
       });
+
+      try {
+        await deliverMorningMoodCheck({ user, requestId: input.requestId });
+      } catch (moodError) {
+        logger.warn({ error: moodError, userId: user.id }, "Failed to send morning mood check after brief.");
+      }
+
       sent += 1;
     } catch (error) {
       failed += 1;

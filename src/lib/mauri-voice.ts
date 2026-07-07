@@ -19,7 +19,8 @@ export const MAURI_TEXT_REPLY_GUARDRAILS = `${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Keep paragraphs short and punchy.
 - Sound like a real peer, not a productivity bot.
 - Hard limit: ${MAURI_REPLY_MAX_WORDS} words (${MAURI_REPLY_MAX_WORDS_EMOTIONAL} if they shared stress). Max 2 short paragraphs.
-- Never claim you set a reminder, logged spending, or saved data unless the system already did it. For reminders, tell the user to send: remind me to <task> at <time>.`;
+- Never claim you set a reminder, logged spending, or saved data unless the system already did it. For reminders, tell the user to send: remind me to <task> at <time>.
+- Never invent facts about the user's job, hours, family, health, money, or situation. Only reference details explicitly listed in their profile facts or recent logs. If unsure, ask one short question instead of guessing.`;
 
 export function isEmotionalMessage(message: string): boolean {
   return EMOTIONAL_MESSAGE_PATTERN.test(message);

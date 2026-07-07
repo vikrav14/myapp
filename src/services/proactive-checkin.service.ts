@@ -26,7 +26,13 @@ import {
 import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
 import { findUserById, mapUser, updateUserState } from "./user.service.js";
 import { hasModule } from "./user-modules.service.js";
+import { TRIAL_PROACTIVE_MIN_SILENCE_HOURS } from "./relationship-engagement.constants.js";
+import { isWithinTrialRelationshipWindow } from "./relationship-engagement.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
+
+function effectiveMinSilenceHours(user: MauriUser): number {
+  return isWithinTrialRelationshipWindow(user) ? TRIAL_PROACTIVE_MIN_SILENCE_HOURS : PROACTIVE_CHECKIN_MIN_SILENCE_HOURS;
+}
 
 export type ProactiveCheckInMode = "care" | "useful" | "curious";
 
@@ -275,18 +281,18 @@ export async function buildCareCandidate(input: {
   mind: UserMindSnapshotPayload | null;
   silenceHours: number | null;
 }): Promise<ProactiveCheckInCandidate | null> {
+  const minSilence = effectiveMinSilenceHours(input.user);
+
   if (input.silenceHours === null) {
     return null;
   }
 
-  if (
-    input.silenceHours < PROACTIVE_CHECKIN_MIN_SILENCE_HOURS ||
-    input.silenceHours > PROACTIVE_CHECKIN_CARE_SILENCE_MAX_HOURS
-  ) {
+  if (input.silenceHours < minSilence || input.silenceHours > PROACTIVE_CHECKIN_CARE_SILENCE_MAX_HOURS) {
     return null;
   }
 
-  if (!hasEmotionalSignal(input.mind) || !hasModule(input.user, "habits")) {
+  const habitsOrTrial = hasModule(input.user, "habits") || isWithinTrialRelationshipWindow(input.user);
+  if (!hasEmotionalSignal(input.mind) || !habitsOrTrial) {
     return null;
   }
 
@@ -310,7 +316,9 @@ export async function buildUsefulCandidate(input: {
   mind: UserMindSnapshotPayload | null;
   silenceHours: number | null;
 }): Promise<ProactiveCheckInCandidate | null> {
-  if (input.silenceHours === null || input.silenceHours < PROACTIVE_CHECKIN_MIN_SILENCE_HOURS) {
+  const minSilence = effectiveMinSilenceHours(input.user);
+
+  if (input.silenceHours === null || input.silenceHours < minSilence) {
     return null;
   }
 
@@ -389,11 +397,16 @@ export async function buildCuriousCandidate(input: {
   mind: UserMindSnapshotPayload | null;
   silenceHours: number | null;
 }): Promise<ProactiveCheckInCandidate | null> {
-  if (input.silenceHours === null || input.silenceHours < PROACTIVE_CHECKIN_MIN_SILENCE_HOURS) {
+  const minSilence = effectiveMinSilenceHours(input.user);
+
+  if (input.silenceHours === null || input.silenceHours < minSilence) {
     return null;
   }
 
-  if (!isThinMind(input.mind)) {
+  const openLoop = input.mind?.open_loops?.map((loop) => loop.trim()).find(Boolean);
+  const trialThreadEligible = isWithinTrialRelationshipWindow(input.user) && Boolean(openLoop);
+
+  if (!isThinMind(input.mind) && !trialThreadEligible) {
     return null;
   }
 
@@ -405,8 +418,9 @@ export async function buildCuriousCandidate(input: {
     }
   }
 
-  const hookSummary =
-    "I'm still getting to know what actually helps you — routines, stress triggers, what a good week looks like.";
+  const hookSummary = openLoop
+    ? `You mentioned ${openLoop} — still live for you, or moved on? One word is fine.`
+    : "I'm still getting to know what actually helps you — routines, stress triggers, what a good week looks like.";
   return {
     mode: "curious",
     hookSummary,
@@ -453,7 +467,8 @@ export async function canSendProactiveCheckIn(input: {
     return { ok: false, reason: "no_history" };
   }
 
-  if (input.silenceHours < PROACTIVE_CHECKIN_MIN_SILENCE_HOURS) {
+  const minSilence = effectiveMinSilenceHours(input.user);
+  if (input.silenceHours < minSilence) {
     return { ok: false, reason: "too_soon" };
   }
 
