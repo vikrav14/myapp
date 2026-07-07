@@ -8,6 +8,7 @@ import {
   parseReminderCommand
 } from "./reminder-parse.service.js";
 import type { ReminderRepeatKind } from "./reminder-parse.service.js";
+import { maybeAppendReminderCompletionNudge } from "./relationship-engagement.service.js";
 import {
   computeNextDailyFireAt,
   computeNextOnceFireAt,
@@ -478,10 +479,13 @@ export async function handleReminderMessage(input: {
 
     return {
       handled: true,
-      reply:
-        updated.status === "completed"
-          ? `Done. "${reminder.label}" is cleared.`
-          : `Done. Next ping: ${formatMauritiusDateTime(new Date(updated.next_fire_at))}`
+      reply: await maybeAppendReminderCompletionNudge({
+        user: input.user,
+        baseReply:
+          updated.status === "completed"
+            ? `Done. "${reminder.label}" is cleared.`
+            : `Done. Next ping: ${formatMauritiusDateTime(new Date(updated.next_fire_at))}`
+      })
     };
   }
 

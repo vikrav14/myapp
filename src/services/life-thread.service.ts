@@ -6,7 +6,13 @@ import {
   LIFE_THREAD_STAGGER_DAYS
 } from "./life-thread.constants.js";
 
-export type LifeThreadKind = "health_wait" | "family_care" | "crisis" | "generic";
+export type LifeThreadKind =
+  | "health_wait"
+  | "family_care"
+  | "crisis"
+  | "personal_crossroads"
+  | "substance"
+  | "generic";
 
 export interface LifeThreadCandidate {
   loopText: string;
@@ -19,16 +25,26 @@ const HEALTH_WAIT_PATTERN =
   /\b(waiting on|awaiting|biopsy|scan result|test result|results back|hospital|appointment|diagnosis|fertility)\b/i;
 const FAMILY_CARE_PATTERN =
   /\b(mum|mom|dad|father|mother|parent|sister|brother|family|unwell|not great|struggling|ageing|aging)\b/i;
-const CRISIS_PATTERN = /\b(so much|burnout|overwhelm|a lot at once|everything at once|heavy right now)\b/i;
+const SUBSTANCE_PATTERN =
+  /\b(drink(ing)? a lot|drink too much|drinking too much|heavy drink|too much alcohol|alcohol problem)\b/i;
+const CROSSROADS_PATTERN =
+  /\b(lost my way|lost way|career change|change career|considering a career|off track|not looking good|feel lost|no direction|don't know what|dont know what)\b/i;
+const CRISIS_PATTERN =
+  /\b(so much|burnout|overwhelm|a lot at once|everything at once|heavy right now|its not looking good|it's not looking good|not looking good|hopeless|can't cope|cannot cope)\b/i;
+const MONEY_PRESSURE_PATTERN =
+  /\b(struggling with money|money trouble|can't afford|cannot afford|broke|financial stress|money pressure|no money)\b/i;
 
 const EMOTIONAL_MESSAGE_PATTERN =
-  /\b(waiting|results|scared|worried|anxious|biopsy|hospital|unwell|crisis|heavy|so much|burnout|not great)\b/i;
+  /\b(waiting|results|scared|worried|anxious|biopsy|hospital|unwell|crisis|heavy|so much|burnout|not great|lost|drink|money|career change)\b/i;
 
-const KIND_PRIORITY: Record<LifeThreadKind, number> = {
+const THREAD_FACT_CATEGORIES = new Set(["relationships", "stressors", "goals", "life_context"]);
+
+const KIND_PRIORITY: Record<Exclude<LifeThreadKind, "generic">, number> = {
   health_wait: 1,
   family_care: 2,
-  crisis: 3,
-  generic: 4
+  substance: 3,
+  personal_crossroads: 4,
+  crisis: 5
 };
 
 function classifyThreadText(text: string): LifeThreadKind {
@@ -38,6 +54,14 @@ function classifyThreadText(text: string): LifeThreadKind {
 
   if (FAMILY_CARE_PATTERN.test(text)) {
     return "family_care";
+  }
+
+  if (SUBSTANCE_PATTERN.test(text)) {
+    return "substance";
+  }
+
+  if (CROSSROADS_PATTERN.test(text) || MONEY_PRESSURE_PATTERN.test(text)) {
+    return "personal_crossroads";
   }
 
   if (CRISIS_PATTERN.test(text)) {
@@ -75,6 +99,10 @@ function buildCandidate(loopText: string): LifeThreadCandidate | null {
   };
 }
 
+function factText(fact: UserMindFact): string {
+  return `${fact.fact_key} ${fact.fact_value}`.replace(/\s+/g, " ").trim();
+}
+
 export function buildLifeThreadCandidatesFromExtraction(
   extraction: UserMindExtraction
 ): LifeThreadCandidate[] {
@@ -94,6 +122,13 @@ export function buildLifeThreadCandidatesFromExtraction(
     }
   }
 
+  for (const goal of extraction.active_goals ?? []) {
+    const candidate = buildCandidate(goal);
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+
   return dedupeAndRankCandidates(candidates);
 }
 
@@ -101,11 +136,11 @@ export function buildLifeThreadCandidatesFromFacts(facts: UserMindFact[]): LifeT
   const candidates: LifeThreadCandidate[] = [];
 
   for (const fact of facts) {
-    if (fact.category !== "relationships" && fact.category !== "stressors") {
+    if (!THREAD_FACT_CATEGORIES.has(fact.category)) {
       continue;
     }
 
-    const candidate = buildCandidate(fact.fact_value);
+    const candidate = buildCandidate(factText(fact));
     if (candidate) {
       candidates.push(candidate);
     }

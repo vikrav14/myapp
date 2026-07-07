@@ -59,6 +59,32 @@ describe("life thread classification", () => {
 
     expect(candidates).toHaveLength(0);
   });
+
+  it("queues painter career-crossroads threads from onboarding facts", () => {
+    const candidates = buildLifeThreadCandidatesFromFacts([
+      fact({
+        category: "life_context",
+        fact_key: "work",
+        fact_value: "Painter struggling with money"
+      }),
+      fact({
+        category: "goals",
+        fact_key: "career",
+        fact_value: "Considering a career change because I feel I have lost my way"
+      }),
+      fact({
+        category: "stressors",
+        fact_key: "drinking",
+        fact_value: "Drinking a lot lately and it is not looking good"
+      })
+    ]);
+
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates[0]?.offsetDays).toBeGreaterThanOrEqual(1);
+    expect(candidates.some((candidate) => candidate.kind === "personal_crossroads" || candidate.kind === "substance")).toBe(
+      true
+    );
+  });
 });
 
 describe("heavy know-you detection", () => {

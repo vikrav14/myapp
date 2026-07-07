@@ -135,7 +135,9 @@ const envSchema = z.object({
   PROACTIVE_CHECKINS_ENABLED: envBoolean.default(true),
   PROACTIVE_CHECKIN_CRON: z.string().default("0 16 * * *"),
   PROACTIVE_CHECKIN_HOUR: z.coerce.number().int().min(0).max(23).default(16),
-  PROACTIVE_CHECKIN_MINUTE: z.coerce.number().int().min(0).max(59).default(0)
+  PROACTIVE_CHECKIN_MINUTE: z.coerce.number().int().min(0).max(59).default(0),
+  RELATIONSHIP_ENGAGEMENT_ENABLED: envBoolean.default(true),
+  RELATIONSHIP_EVENING_CRON: z.string().default("0 19 * * *")
 });
 
 export const env = envSchema.parse(process.env);
