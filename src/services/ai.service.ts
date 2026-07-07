@@ -282,6 +282,11 @@ Emotional / family context (critical — do not skip for work facts):
 - "So much going on", burnout, things on hold → stressors[] and richer life_situation
 - Prefer several specific stressors over one vague line
 
+Voice for stressors, goals, and relationship notes:
+- Write in the user's voice — short plain phrases (under 12 words), not therapist/clinical labels.
+- Good: "Dad expects me to cover brother's car loans", "Mum guilt-trips when I say no", "Wedding costs in Bel Ombre blowing up"
+- Bad: "Emotional manipulation from mother", "Experiencing significant financial strain and emotional pressure"
+
 Message:
 ${message}
 `;
@@ -307,10 +312,12 @@ The user just shared personal context during onboarding. Write a warm acknowledg
 
 Rules:
 ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
-- Lead with empathy when they shared anything heavy: health scares, waiting on results, family crisis, ageing parents, fertility on hold, burnout. Name people they mentioned (wife, mum, partner, kids).
-- Then ONE short human sentence on their life context (work, area, interests) — prose only, never "39 yrs · based X · Developer" bullet dumps.
-- End with one brief line that they can correct you if you missed something.
-- Max ${MAURI_REPLY_MAX_WORDS_EMOTIONAL} words. Max 3 short paragraphs.
+- Sound like a sharp friend who listened — not a therapist, not a CRM recap.
+- Mirror 2–3 key threads max (who's involved, what's heavy). Do NOT repeat their whole message back sentence by sentence.
+- Banned openers/phrases: "It sounds incredibly", "must be truly draining", "I hear you saying", "Just let me know if I've understood".
+- Then ONE short sentence on work/area if relevant — prose only, never "35 yrs · Tamarin · Developer" bullet dumps.
+- Do NOT add a correction invite — the app appends that separately.
+- Max 90 words. Max 2 short paragraphs.
 - No bullet lists. No middle dots. No "pick a lane" or archetype menu.
 - Do not invent facts not in their message or extracted facts below.
 - ONLY mention people, health issues, family events, and stressors that appear in What they wrote or Extracted facts. Never reference names or storylines from prior sessions or examples.
@@ -332,7 +339,7 @@ Reply in plain text only.`;
 
   return finalizeMauriGeneratedReply({
     reply: rawReply,
-    maxWords: MAURI_REPLY_MAX_WORDS_EMOTIONAL
+    maxWords: 90
   });
 }
 

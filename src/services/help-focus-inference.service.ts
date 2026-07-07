@@ -1,6 +1,7 @@
 import type { UserMindFact } from "../types.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY, HELP_FOCUS_CATALOG, HELP_FOCUS_KEYS } from "./help-focus.constants.js";
+import { combinedFactBlob, hasBoundaryGoal, hasFamilyMoneyPressure } from "./profile-inference.service.js";
 
 export interface InferredHelpFocus {
   primary: HelpFocusKey;
@@ -9,15 +10,15 @@ export interface InferredHelpFocus {
 
 const DOMAIN_PATTERNS: Record<HelpFocusKey, RegExp> = {
   productivity: /\b(productivity|focus|deep work|routine|habit|overwhelm|chaos|procrastinat|distract)\b/i,
-  personal_finance: /\b(money|finance|afford|rent|loan|debt|broke|saving|salary|payday|runway|tuition|pension)\b/i,
+  personal_finance: /\b(money|finance|afford|rent|loan|debt|broke|saving|salary|payday|runway|tuition|pension|wedding|bank account|bleeding me dry|flat despite)\b/i,
   business: /\b(business|startup|founder|shop owner|retail|entrepreneur|side hustle|client|customer|revenue)\b/i,
   self_help: /\b(lost my way|lost way|confidence|identity|stuck|self esteem|not looking good|feel lost|depressed|anxious)\b/i,
   critical_thinking: /\b(decision|choose|confused about|not sure if|should i|what if|scam|misinformation)\b/i,
-  relationship: /\b(partner|wife|husband|girlfriend|boyfriend|marriage|lonely|breakup|family conflict|family drama|attachment|controlling|overbearing|granddaughter|grandson|grandchild)\b/i,
+  relationship: /\b(partner|wife|husband|girlfriend|boyfriend|fianc[eé]e|marriage|lonely|breakup|family conflict|family drama|attachment|controlling|overbearing|granddaughter|grandson|grandchild|mum|mother|dad|father)\b/i,
   human_behavior: /\b(office politics|boss|coworker|manipul|leverage|power play|toxic colleague)\b/i,
   philosophy: /\b(meaning|purpose|stoic|why am i|what's the point|whats the point|acceptance|grief)\b/i,
   discipline: /\b(discipline|lazy|can't stick|cannot stick|give up|accountability|no motivation|drink|drinking)\b/i,
-  communication: /\b(confront|negotiat|raise|boundary|argument|talk to my|tell my boss|difficult conversation)\b/i,
+  communication: /\b(confront|negotiat|raise|boundar(y|ies)|argument|talk to my|tell my boss|difficult conversation|say no|selfish)\b/i,
   health: /\b(sleep|exhaust|tired|health|doctor|hospital|dengue|burnout|no energy|sick)\b/i,
   career: /\b(career|job|promotion|interview|cv|resume|painter|developer|employed|unemployed|émigr|emigr|office in)\b/i,
   parenting: /\b(parent|parenting|daughter|son|child|kid|grandchild|granddaughter|grandson|school|tuition|carer)\b/i
@@ -75,9 +76,24 @@ export function inferHelpFocusFromFacts(facts: UserMindFact[]): InferredHelpFocu
     }
   }
 
-  const combined = facts.map(factBlob).join(" ");
+  const combined = combinedFactBlob(facts);
   if (/\b(struggling with money|money pressure|can't afford|cannot afford|broke|financial stress)\b/.test(combined)) {
     scores.personal_finance += 2;
+  }
+
+  if (hasFamilyMoneyPressure(facts)) {
+    scores.personal_finance += 4;
+    scores.relationship += 3;
+    scores.career = Math.max(0, scores.career - 2);
+  }
+
+  if (hasBoundaryGoal(facts)) {
+    scores.communication += 4;
+    scores.relationship += 1;
+  }
+
+  if (/\b(bitter|guilt trip|calls me selfish|emotional manipulation)\b/.test(combined)) {
+    scores.relationship += 2;
   }
 
   if (/\b(private|secret|track.*fund|little fund|pension|tuition)\b/.test(combined)) {
@@ -112,8 +128,17 @@ export function inferHelpFocusFromFacts(facts: UserMindFact[]): InferredHelpFocu
     .filter((entry) => entry.score > 0)
     .sort((left, right) => right.score - left.score);
 
-  const primary = ranked[0]?.key ?? "self_help";
-  const secondary = ranked[1]?.key && ranked[1].key !== primary ? ranked[1].key : null;
+  let primary = ranked[0]?.key ?? "self_help";
+  let secondary = ranked[1]?.key && ranked[1].key !== primary ? ranked[1].key : null;
+
+  if (hasFamilyMoneyPressure(facts) && scores.personal_finance > 0 && primary !== "personal_finance") {
+    secondary = primary;
+    primary = "personal_finance";
+  }
+
+  if (hasBoundaryGoal(facts) && primary === "personal_finance" && secondary !== "communication" && scores.communication > 0) {
+    secondary = "communication";
+  }
 
   return { primary, secondary };
 }

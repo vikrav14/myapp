@@ -1,6 +1,6 @@
 import type { MauriArchetype, MauriUser, UserMindFact } from "../types.js";
 import { CUSTOM_LANE_ARCHETYPE, canonicalArchetypeKey } from "../types.js";
-import { hasPrivateFinanceSignal, isRetiredOrElderProfile } from "./profile-inference.service.js";
+import { hasBoundaryGoal, hasFamilyMoneyPressure, hasPrivateFinanceSignal, isRetiredOrElderProfile } from "./profile-inference.service.js";
 import { updateUserState } from "./user.service.js";
 
 const ARCHETYPE_WEEKLY_FOCUS: Record<string, string> = {
@@ -20,6 +20,16 @@ export function inferWeeklyFocusFromFacts(facts: UserMindFact[], archetype: stri
   const blob = facts.map((fact) => `${fact.fact_key} ${fact.fact_value}`.toLowerCase()).join(" ");
   const elder = isRetiredOrElderProfile(facts);
   const privateFinance = hasPrivateFinanceSignal(facts);
+  const familyMoney = hasFamilyMoneyPressure(facts);
+  const boundaryGoal = hasBoundaryGoal(facts);
+
+  if (familyMoney && boundaryGoal) {
+    return "Hold one money boundary today — log it privately";
+  }
+
+  if (familyMoney) {
+    return "Log one family-money moment before you react";
+  }
 
   if (elder && privateFinance) {
     return "Log one private savings move — just for you";

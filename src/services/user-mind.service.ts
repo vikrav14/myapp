@@ -250,6 +250,14 @@ function shouldUseKnowYouAiAcknowledgement(message: string, facts: UserMindFact[
   return facts.some((fact) => fact.category === "stressors" || fact.category === "relationships");
 }
 
+const KNOW_YOU_CORRECTION_SUFFIX = "Wrong or missing something? Just correct me in chat.";
+
+function stripDuplicateKnowYouCorrection(reply: string): string {
+  return reply
+    .replace(/\n\n?(wrong or missing something\??[^\n]*|just (let me know|correct me)[^\n]*)\.?$/i, "")
+    .trim();
+}
+
 export async function resolveKnowYouAcknowledgement(input: {
   user: MauriUser;
   message: string;
@@ -270,13 +278,15 @@ export async function resolveKnowYouAcknowledgement(input: {
 
   if (shouldUseKnowYouAiAcknowledgement(input.message, input.facts)) {
     try {
-      const aiReply = await generateKnowYouAcknowledgement({
-        firstName: name,
-        message: input.message,
-        factsSummary: formatUserMindForPrompt(input.facts)
-      });
+      const aiReply = stripDuplicateKnowYouCorrection(
+        await generateKnowYouAcknowledgement({
+          firstName: name,
+          message: input.message,
+          factsSummary: formatUserMindForPrompt(input.facts)
+        })
+      );
 
-      return `${aiReply}\n\nWrong or missing something? Just correct me in chat.`;
+      return `${aiReply}\n\n${KNOW_YOU_CORRECTION_SUFFIX}`;
     } catch (error) {
       logger.warn({ error, userId: input.user.id }, "Know-you AI acknowledgement failed; using template.");
     }

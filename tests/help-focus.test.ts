@@ -54,4 +54,19 @@ describe("help focus inference", () => {
     expect(prompt).toContain("Secondary help focus: Discipline");
     expect(prompt).toContain("Never name-drop books");
   });
+
+  it("prioritises finance and communication for family money pressure profiles", () => {
+    const inferred = inferHelpFocusFromFacts([
+      fact({ category: "life_context", fact_key: "work", fact_value: "Remote developer in Tamarin for EU company" }),
+      fact({
+        category: "stressors",
+        fact_key: "family",
+        fact_value: "Family bleeding me dry — dad expects me to cover brother's loans"
+      }),
+      fact({ category: "goals", fact_key: "boundaries", fact_value: "Build boundaries with family" })
+    ]);
+
+    expect(inferred.primary).toBe("personal_finance");
+    expect(["communication", "relationship"]).toContain(inferred.secondary);
+  });
 });

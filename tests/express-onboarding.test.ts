@@ -168,4 +168,38 @@ describe("express onboarding", () => {
     expect(shouldSuppressPostActivationNoise(user, "start my trial")).toBe(true);
     expect(shouldSuppressPostActivationNoise(user, "hey can you remind me tomorrow?")).toBe(false);
   });
+
+  it("infers remote dev with family money pressure toward finance + boundaries setup", () => {
+    const facts = [
+      fact({ category: "life_context", fact_key: "work", fact_value: "Remote dev in Tamarin for an EU company" }),
+      fact({ category: "location", fact_key: "area", fact_value: "Tamarin" }),
+      fact({
+        category: "stressors",
+        fact_key: "family_loans",
+        fact_value: "Dad expects me to pay off my brother's bad car loans"
+      }),
+      fact({ category: "stressors", fact_key: "mum_guilt", fact_value: "Mum cries and calls me selfish when I say no" }),
+      fact({
+        category: "goals",
+        fact_key: "wedding",
+        fact_value: "Fiancée wants a massive traditional wedding at Bel Ombre next year"
+      }),
+      fact({ category: "goals", fact_key: "boundaries", fact_value: "I want to build boundaries" }),
+      fact({
+        category: "stressors",
+        fact_key: "money_flat",
+        fact_value: "Making good money but bank account stays flat and I feel bitter"
+      })
+    ];
+
+    const setup = inferExpressSetup(facts);
+
+    expect(setup.archetype).toBe("Corporate / Career");
+    expect(setup.morningPulseLabel).toBe("remote work + money pressure");
+    expect(setup.topics).toEqual(["Tech", "Money", "LocalBuzz"]);
+    expect(setup.modules).toEqual(["career"]);
+    expect(inferWeeklyFocusFromFacts(facts, setup.archetype)).toContain("money boundary");
+    expect(inferHelpFocusFromFacts(facts).primary).toBe("personal_finance");
+    expect(["communication", "relationship"]).toContain(inferHelpFocusFromFacts(facts).secondary);
+  });
 });
