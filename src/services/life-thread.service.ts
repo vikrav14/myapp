@@ -122,7 +122,7 @@ export function buildLifeThreadCandidatesFromExtraction(
     }
   }
 
-  for (const goal of extraction.active_goals ?? []) {
+  for (const goal of extraction.goals ?? []) {
     const candidate = buildCandidate(goal);
     if (candidate) {
       candidates.push(candidate);
