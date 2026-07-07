@@ -6,9 +6,11 @@ import {
   buildExpressActivationReply,
   buildExpressStartSummary,
   inferExpressSetup,
+  isExpressCardEchoMessage,
   isExpressSetupQuestion,
   isExpressStartConfirmation,
   resolveExpressSetupQuestionReply,
+  shouldSuppressPostActivationNoise,
   type ExpressOnboardingSetup
 } from "./express-onboarding.service.js";
 import {
@@ -74,7 +76,8 @@ async function activateUserExpress(
     locked_at: null
   });
 
-  const updatedUser = await assignWeeklyFocusForUser(activatedUser);
+  const facts = await loadUserMindFacts(user.id);
+  const updatedUser = await assignWeeklyFocusForUser(activatedUser, facts);
   const focusedUser = await assignHelpFocusFromFacts(updatedUser);
   const pendingFollowUps = (await listPendingFollowUpsForUser(focusedUser.id)).filter(
     (followUp) => followUp.source === "onboarding"
@@ -90,7 +93,8 @@ async function activateUserExpress(
     buildExpressActivationReply({
       firstName: focusedUser.first_name,
       setup,
-      weeklyFocus: focusedUser.weekly_focus_habit ?? "one small win each day"
+      weeklyFocus: focusedUser.weekly_focus_habit ?? "one small win each day",
+      facts
     }),
     "",
     adviceLine
@@ -132,6 +136,13 @@ async function beginExpressStartStep(user: MauriUser, prefixReply?: string): Pro
 async function handleExpressSetupMessage(user: MauriUser, message: string): Promise<OnboardingResult> {
   if (isExpressStartConfirmation(message)) {
     return completeExpressStart(user);
+  }
+
+  if (isExpressCardEchoMessage(message)) {
+    return {
+      handled: true,
+      user
+    };
   }
 
   const facts = await loadUserMindFacts(user.id);
@@ -248,6 +259,13 @@ export async function handleOnboardingMessage(input: {
   const { user, message } = input;
 
   if (user.onboarding_state === "active") {
+    if (shouldSuppressPostActivationNoise(user, message)) {
+      return {
+        handled: true,
+        user
+      };
+    }
+
     return {
       handled: false,
       user

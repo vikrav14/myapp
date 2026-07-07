@@ -1,7 +1,8 @@
-import type { MauriArchetype, MauriModuleKey, MorningBriefTopicKey, UserMindFact } from "../types.js";
+import type { MauriArchetype, MauriModuleKey, MauriUser, MorningBriefTopicKey, UserMindFact } from "../types.js";
 import { MODULE_CATALOG } from "./user-modules.constants.js";
 import { defaultTopicsForArchetype, formatTopicList } from "./morning-brief-topics.service.js";
 import { formatModuleLabels, suggestModulesFromFacts } from "./user-modules.service.js";
+import { hasPrivateFinanceSignal, isRetiredOrElderProfile } from "./profile-inference.service.js";
 import { generateExpressSetupQuestionReply } from "./ai.service.js";
 import { formatUserMindForPrompt } from "./user-mind.service.js";
 import { logger } from "../lib/logger.js";
@@ -20,6 +21,8 @@ const MORNING_PULSE_LABELS: Record<MauriArchetype, string> = {
   "Life & Habit Tracking": "balance + routines + local life",
   Custom: "your mix — tuned from what you shared"
 };
+
+export const POST_ACTIVATION_QUIET_WINDOW_MINUTES = 15;
 
 const START_CONFIRMATIONS = new Set([
   "start",
@@ -43,6 +46,47 @@ function factBlob(fact: UserMindFact): string {
 
 function isDependentContext(blob: string): boolean {
   return /\b(daughter|son|child|kid|saving for|their uni|their university|her uni|his uni)\b/.test(blob);
+}
+
+export { hasPrivateFinanceSignal, isRetiredOrElderProfile } from "./profile-inference.service.js";
+
+export function isExpressCardEchoMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
+  if (normalized.length < 40) {
+    return false;
+  }
+
+  const markers = [
+    "ready when you are",
+    "one tap starts your 7-day trial",
+    "here's what i'll set up",
+    "morning pulse:",
+    "also watching:",
+    "tags:",
+    "tap start my trial below",
+    "you're in,",
+    "your 7-day trial starts now",
+    "what makes mauri different",
+    "for advice i'll lean into",
+    "brain dump, remind me, help"
+  ];
+
+  const hits = markers.filter((marker) => normalized.includes(marker)).length;
+  return hits >= 2 || (hits >= 1 && normalized.length > 160);
+}
+
+export function shouldSuppressPostActivationNoise(user: MauriUser, message: string): boolean {
+  if (user.onboarding_state !== "active" || !user.onboarding_completed_at) {
+    return false;
+  }
+
+  const minutesSince =
+    (Date.now() - new Date(user.onboarding_completed_at).getTime()) / (60 * 1000);
+  if (minutesSince > POST_ACTIVATION_QUIET_WINDOW_MINUTES) {
+    return false;
+  }
+
+  return isExpressStartConfirmation(message) || isExpressCardEchoMessage(message);
 }
 
 export function inferArchetypeFromFacts(facts: UserMindFact[]): MauriArchetype {
@@ -75,6 +119,10 @@ export function inferArchetypeFromFacts(facts: UserMindFact[]): MauriArchetype {
       scores["Entrepreneur Mode"] += 2;
     }
 
+    if (/\b(retired|pension|widow|widower|grandmother|grandfather|grandma|grandpa)\b/.test(blob)) {
+      scores["Life & Habit Tracking"] += 2;
+    }
+
     if (/\b(habit|routine|balance|wellness|mood|gym|carer|caregiver|primary carer|running on empty|no sleep|exhausted)\b/.test(blob)) {
       scores["Life & Habit Tracking"] += 1;
     }
@@ -97,6 +145,17 @@ export function inferArchetypeFromFacts(facts: UserMindFact[]): MauriArchetype {
 }
 
 export function buildMorningPulseLabel(archetype: MauriArchetype, facts: UserMindFact[]): string {
+  const elder = isRetiredOrElderProfile(facts);
+  const privateFinance = hasPrivateFinanceSignal(facts);
+
+  if (elder && privateFinance) {
+    return "quiet money + local life";
+  }
+
+  if (elder) {
+    return "local life + calm routines";
+  }
+
   const base = MORNING_PULSE_LABELS[archetype] ?? MORNING_PULSE_LABELS["Life & Habit Tracking"];
   const hasMoneyPressure = facts.some((fact) => {
     const blob = factBlob(fact);
@@ -115,10 +174,23 @@ export function buildMorningPulseLabel(archetype: MauriArchetype, facts: UserMin
   return base;
 }
 
+function inferTopicsFromFacts(facts: UserMindFact[], archetype: MauriArchetype): MorningBriefTopicKey[] {
+  if (isRetiredOrElderProfile(facts)) {
+    return ["LocalBuzz", "Money", "Traffic"];
+  }
+
+  if (hasPrivateFinanceSignal(facts)) {
+    const base = defaultTopicsForArchetype(archetype);
+    return base.map((topic) => (topic === "Entertainment" ? "Traffic" : topic));
+  }
+
+  return defaultTopicsForArchetype(archetype);
+}
+
 export function inferExpressSetup(facts: UserMindFact[]): ExpressOnboardingSetup {
   const archetype = inferArchetypeFromFacts(facts);
   const modules = suggestModulesFromFacts(facts, archetype);
-  const topics = defaultTopicsForArchetype(archetype);
+  const topics = inferTopicsFromFacts(facts, archetype);
 
   return {
     archetype,
@@ -153,16 +225,26 @@ export function buildExpressActivationReply(input: {
   firstName?: string | null;
   setup: ExpressOnboardingSetup;
   weeklyFocus: string;
+  facts?: UserMindFact[];
 }): string {
   const name = input.firstName?.trim() || "there";
+  const facts = input.facts ?? [];
+  const privateFinance = hasPrivateFinanceSignal(facts);
   const watching =
     input.setup.modules.length > 0
       ? `Also watching: ${formatModuleLabels(input.setup.modules)}.`
-      : "Add extra tools anytime — e.g. add habits / add career.";
+      : "Add extra tools anytime — e.g. add career / add habits.";
 
-  return [
-    `You're in, ${name} ✌️`,
-    "",
+  const lines = [`You're in, ${name} ✌️`, ""];
+
+  if (privateFinance) {
+    lines.push(
+      "Your private money notes stay between us — nothing surfaces in your 7am pulse or anywhere else.",
+      ""
+    );
+  }
+
+  lines.push(
     `Your 7am pulse will lean into ${input.setup.morningPulseLabel} — personal stuff stays out of that.`,
     watching,
     "",
@@ -171,7 +253,9 @@ export function buildExpressActivationReply(input: {
     `This week's habit: ${input.weeklyFocus}`,
     "",
     "Brain dump, remind me, help — all live now. The more we talk, the better I get at what's next for *you*. I'll check in gently on the live stuff."
-  ].join("\n");
+  );
+
+  return lines.join("\n");
 }
 
 export function isExpressStartConfirmation(message: string): boolean {

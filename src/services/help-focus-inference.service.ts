@@ -13,7 +13,7 @@ const DOMAIN_PATTERNS: Record<HelpFocusKey, RegExp> = {
   business: /\b(business|startup|founder|shop owner|retail|entrepreneur|side hustle|client|customer|revenue)\b/i,
   self_help: /\b(lost my way|lost way|confidence|identity|stuck|self esteem|not looking good|feel lost|depressed|anxious)\b/i,
   critical_thinking: /\b(decision|choose|confused about|not sure if|should i|what if|scam|misinformation)\b/i,
-  relationship: /\b(partner|wife|husband|girlfriend|boyfriend|marriage|lonely|breakup|family conflict|attachment)\b/i,
+  relationship: /\b(partner|wife|husband|girlfriend|boyfriend|marriage|lonely|breakup|family conflict|family drama|attachment|controlling|overbearing|granddaughter|grandson|grandchild)\b/i,
   human_behavior: /\b(office politics|boss|coworker|manipul|leverage|power play|toxic colleague)\b/i,
   philosophy: /\b(meaning|purpose|stoic|why am i|what's the point|whats the point|acceptance|grief)\b/i,
   discipline: /\b(discipline|lazy|can't stick|cannot stick|give up|accountability|no motivation|drink|drinking)\b/i,
@@ -66,6 +66,13 @@ export function inferHelpFocusFromFacts(facts: UserMindFact[]): InferredHelpFocu
         scores[key] += fact.category === "stressors" || fact.category === "goals" ? 2 : 1;
       }
     }
+
+    if (
+      fact.category === "goals" &&
+      /\b(track.*fund|private.*fund|little fund|track my|safe space.*track)\b/.test(blob)
+    ) {
+      scores.personal_finance += 4;
+    }
   }
 
   const combined = facts.map(factBlob).join(" ");
@@ -73,12 +80,31 @@ export function inferHelpFocusFromFacts(facts: UserMindFact[]): InferredHelpFocu
     scores.personal_finance += 2;
   }
 
+  if (/\b(private|secret|track.*fund|little fund|pension|tuition)\b/.test(combined)) {
+    scores.personal_finance += 2;
+  }
+
+  if (/\b(private.*fund|track.*fund|little fund|safe space.*track|track my little)\b/.test(combined)) {
+    scores.personal_finance += 3;
+  }
+
   if (/\b(drink(ing)? a lot|heavy drink|lost my way|lost way)\b/.test(combined)) {
     scores.discipline += 1;
     scores.self_help += 1;
   }
 
-  if (/\b(daughter|son|child|tuition|parent|parenting|grandchild)\b/.test(combined)) {
+  if (/\b(granddaughter|grandson|grandchild|grandma|grandpa|grandmother|grandfather)\b/.test(combined)) {
+    scores.relationship += 2;
+  }
+
+  if (/\b(family drama|controlling|overbearing|son.*control)\b/.test(combined)) {
+    scores.relationship += 2;
+  }
+
+  if (
+    /\b(daughter|son|child|tuition|parent|parenting)\b/.test(combined) &&
+    !/\bgrand(daughter|son|child|ma|pa|mother|father)\b/.test(combined)
+  ) {
     scores.parenting += 2;
   }
 
