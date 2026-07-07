@@ -16,6 +16,7 @@ Daily
 
 Discover yourself
 - what do you know about me — your person profile (not just logs)
+- help focus — pick advice lane (money, career, discipline, relationships…)
 - remember that … — save something about you
 - forget that … — remove a stored fact
 - my focus — this week's one habit

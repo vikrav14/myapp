@@ -20,6 +20,7 @@ import {
   type UserMindExtraction,
   type UserMindSnapshotPayload
 } from "../schemas/user-mind.js";
+import { buildHelpFocusPromptForUser } from "./help-focus.service.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
 import {
   localAlertClassificationJsonSchema,
@@ -516,6 +517,9 @@ Subscription status: ${user.subscription_status}
 
 Who this person is (what they told you — stable profile):
 ${context.userMindPrompt}
+
+Advice lens (help focus — how to prioritize guidance):
+${buildHelpFocusPromptForUser(user)}
 
 What you've learned from their week (nightly reflection — if available):
 ${context.userMindSnapshotPrompt ?? "Not built yet — rely on facts and recent logs."}

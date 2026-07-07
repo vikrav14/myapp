@@ -1,6 +1,13 @@
 import type { MauriModuleKey, WhatsAppInteractiveOutbound } from "../types.js";
 import { buildArchetypePickerRows } from "./archetype-catalog.js";
+import { HELP_FOCUS_CATALOG } from "./help-focus.constants.js";
+import type { HelpFocusKey } from "./help-focus.constants.js";
+import { formatHelpFocusLabel } from "./help-focus-inference.service.js";
 import { MODULE_CATALOG } from "./user-modules.constants.js";
+
+const HELP_DOMAIN_REPLY_ENTRIES = Object.fromEntries(
+  HELP_FOCUS_CATALOG.map((entry) => [`help_domain_${entry.key}`, `help domain ${entry.key.replace(/_/g, " ")}`])
+) as Record<string, string>;
 
 export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   archetype_student: "Student Grind",
@@ -29,6 +36,7 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   rate_4: "rate 4",
   rate_5: "rate 5",
   help_focus: "my focus",
+  help_advice_focus: "help focus",
   help_roast: "roast me",
   help_hype: "hype me",
   help_runway: "my runway",
@@ -50,6 +58,8 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   reminder_snooze_tomorrow: "snooze tomorrow",
   reminder_skip: "skip"
 };
+
+Object.assign(INTERACTIVE_REPLY_MAP, HELP_DOMAIN_REPLY_ENTRIES);
 
 export function resolveInteractiveReplyId(replyId: string): string | null {
   return INTERACTIVE_REPLY_MAP[replyId] ?? null;
@@ -281,6 +291,7 @@ export function buildHelpMenuInteractive(): WhatsAppInteractiveOutbound {
         title: "Discover",
         rows: [
           { id: "help_focus", title: "My focus", description: "This week's one habit" },
+          { id: "help_advice_focus", title: "Advice focus", description: "Money, career, discipline…" },
           { id: "help_roast", title: "Roast me", description: "Sharp truth from your week" },
           { id: "help_hype", title: "Hype me", description: "Celebrate what's working" }
         ]
@@ -345,6 +356,47 @@ export function buildReminderDeliveryInteractive(label: string): WhatsAppInterac
           { id: "reminder_skip", title: "Skip", description: "Skip this ping" }
         ]
       }
+    ]
+  };
+}
+
+export function buildHelpFocusPickerInteractive(input: {
+  firstName?: string | null;
+  suggestedPrimary?: HelpFocusKey | null;
+  suggestedSecondary?: HelpFocusKey | null;
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+  const suggested =
+    input.suggestedPrimary && input.suggestedSecondary
+      ? `${formatHelpFocusLabel(input.suggestedPrimary)} + ${formatHelpFocusLabel(input.suggestedSecondary)}`
+      : input.suggestedPrimary
+        ? formatHelpFocusLabel(input.suggestedPrimary)
+        : null;
+
+  const body = suggested
+    ? `${name} — for advice I'm leaning into ${suggested}. Pick a different lane if you want.`
+    : `${name} — what do you want me to help with most?`;
+
+  const firstSection = HELP_FOCUS_CATALOG.slice(0, 7).map((entry) => ({
+    id: `help_domain_${entry.key}`,
+    title: entry.label.slice(0, 24),
+    description: entry.description.slice(0, 72)
+  }));
+
+  const secondSection = HELP_FOCUS_CATALOG.slice(7).map((entry) => ({
+    id: `help_domain_${entry.key}`,
+    title: entry.label.slice(0, 24),
+    description: entry.description.slice(0, 72)
+  }));
+
+  return {
+    header: "Advice focus",
+    body,
+    footer: "Changes how I advise — not your 7am news tags",
+    listButtonLabel: "Pick lane",
+    sections: [
+      { title: "Life & work", rows: firstSection },
+      { title: "Mind & people", rows: secondSection }
     ]
   };
 }
