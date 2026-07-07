@@ -30,6 +30,11 @@ supabase/migrations/022_squad_custom_pact_weights.sql
 supabase/migrations/023_user_mind_snapshots.sql
 supabase/migrations/024_open_loop_follow_ups.sql
 supabase/migrations/025_proactive_checkins.sql
+supabase/migrations/026_quiet_hours.sql
+supabase/migrations/027_open_loop_onboarding_source.sql
+supabase/migrations/028_active_modules.sql
+supabase/migrations/029_brief_focus.sql
+supabase/migrations/030_help_focus.sql
 ```
 
 ## 2. Deploy the web service (Render)

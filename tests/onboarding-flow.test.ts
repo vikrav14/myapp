@@ -58,6 +58,12 @@ vi.mock("../src/services/open-loop-follow-up.service.js", async () => {
   };
 });
 
+const mockAssignHelpFocusFromFacts = vi.fn();
+
+vi.mock("../src/services/help-focus.service.js", () => ({
+  assignHelpFocusFromFacts: mockAssignHelpFocusFromFacts
+}));
+
 const { handleOnboardingMessage } = await import("../src/services/onboarding.service.js");
 
 const baseUser = {
@@ -129,6 +135,11 @@ describe("handleOnboardingMessage express flow", () => {
     mockGenerateExpressSetupQuestionReply.mockResolvedValue(
       "I picked Money because you mentioned the MCB card — LocalBuzz for Triolet local context, not random templates."
     );
+    mockAssignHelpFocusFromFacts.mockImplementation(async (user: Record<string, unknown>) => ({
+      ...user,
+      help_focus_primary: "personal_finance",
+      help_focus_secondary: "career"
+    }));
   });
 
   it("prompts know-you first for short replies", async () => {
@@ -213,6 +224,8 @@ describe("handleOnboardingMessage express flow", () => {
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("You're in, Vik");
     expect(result.reply).toContain("7am pulse");
+    expect(result.reply).toContain("For advice I'll lean into");
+    expect(result.interactive?.listButtonLabel).toBe("Pick lane");
     expect(result.reply).not.toContain("Corporate / Career shapes");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       baseUser.id,

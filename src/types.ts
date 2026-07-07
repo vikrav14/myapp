@@ -48,6 +48,21 @@ export function canonicalArchetypeKey(archetype: string): string {
 
 export type MauriModuleKey = "career" | "habits" | "founder" | "student";
 
+export type HelpFocusKey =
+  | "productivity"
+  | "personal_finance"
+  | "business"
+  | "self_help"
+  | "critical_thinking"
+  | "relationship"
+  | "human_behavior"
+  | "philosophy"
+  | "discipline"
+  | "communication"
+  | "health"
+  | "career"
+  | "parenting";
+
 export interface MauriUser {
   id: string;
   phone_number: string;
@@ -55,6 +70,8 @@ export interface MauriUser {
   archetype: MauriArchetype | string;
   brief_focus: string | null;
   active_modules: MauriModuleKey[];
+  help_focus_primary: HelpFocusKey | null;
+  help_focus_secondary: HelpFocusKey | null;
   onboarding_state: OnboardingState;
   subscription_status: SubscriptionStatus;
   onboarding_completed_at: string | null;

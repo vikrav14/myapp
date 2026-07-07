@@ -272,7 +272,7 @@ Incoming message
 
 | Blueprint concept | Current / planned code touchpoint |
 |-------------------|----------------------------------|
-| Help focus catalog | `users.help_focus_primary`, `users.help_focus_secondary` (migration TBD) |
+| Help focus catalog | `users.help_focus_primary`, `users.help_focus_secondary` (migration **030**) |
 | Engine prompt injection | `ai.service.ts` — cached system block per focus |
 | EQ triage | `life-thread.service.ts`, `user-mind.service.ts`, `relationship-engagement.service.ts` |
 | 60-word cap | `mauri-voice.ts` — align `MAURI_REPLY_MAX_WORDS` with blueprint if product confirms |

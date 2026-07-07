@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase.js";
-import type { MauriModuleKey, MauriUser, MorningBriefTopicKey } from "../types.js";
+import type { MauriModuleKey, MauriUser, MorningBriefTopicKey, HelpFocusKey } from "../types.js";
 import { MAURI_MODULE_KEYS, MAX_ACTIVE_MODULES } from "./user-modules.constants.js";
+import { isHelpFocusKey } from "./help-focus-inference.service.js";
 
 function sanitizeUserModules(value: unknown): MauriModuleKey[] {
   if (!Array.isArray(value)) {
@@ -23,6 +24,14 @@ function sanitizeUserModules(value: unknown): MauriModuleKey[] {
   return unique;
 }
 
+function sanitizeHelpFocus(value: unknown): HelpFocusKey | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  return isHelpFocusKey(value) ? value : null;
+}
+
 export function mapUser(record: Record<string, unknown>): MauriUser {
   return {
     id: String(record.id),
@@ -31,6 +40,8 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
     archetype: String(record.archetype ?? "Life & Habit Tracking"),
     brief_focus: record.brief_focus ? String(record.brief_focus) : null,
     active_modules: sanitizeUserModules(record.active_modules),
+    help_focus_primary: sanitizeHelpFocus(record.help_focus_primary),
+    help_focus_secondary: sanitizeHelpFocus(record.help_focus_secondary),
     onboarding_state: (record.onboarding_state ?? "active") as MauriUser["onboarding_state"],
     subscription_status: (record.subscription_status ?? "Trial_Active") as MauriUser["subscription_status"],
     onboarding_completed_at: record.onboarding_completed_at ? String(record.onboarding_completed_at) : null,

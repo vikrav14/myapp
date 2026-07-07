@@ -31,6 +31,9 @@ import {
   listPendingFollowUpsForUser,
   seedLifeThreadsFromOnboarding
 } from "./open-loop-follow-up.service.js";
+import { assignHelpFocusFromFacts } from "./help-focus.service.js";
+import { formatHelpFocusLabel } from "./help-focus-inference.service.js";
+import { buildHelpFocusPickerInteractive } from "./whatsapp-interactive.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
 
@@ -72,16 +75,25 @@ async function activateUserExpress(
   });
 
   const updatedUser = await assignWeeklyFocusForUser(activatedUser);
-  const pendingFollowUps = (await listPendingFollowUpsForUser(updatedUser.id)).filter(
+  const focusedUser = await assignHelpFocusFromFacts(updatedUser);
+  const pendingFollowUps = (await listPendingFollowUpsForUser(focusedUser.id)).filter(
     (followUp) => followUp.source === "onboarding"
   );
   const threadNote = buildLifeThreadActivationNote(pendingFollowUps);
+  const adviceLine =
+    focusedUser.help_focus_primary && focusedUser.help_focus_secondary
+      ? `For advice I'll lean into ${formatHelpFocusLabel(focusedUser.help_focus_primary)} + ${formatHelpFocusLabel(focusedUser.help_focus_secondary)} — tap below to change, or reply help focus anytime.`
+      : focusedUser.help_focus_primary
+        ? `For advice I'll lean into ${formatHelpFocusLabel(focusedUser.help_focus_primary)} — tap below to change, or reply help focus anytime.`
+        : "Reply help focus anytime to pick what you want advice on.";
   const replyParts = [
     buildExpressActivationReply({
-      firstName: updatedUser.first_name,
+      firstName: focusedUser.first_name,
       setup,
-      weeklyFocus: updatedUser.weekly_focus_habit ?? "one small win each day"
-    })
+      weeklyFocus: focusedUser.weekly_focus_habit ?? "one small win each day"
+    }),
+    "",
+    adviceLine
   ];
 
   if (threadNote) {
@@ -90,9 +102,15 @@ async function activateUserExpress(
 
   return {
     handled: true,
-    user: updatedUser,
+    user: focusedUser,
     reply: replyParts.join("\n"),
-    outboundFlow: "express_activation"
+    outboundFlow: "express_activation",
+    interactive: buildHelpFocusPickerInteractive({
+      firstName: focusedUser.first_name,
+      suggestedPrimary: focusedUser.help_focus_primary,
+      suggestedSecondary: focusedUser.help_focus_secondary
+    }),
+    sendTextBeforeInteractive: true
   };
 }
 

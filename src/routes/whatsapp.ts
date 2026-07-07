@@ -14,6 +14,7 @@ import { handleFinanceCommandMessage } from "../services/payday-runway.service.j
 import { handleReceiptImageMessage } from "../services/receipt-scan.service.js";
 import { handleCalendarMessage } from "../services/calendar.service.js";
 import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
+import { handleHelpFocusMessage } from "../services/help-focus.service.js";
 import { handleUserMindCommandMessage } from "../services/user-mind.service.js";
 import { handleServiceFeedbackMessage } from "../services/weekly-report-feedback.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
@@ -291,6 +292,40 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: accessPolicyResult.user.subscription_status,
         sourceType: inboundMessage.kind,
         replyPreview: fallbackReply
+      });
+      return;
+    }
+
+    const helpFocusResult = await handleHelpFocusMessage({
+      user: accessPolicyResult.user,
+      message: normalizedMessageText
+    });
+
+    if (helpFocusResult.handled && (helpFocusResult.reply || helpFocusResult.interactive)) {
+      await sendMauriReply(
+        inboundMessage.from,
+        {
+          text: helpFocusResult.reply,
+          interactive: helpFocusResult.interactive
+        },
+        {
+          userId: (helpFocusResult.user ?? accessPolicyResult.user).id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "help_focus"
+          }
+        }
+      );
+
+      await respondOk({
+        ok: true,
+        userId: (helpFocusResult.user ?? accessPolicyResult.user).id,
+        sourceType: inboundMessage.kind,
+        onboardingState: (helpFocusResult.user ?? accessPolicyResult.user).onboarding_state,
+        subscriptionStatus: (helpFocusResult.user ?? accessPolicyResult.user).subscription_status,
+        transcriptPreview,
+        replyPreview: helpFocusResult.reply ?? helpFocusResult.interactive?.body
       });
       return;
     }
