@@ -10,6 +10,9 @@ import type {
 } from "../types.js";
 import { generateWeeklyDiagnosticCopy, generateWeeklyFeedbackSection } from "./ai.service.js";
 import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
+import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
+import { formatUserMindSnapshotForPrompt } from "./user-mind-prompt.js";
+import { listPendingFollowUpsForUser } from "./open-loop-follow-up.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
 import {
@@ -32,6 +35,126 @@ import {
 interface ReportWindow {
   weekStart: string;
   weekEnd: string;
+}
+
+export interface WeeklyReportNarrativeContext {
+  userMindSnapshotPrompt: string | null;
+  openLoops: string[];
+  weeklyFocusHabit: string | null;
+  momentumDelta: number | null;
+  priorMomentumScore: number | null;
+  isQuietWeek: boolean;
+}
+
+export function isQuietReportWeek(summary: WeeklyDiagnosticSummary): boolean {
+  return (
+    summary.finance.entry_count === 0 &&
+    summary.habits.total_logs === 0 &&
+    summary.todos.completed_count === 0
+  );
+}
+
+export function buildWeeklyReportNarrativePrompt(context: WeeklyReportNarrativeContext): string {
+  const lines: string[] = [];
+
+  if (context.userMindSnapshotPrompt) {
+    lines.push(`Reflection snapshot:\n${context.userMindSnapshotPrompt}`);
+  }
+
+  if (context.openLoops.length > 0) {
+    lines.push(`Open loops still live: ${context.openLoops.join("; ")}`);
+  }
+
+  if (context.weeklyFocusHabit) {
+    lines.push(`Weekly focus habit: ${context.weeklyFocusHabit}`);
+  }
+
+  if (context.priorMomentumScore !== null && context.momentumDelta !== null) {
+    const direction = context.momentumDelta >= 0 ? "up" : "down";
+    lines.push(
+      `Momentum vs last week: ${context.priorMomentumScore} → ${context.priorMomentumScore + context.momentumDelta} (${direction} ${Math.abs(context.momentumDelta)})`
+    );
+  }
+
+  if (context.isQuietWeek) {
+    lines.push(
+      "Measurable logs were quiet this week — still write a human report using profile, snapshot, and open loops. Do not sound empty or robotic."
+    );
+  }
+
+  return lines.length > 0 ? lines.join("\n\n") : "No reflection snapshot or open loops loaded.";
+}
+
+export function buildQuietWeekFallbackSignal(
+  narrative: WeeklyReportNarrativeContext | undefined
+): string | null {
+  if (!narrative?.isQuietWeek) {
+    return null;
+  }
+
+  if (narrative.openLoops.length > 0) {
+    return `A quiet week on the logs — ${narrative.openLoops[0]} is still live.`;
+  }
+
+  if (narrative.userMindSnapshotPrompt) {
+    const lifeLine = narrative.userMindSnapshotPrompt
+      .split("\n")
+      .find((line) => line.startsWith("Life summary:"))
+      ?.replace(/^Life summary:\s*/i, "")
+      .trim();
+
+    if (lifeLine) {
+      return `A quiet week on the logs — ${lifeLine.charAt(0).toLowerCase()}${lifeLine.slice(1)} still counts.`;
+    }
+  }
+
+  if (narrative.weeklyFocusHabit) {
+    return `A quiet week on the logs — your focus (${narrative.weeklyFocusHabit}) still matters.`;
+  }
+
+  return "A quiet week on the logs — the pattern still matters.";
+}
+
+async function buildWeeklyReportNarrativeContext(input: {
+  user: MauriUser;
+  window: ReportWindow;
+  summary: WeeklyDiagnosticSummary;
+}): Promise<WeeklyReportNarrativeContext> {
+  const [mindRecord, pendingFollowUps, priorReportResult] = await Promise.all([
+    getUserMindSnapshot(input.user.id).catch(() => null),
+    listPendingFollowUpsForUser(input.user.id).catch(() => []),
+    supabase
+      .from("weekly_reports")
+      .select("summary_json")
+      .eq("user_id", input.user.id)
+      .lt("week_end", input.window.weekStart)
+      .order("week_end", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  ]);
+
+  if (priorReportResult.error) {
+    throw new Error(`Failed to load prior weekly report: ${priorReportResult.error.message}`);
+  }
+
+  const priorSummary = priorReportResult.data?.summary_json as WeeklyDiagnosticSummary | undefined;
+  const priorMomentumScore =
+    priorSummary && typeof priorSummary.momentum_score === "number" ? priorSummary.momentum_score : null;
+  const momentumDelta =
+    priorMomentumScore !== null ? input.summary.momentum_score - priorMomentumScore : null;
+
+  const snapshotLoops = mindRecord?.snapshot.open_loops ?? [];
+  const followUpLoops = pendingFollowUps.map((followUp) => followUp.loop_text);
+  const openLoops = [...new Set([...snapshotLoops, ...followUpLoops])].slice(0, 8);
+
+  return {
+    userMindSnapshotPrompt: mindRecord ? formatUserMindSnapshotForPrompt(mindRecord.snapshot) : null,
+    openLoops,
+    weeklyFocusHabit: input.user.weekly_focus_habit,
+    momentumDelta,
+    priorMomentumScore,
+    isQuietWeek: isQuietReportWeek(input.summary)
+  };
 }
 
 function utcMidnight(date: Date): Date {
@@ -93,7 +216,11 @@ function computeMomentumScore(summary: Omit<WeeklyDiagnosticSummary, "momentum_s
   return Math.max(0, Math.min(100, Math.round(financeSignal + habitSignal + todoSignal + emotionalSignal)));
 }
 
-function buildFallbackReport(user: MauriUser, summary: WeeklyDiagnosticSummary): string {
+function buildFallbackReport(
+  user: MauriUser,
+  summary: WeeklyDiagnosticSummary,
+  narrative?: WeeklyReportNarrativeContext
+): string {
   const name = user.first_name?.trim() || "You";
   const highlights: string[] = [];
 
@@ -111,10 +238,11 @@ function buildFallbackReport(user: MauriUser, summary: WeeklyDiagnosticSummary):
     highlights.push(`${summary.todos.completed_count} tasks done, ${summary.todos.open_count} still open`);
   }
 
+  const quietSignal = buildQuietWeekFallbackSignal(narrative);
   const signal =
     highlights.length > 0
       ? highlights.join(" · ")
-      : "A quiet week on the logs — the pattern still matters.";
+      : quietSignal ?? "A quiet week on the logs — the pattern still matters.";
 
   const closer = summary.trial_cliffhanger
     ? "The deeper pattern is getting clearer. That layer locks when trial ends."
@@ -332,6 +460,8 @@ export async function generateWeeklyDiagnosticReport(input: {
   const summary = await buildWeeklyDiagnosticSummary(user, window);
   const userMindFacts = await loadUserMindFacts(user.id);
   const userMindPrompt = formatUserMindForPrompt(userMindFacts);
+  const narrative = await buildWeeklyReportNarrativeContext({ user, window, summary });
+  const narrativePrompt = buildWeeklyReportNarrativePrompt(narrative);
   const feedbackPrompt = await buildWeeklyFeedbackPromptContext({
     user,
     window: { weekStart: window.weekStart, weekEnd: window.weekEnd },
@@ -343,11 +473,12 @@ export async function generateWeeklyDiagnosticReport(input: {
     reportText = await generateWeeklyDiagnosticCopy({
       user,
       summary,
-      userMindPrompt
+      userMindPrompt,
+      narrativePrompt
     });
   } catch (error) {
     logger.warn({ error, userId: user.id }, "Falling back to deterministic weekly report copy.");
-    reportText = buildFallbackReport(user, summary);
+    reportText = buildFallbackReport(user, summary, narrative);
   }
 
   reportText = finalizeMauriGeneratedReply({

@@ -23,6 +23,11 @@ import {
 import { buildHelpFocusPromptForUser } from "./help-focus.service.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
 import {
+  messageRouterExtractionJsonSchema,
+  messageRouterExtractionSchema,
+  type MessageRouterExtraction
+} from "../schemas/message-router.js";
+import {
   localAlertClassificationJsonSchema,
   localAlertClassificationSchema,
   type LocalAlertClassification
@@ -242,6 +247,47 @@ ${message}
   const parsed = parseStructuredJson(rawJson);
 
   return mauriBrainDumpSchema.parse(parsed);
+}
+
+export async function routeInboundMessage(input: {
+  message: string;
+  existingFactsSummary?: string | undefined;
+}): Promise<MessageRouterExtraction> {
+  const factsBlock = input.existingFactsSummary?.trim()
+    ? `Known profile facts:\n${input.existingFactsSummary}`
+    : "No profile facts loaded.";
+
+  const routingPrompt = `
+You are Mauri's message router for a Mauritian lifestyle companion on WhatsApp.
+Classify the inbound message and extract only what the user clearly stated.
+
+Rules:
+- Return a single JSON object matching the schema.
+- intent "chat_only" — vent, question, banter, no measurable log or profile change.
+- intent "structured_log" — finance, habit, todo, or emotional mood/vent score.
+- intent "profile_delta" — stable life fact changed (job, relationship, goal, stressor).
+- intent "mixed" — both structured logs and profile deltas in one message.
+- Do NOT emit intent "command" — explicit commands are handled elsewhere.
+- Omit structured keys not clearly supported by the message.
+- profile_deltas: category, fact_key (snake_case), fact_value (user voice, concise).
+- todo_completions only when the user clearly marked a task done ("done X", "finished X").
+- confidence "low" if ambiguous; prefer chat_only over guessing.
+- Do not invent amounts, names, or facts.
+
+${factsBlock}
+
+Message:
+${input.message}
+`;
+
+  const rawJson = await callGemini({
+    prompt: routingPrompt,
+    responseMimeType: "application/json",
+    responseSchema: sanitizeGeminiResponseSchema(messageRouterExtractionJsonSchema)
+  });
+  const parsed = parseStructuredJson(rawJson);
+
+  return messageRouterExtractionSchema.parse(parsed);
 }
 
 export async function extractUserMindProfile(message: string): Promise<UserMindExtraction> {
@@ -610,9 +656,11 @@ export async function generateWeeklyDiagnosticCopy(input: {
   user: MauriUser;
   summary: WeeklyDiagnosticSummary;
   userMindPrompt?: string | undefined;
+  narrativePrompt?: string | undefined;
 }): Promise<string> {
   const { user, summary } = input;
   const userMindPrompt = input.userMindPrompt ?? "No explicit person profile yet.";
+  const narrativePrompt = input.narrativePrompt?.trim() || "No reflection snapshot or open loops loaded.";
 
   const prompt = `
 You are Mauri.
@@ -636,11 +684,15 @@ Subscription status: ${user.subscription_status}
 Who this person is:
 ${userMindPrompt}
 
+Living reflection (snapshot, open loops, weekly focus — use especially when logs are quiet):
+${narrativePrompt}
+
 Weekly summary:
 ${JSON.stringify(summary)}
 
 Write a compact weekly diagnostic.
 Reflect what moved, what slipped, and what pattern is quietly shaping their week.
+If logs are empty but profile/snapshot show live stress or goals, name that story — do not call it a blank week.
 If momentum is decent, say it clean.
 If the week was messy, be honest without being harsh.
 If trial_cliffhanger is true, end with a subtle but irresistible cliffhanger that hints deeper tracking gets locked after trial unless they unlock premium.
