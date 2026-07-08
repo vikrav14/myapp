@@ -34,7 +34,7 @@ import {
   seedLifeThreadsFromOnboarding
 } from "./open-loop-follow-up.service.js";
 import { assignHelpFocusFromFacts } from "./help-focus.service.js";
-import { formatHelpFocusLabel } from "./help-focus-inference.service.js";
+import { buildHelpFocusActivationExplanation } from "./help-focus-inference.service.js";
 import { buildHelpFocusPickerInteractive } from "./whatsapp-interactive.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
@@ -83,22 +83,23 @@ async function activateUserExpress(
     (followUp) => followUp.source === "onboarding"
   );
   const threadNote = buildLifeThreadActivationNote(pendingFollowUps);
-  const adviceLine =
-    focusedUser.help_focus_primary && focusedUser.help_focus_secondary
-      ? `For advice I'll lean into ${formatHelpFocusLabel(focusedUser.help_focus_primary)} + ${formatHelpFocusLabel(focusedUser.help_focus_secondary)} — tap below to change, or reply help focus anytime.`
-      : focusedUser.help_focus_primary
-        ? `For advice I'll lean into ${formatHelpFocusLabel(focusedUser.help_focus_primary)} — tap below to change, or reply help focus anytime.`
-        : "Reply help focus anytime to pick what you want advice on.";
+  const adviceLine = buildHelpFocusActivationExplanation({
+    primary: focusedUser.help_focus_primary,
+    secondary: focusedUser.help_focus_secondary,
+    facts
+  });
   const replyParts = [
     buildExpressActivationReply({
       firstName: focusedUser.first_name,
       setup,
       weeklyFocus: focusedUser.weekly_focus_habit ?? "one small win each day",
       facts
-    }),
-    "",
-    adviceLine
+    })
   ];
+
+  if (adviceLine) {
+    replyParts.push("", adviceLine);
+  }
 
   if (threadNote) {
     replyParts.push("", threadNote);
@@ -112,7 +113,8 @@ async function activateUserExpress(
     interactive: buildHelpFocusPickerInteractive({
       firstName: focusedUser.first_name,
       suggestedPrimary: focusedUser.help_focus_primary,
-      suggestedSecondary: focusedUser.help_focus_secondary
+      suggestedSecondary: focusedUser.help_focus_secondary,
+      variant: "activation"
     }),
     sendTextBeforeInteractive: true
   };

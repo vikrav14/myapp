@@ -168,6 +168,7 @@ describe("life thread copy helpers", () => {
     const bridge = buildHeavyShareTrustBridge("Vik");
     expect(bridge).toContain("not just logging this");
     expect(bridge).toContain("stays between us");
+    expect(bridge).toContain("🦤");
     expect(bridge).toContain("check in gently");
     expect(bridge).toContain("When you're ready");
   });

@@ -1,4 +1,5 @@
 import type { UserMindFact } from "../types.js";
+import { mauriSignatureLine } from "../lib/mauri-voice.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY, HELP_FOCUS_CATALOG, HELP_FOCUS_KEYS } from "./help-focus.constants.js";
 import { combinedFactBlob, hasBoundaryGoal, hasFamilyMoneyPressure } from "./profile-inference.service.js";
@@ -55,6 +56,86 @@ export function formatHelpFocusLabel(key: HelpFocusKey | null | undefined): stri
   }
 
   return HELP_FOCUS_BY_KEY[key]?.label ?? key;
+}
+
+export function formatHelpFocusUserLens(key: HelpFocusKey | null | undefined): string | null {
+  if (!key) {
+    return null;
+  }
+
+  return HELP_FOCUS_BY_KEY[key]?.userLens ?? null;
+}
+
+function pickHelpFocusFactHook(
+  facts: UserMindFact[],
+  primary: HelpFocusKey,
+  secondary: HelpFocusKey | null
+): string | null {
+  const blob = combinedFactBlob(facts);
+
+  if (primary === "personal_finance" || secondary === "personal_finance") {
+    if (hasFamilyMoneyPressure(facts)) {
+      return "picked up family money pressure on top of good income";
+    }
+    if (/\b(bank account.*flat|bleeding me dry|loan|wedding.*cost)\b/.test(blob)) {
+      return "picked up money stress from what you shared";
+    }
+  }
+
+  if (primary === "parenting" || secondary === "parenting") {
+    if (/\b(carer|caregiver|special needs|tuition|sandwich)\b/.test(blob)) {
+      return "picked up carer and family-load pressure";
+    }
+  }
+
+  if (primary === "communication" || secondary === "communication") {
+    if (/\b(boundar(y|ies)|say no|guilt trip|selfish)\b/.test(blob)) {
+      return "picked up you want to hold boundaries without the guilt";
+    }
+  }
+
+  if (primary === "relationship" || secondary === "relationship") {
+    if (/\b(mum|dad|fianc|family drama|guilt)\b/.test(blob)) {
+      return "picked up family dynamics weighing on you";
+    }
+  }
+
+  return null;
+}
+
+export function buildHelpFocusActivationExplanation(input: {
+  primary: HelpFocusKey | null;
+  secondary?: HelpFocusKey | null;
+  facts?: UserMindFact[];
+}): string | null {
+  if (!input.primary) {
+    return "Reply help focus anytime to pick what you want advice on.";
+  }
+
+  const labels =
+    input.secondary && input.secondary !== input.primary
+      ? `${formatHelpFocusLabel(input.primary)} + ${formatHelpFocusLabel(input.secondary)}`
+      : formatHelpFocusLabel(input.primary);
+
+  const lenses = [formatHelpFocusUserLens(input.primary), input.secondary ? formatHelpFocusUserLens(input.secondary) : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  const factHook =
+    input.facts && input.facts.length > 0
+      ? pickHelpFocusFactHook(input.facts, input.primary, input.secondary ?? null)
+      : null;
+
+  const whyLine = factHook ? `I ${factHook}.` : "I read that from what you shared.";
+
+  return [
+    `For advice I'll lean into ${labels} — ${whyLine}`,
+    "",
+    `How I'll help: ${lenses}.`,
+    mauriSignatureLine("Classic frameworks woven in — I won't quiz you on book titles."),
+    "",
+    "Tap Pick lane below to confirm or switch. Reply help focus anytime."
+  ].join("\n");
 }
 
 export function inferHelpFocusFromFacts(facts: UserMindFact[]): InferredHelpFocus {
@@ -181,9 +262,16 @@ export function buildHelpFocusStatusReply(input: {
     return `${name} — pick what you want me to help with most. Tap the list below or reply help focus anytime.`;
   }
 
-  if (input.secondary) {
-    return `${name} — I'm leaning into ${formatHelpFocusLabel(input.primary)} and ${formatHelpFocusLabel(input.secondary)} for advice. Reply help focus to change.`;
-  }
+  const labels =
+    input.secondary && input.secondary !== input.primary
+      ? `${formatHelpFocusLabel(input.primary)} + ${formatHelpFocusLabel(input.secondary)}`
+      : formatHelpFocusLabel(input.primary);
 
-  return `${name} — I'm leaning into ${formatHelpFocusLabel(input.primary)} for advice. Reply help focus to change.`;
+  const lenses = [formatHelpFocusUserLens(input.primary), input.secondary ? formatHelpFocusUserLens(input.secondary) : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  return `${name} — advice focus: ${labels}.
+
+How I help: ${lenses}. Reply help focus to change.`;
 }
