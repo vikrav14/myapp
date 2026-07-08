@@ -7,7 +7,7 @@ import {
   normalizeHelpFocusKey
 } from "../src/services/help-focus-inference.service.js";
 import { parseHelpFocusCommand } from "../src/services/help-focus.service.js";
-import { buildHelpFocusPickerInteractive } from "../src/services/whatsapp-interactive.service.js";
+import { buildHelpFocusActivationInteractive, buildHelpFocusPickerInteractive } from "../src/services/whatsapp-interactive.service.js";
 import type { UserMindFact } from "../src/types.js";
 
 function fact(overrides: Partial<UserMindFact> & Pick<UserMindFact, "category" | "fact_value">): UserMindFact {
@@ -42,6 +42,7 @@ describe("help focus inference", () => {
 
   it("normalizes labels and command phrases", () => {
     expect(normalizeHelpFocusKey("Personal Finance")).toBe("personal_finance");
+    expect(parseHelpFocusCommand("help focus confirm")).toEqual({ type: "confirm" });
     expect(parseHelpFocusCommand("help focus")).toEqual({ type: "show" });
     expect(parseHelpFocusCommand("help domain discipline")).toEqual({ type: "set", key: "discipline" });
   });
@@ -99,6 +100,13 @@ describe("help focus inference", () => {
     expect(explanation).toContain("Classic frameworks woven in");
     expect(explanation).toContain("🦤 Classic frameworks woven in");
     expect(explanation).not.toContain("Psychology of Money");
+
+    expect(explanation).toContain("Next message");
+    expect(explanation).toContain("Looks good or Pick lane");
+
+    const activationButtons = buildHelpFocusActivationInteractive({ firstName: "Vik" });
+    expect(activationButtons.buttons?.[0]?.title).toBe("Looks good");
+    expect(activationButtons.buttons?.[1]?.title).toBe("Pick lane");
 
     const picker = buildHelpFocusPickerInteractive({
       firstName: "Vik",

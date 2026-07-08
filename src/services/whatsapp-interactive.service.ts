@@ -36,6 +36,7 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   rate_4: "rate 4",
   rate_5: "rate 5",
   help_focus: "my focus",
+  help_focus_confirm: "help focus confirm",
   help_advice_focus: "help focus",
   help_roast: "roast me",
   help_hype: "hype me",
@@ -356,6 +357,22 @@ export function buildReminderDeliveryInteractive(label: string): WhatsAppInterac
           { id: "reminder_skip", title: "Skip", description: "Skip this ping" }
         ]
       }
+    ]
+  };
+}
+
+export function buildHelpFocusActivationInteractive(input: {
+  firstName?: string | null;
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+
+  return {
+    header: "Advice focus",
+    body: `${name} — happy with that advice lane, or want to switch?`,
+    footer: "Shapes how I counsel — not your 7am brief",
+    buttons: [
+      { id: "help_focus_confirm", title: "Looks good" },
+      { id: "help_advice_focus", title: "Pick lane" }
     ]
   };
 }

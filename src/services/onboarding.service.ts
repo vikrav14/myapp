@@ -35,7 +35,7 @@ import {
 } from "./open-loop-follow-up.service.js";
 import { assignHelpFocusFromFacts } from "./help-focus.service.js";
 import { buildHelpFocusActivationExplanation } from "./help-focus-inference.service.js";
-import { buildHelpFocusPickerInteractive } from "./whatsapp-interactive.service.js";
+import { buildHelpFocusActivationInteractive } from "./whatsapp-interactive.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
 import { updateUserState } from "./user.service.js";
 
@@ -110,11 +110,8 @@ async function activateUserExpress(
     user: focusedUser,
     reply: replyParts.join("\n"),
     outboundFlow: "express_activation",
-    interactive: buildHelpFocusPickerInteractive({
-      firstName: focusedUser.first_name,
-      suggestedPrimary: focusedUser.help_focus_primary,
-      suggestedSecondary: focusedUser.help_focus_secondary,
-      variant: "activation"
+    interactive: buildHelpFocusActivationInteractive({
+      firstName: focusedUser.first_name
     }),
     sendTextBeforeInteractive: true
   };

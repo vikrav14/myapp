@@ -10,6 +10,7 @@ import {
   markOutboundMessageSent
 } from "./outbound-message.service.js";
 import { resolveInteractiveReplyId } from "./whatsapp-interactive.service.js";
+import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
 
 function summarizeInteractiveForLog(interactive: WhatsAppInteractiveOutbound): string {
   if (interactive.buttons?.length) {
@@ -518,9 +519,22 @@ export async function sendMauriReply(
           pairedWithInteractive: true
         }
       });
+      await sleep(OUTBOUND_PAIR_DELAY_MS);
     }
 
-    await sendWhatsAppInteractive(to, payload.interactive, options);
+    try {
+      await sendWhatsAppInteractive(to, payload.interactive, options);
+    } catch (error) {
+      logger.error(
+        { error, to, userId: options?.userId, flow: options?.metadata?.flow },
+        "WhatsApp interactive send failed after text; sending fallback."
+      );
+      await sendWhatsAppMessage(
+        to,
+        "Buttons didn't load — reply help focus to confirm or change your advice lane.",
+        options
+      );
+    }
     return;
   }
 
