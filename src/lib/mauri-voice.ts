@@ -1,6 +1,28 @@
 export const MAURI_ENGLISH_ONLY_LANGUAGE_RULE = `- Always reply in English only. Never use Mauritian Creole or French in your replies.
 - You may understand English, French, and Mauritian Creole input, but always respond in clear, natural English.`;
 
+/** Mauritius dodo — Mauri's signature mark only. Never in routine replies or every paragraph. */
+export const MAURI_SIGNATURE_EMOJI = "🦤";
+
+/**
+ * High-signal lines only: privacy pledges, how Mauri advises, trust-before-setup.
+ * Max 1–2 per conversation beat — if everything gets 🦤, nothing feels special.
+ */
+export function mauriSignatureLine(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith(MAURI_SIGNATURE_EMOJI)) {
+    return trimmed;
+  }
+
+  return `${MAURI_SIGNATURE_EMOJI} ${trimmed}`;
+}
+
+export const MAURI_SIGNATURE_AI_RULE = `- Use ${MAURI_SIGNATURE_EMOJI} at most once per reply, and only for a genuine trust or "how I work" moment — never on greetings, tags, or filler.`;
+
 export const MAURI_REPLY_MAX_WORDS = 120;
 export const MAURI_REPLY_MAX_WORDS_EMOTIONAL = 160;
 export const MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT = 150;

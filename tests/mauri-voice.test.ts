@@ -9,7 +9,9 @@ import {
   MAURI_REPLY_MAX_WORDS,
   MAURI_REPLY_MAX_WORDS_EMOTIONAL,
   MAURI_REPLY_MAX_WORDS_WEEKLY_REPORT,
-  MAURI_TEXT_REPLY_GUARDRAILS
+  MAURI_SIGNATURE_EMOJI,
+  MAURI_TEXT_REPLY_GUARDRAILS,
+  mauriSignatureLine
 } from "../src/lib/mauri-voice.js";
 
 describe("mauri voice rules", () => {
@@ -21,6 +23,14 @@ describe("mauri voice rules", () => {
   it("bundles language rule into text reply guardrails", () => {
     expect(MAURI_TEXT_REPLY_GUARDRAILS).toContain(MAURI_ENGLISH_ONLY_LANGUAGE_RULE);
     expect(MAURI_TEXT_REPLY_GUARDRAILS).toContain(`${MAURI_REPLY_MAX_WORDS} words`);
+  });
+
+  it("prefixes signature lines with the Mauri dodo once", () => {
+    expect(MAURI_SIGNATURE_EMOJI).toBe("🦤");
+    expect(mauriSignatureLine("Classic frameworks woven in — I won't quiz you on book titles.")).toBe(
+      "🦤 Classic frameworks woven in — I won't quiz you on book titles."
+    );
+    expect(mauriSignatureLine("🦤 Already marked.")).toBe("🦤 Already marked.");
   });
 });
 

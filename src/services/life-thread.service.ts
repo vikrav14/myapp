@@ -5,6 +5,7 @@ import {
   LIFE_THREAD_SCHEDULE_DAYS,
   LIFE_THREAD_STAGGER_DAYS
 } from "./life-thread.constants.js";
+import { mauriSignatureLine } from "../lib/mauri-voice.js";
 
 export type LifeThreadKind =
   | "health_wait"
@@ -252,7 +253,7 @@ export function buildHeavyShareTrustBridge(firstName?: string | null): string {
 
   return `I'm not just logging this and moving on, ${name}.
 
-What you shared stays between us 🔒 — not in your 7am brief, not shared anywhere.
+${mauriSignatureLine("What you shared stays between us — not in your 7am brief, not shared anywhere.")}
 
 I'll check in gently on the live stuff and nudge you toward what's next for *you* — small steps, no guilt trips.
 

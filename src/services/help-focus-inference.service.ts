@@ -1,4 +1,5 @@
 import type { UserMindFact } from "../types.js";
+import { mauriSignatureLine } from "../lib/mauri-voice.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY, HELP_FOCUS_CATALOG, HELP_FOCUS_KEYS } from "./help-focus.constants.js";
 import { combinedFactBlob, hasBoundaryGoal, hasFamilyMoneyPressure } from "./profile-inference.service.js";
@@ -130,7 +131,8 @@ export function buildHelpFocusActivationExplanation(input: {
   return [
     `For advice I'll lean into ${labels} — ${whyLine}`,
     "",
-    `How I'll help: ${lenses}. Classic frameworks woven in — I won't quiz you on book titles.`,
+    `How I'll help: ${lenses}.`,
+    mauriSignatureLine("Classic frameworks woven in — I won't quiz you on book titles."),
     "",
     "Tap Pick lane below to confirm or switch. Reply help focus anytime."
   ].join("\n");

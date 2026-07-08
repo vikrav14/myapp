@@ -97,6 +97,7 @@ describe("help focus inference", () => {
     expect(explanation).toContain("Shame-free money habits");
     expect(explanation).toContain("Connection before correction");
     expect(explanation).toContain("Classic frameworks woven in");
+    expect(explanation).toContain("🦤 Classic frameworks woven in");
     expect(explanation).not.toContain("Psychology of Money");
 
     const picker = buildHelpFocusPickerInteractive({
