@@ -432,10 +432,20 @@ export function buildHelpFocusPickerInteractive(input: {
           ? `${name} — for advice I'm leaning into ${formatHelpFocusLabel(input.suggestedPrimary)}. Pick a different lane if you want.`
           : `${name} — what do you want me to help with most?`;
 
-  const rows = buildHelpFocusPickerRows({
-    suggestedPrimary: input.suggestedPrimary,
-    suggestedSecondary: input.suggestedSecondary
-  });
+  const pickerRowInput: {
+    suggestedPrimary?: HelpFocusKey | null;
+    suggestedSecondary?: HelpFocusKey | null;
+  } = {};
+
+  if (input.suggestedPrimary !== undefined) {
+    pickerRowInput.suggestedPrimary = input.suggestedPrimary;
+  }
+
+  if (input.suggestedSecondary !== undefined) {
+    pickerRowInput.suggestedSecondary = input.suggestedSecondary;
+  }
+
+  const rows = buildHelpFocusPickerRows(pickerRowInput);
 
   return {
     header: "Advice focus",
