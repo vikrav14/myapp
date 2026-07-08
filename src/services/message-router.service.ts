@@ -7,6 +7,8 @@ import {
 } from "../schemas/message-router.js";
 import type { MauriBrainDumpExtraction } from "../types.js";
 import type { UserMindSource } from "../types.js";
+import { completeMatchedTodos, persistExtraction } from "./logging.service.js";
+import { upsertUserMindFacts } from "./user-mind.service.js";
 
 export type MessageRouterMode = "off" | "shadow" | "commit";
 
@@ -90,6 +92,55 @@ export function normalizeRouterExtraction(
   }
 
   return normalized;
+}
+
+export function routerToStructuredExtraction(router: MessageRouterExtraction): MauriBrainDumpExtraction {
+  const normalized = normalizeRouterExtraction(router);
+  return normalized.structured ?? {};
+}
+
+export function appendProfileDeltaAck(reply: string, ack: string | null | undefined): string {
+  const trimmedAck = ack?.trim();
+  if (!trimmedAck) {
+    return reply;
+  }
+
+  return `${reply.trim()}\n\n${trimmedAck}`;
+}
+
+export async function commitRouterExtraction(input: {
+  userId: string;
+  router: MessageRouterExtraction;
+}): Promise<{
+  extraction: MauriBrainDumpExtraction;
+  profileDeltaAck: string | null;
+  completedTodoCount: number;
+}> {
+  const normalized = normalizeRouterExtraction(input.router);
+  const extraction = routerToStructuredExtraction(normalized);
+
+  await persistExtraction(input.userId, extraction);
+
+  let completedTodoCount = 0;
+  if (normalized.todo_completions?.length) {
+    completedTodoCount = await completeMatchedTodos({
+      userId: input.userId,
+      taskMatches: normalized.todo_completions.map((completion) => completion.task_match)
+    });
+  }
+
+  if (normalized.profile_deltas?.length) {
+    await upsertUserMindFacts({
+      userId: input.userId,
+      rows: profileDeltasToFactRows(normalized.profile_deltas)
+    });
+  }
+
+  return {
+    extraction,
+    profileDeltaAck: buildProfileDeltaAck(normalized.profile_deltas),
+    completedTodoCount
+  };
 }
 
 export function mergeStructuredExtractions(
