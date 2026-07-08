@@ -1,10 +1,13 @@
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
+import { env } from "../lib/env.js";
 import { MAURI_SMART_ADVICE_VALUE_LINE, mauriSignatureLine } from "../lib/mauri-voice.js";
+import type { ProfileDelta } from "../schemas/message-router.js";
+import { messageRouterExtractionSchema } from "../schemas/message-router.js";
 import type { UserMindExtraction } from "../schemas/user-mind.js";
 import type { MauriUser, UserMindFact, UserMindSource } from "../types.js";
 import { buildArchetypeLaneList } from "./archetype-catalog.js";
-import { extractUserMindProfile, generateKnowYouAcknowledgement } from "./ai.service.js";
+import { extractUserMindProfile, generateKnowYouAcknowledgement, routeInboundMessage } from "./ai.service.js";
 import { cancelPendingOpenLoopFollowUps } from "./open-loop-follow-up.service.js";
 
 function slugifyKey(value: string): string {
@@ -91,6 +94,23 @@ export function extractionToFactRows(
   }
 
   return rows;
+}
+
+export function profileDeltasToFactRows(
+  deltas: ProfileDelta[],
+  source: UserMindSource = "inferred"
+): Array<{
+  category: string;
+  fact_key: string;
+  fact_value: string;
+  source: UserMindSource;
+}> {
+  return deltas.map((delta) => ({
+    category: delta.category,
+    fact_key: delta.fact_key,
+    fact_value: delta.fact_value,
+    source
+  }));
 }
 
 export async function loadUserMindFacts(userId: string): Promise<UserMindFact[]> {
@@ -395,6 +415,24 @@ export async function ingestUserMindMessage(input: {
   message: string;
   source: UserMindSource;
 }): Promise<UserMindFact[]> {
+  if (env.MESSAGE_ROUTER_MODE === "commit") {
+    try {
+      const routerRaw = await routeInboundMessage({
+        message: input.message,
+        mode: "onboarding"
+      });
+      const normalized = messageRouterExtractionSchema.parse(routerRaw);
+      if (normalized.confidence !== "low" && normalized.profile_deltas?.length) {
+        const rows = profileDeltasToFactRows(normalized.profile_deltas, input.source);
+        if (rows.length >= 2) {
+          return upsertUserMindFacts({ userId: input.userId, rows });
+        }
+      }
+    } catch (error) {
+      logger.warn({ error, userId: input.userId }, "Know-you router ingest failed; falling back to legacy extractor.");
+    }
+  }
+
   const extraction = await extractUserMindProfile(input.message);
   const rows = extractionToFactRows(extraction, input.source);
   return upsertUserMindFacts({ userId: input.userId, rows });

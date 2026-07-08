@@ -43,7 +43,7 @@ export const messageRouterConfidenceSchema = z.enum(["high", "medium", "low"]);
 export const messageRouterExtractionSchema = z.object({
   intent: messageRouterIntentSchema,
   structured: mauriBrainDumpSchema.optional(),
-  profile_deltas: z.array(profileDeltaSchema).max(12).optional(),
+  profile_deltas: z.array(profileDeltaSchema).max(24).optional(),
   todo_completions: z.array(todoCompletionSchema).max(5).optional(),
   open_loop_hint: z.string().min(1).max(300).optional(),
   confidence: messageRouterConfidenceSchema.optional()

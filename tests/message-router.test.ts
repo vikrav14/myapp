@@ -7,9 +7,9 @@ import {
   hasMaterialProfileDeltas,
   mergeStructuredExtractions,
   normalizeRouterExtraction,
-  profileDeltasToFactRows,
   routerToStructuredExtraction
 } from "../src/services/message-router.service.js";
+import { profileDeltasToFactRows } from "../src/services/user-mind.service.js";
 
 describe("message router schema", () => {
   it("parses a mixed extraction payload", () => {
