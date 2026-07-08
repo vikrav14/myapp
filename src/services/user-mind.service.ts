@@ -144,26 +144,19 @@ export function formatUserMindForPrompt(facts: UserMindFact[]): string {
 export function buildKnowYouPrompt(user: MauriUser): string {
   const name = user.first_name?.trim() || "there";
 
-  return `Hey ${name} 👋 I'm Mauri — your week in WhatsApp, not another chatbot tab.
+  return `Hey ${name} 👋 I'm Mauri — here to help you make sense of your week, right from WhatsApp.
 
-Before I track anything, I want to know you like a friend would — not like a blank ChatGPT thread that resets tomorrow.
+Before I track anything, I want to know you like a friend who's around all week — not ChatGPT that resets tomorrow. I stay here, remember what matters, and help you spot patterns over time.
 
-How I'm different:
-🧠 You tell me once — I remember *you*, not just this chat.
-💬 Personal stuff (family, health waits, what's heavy) stays separate from your 7am brief.
-🔔 I follow up when something's live — not random guilt-trip habit lectures.
-🌙 While you sleep, I run off-peak reflection on your week — habits, money, what you shared — so tomorrow's 7am brief and check-ins land prepared, not cold-start.
+What that looks like week to week:
+🌅 7am brief — traffic, weather, stories matched to you (personal stuff never in that)
+📊 Sunday report — roast me or hype me on how the week actually landed
+🔔 Gentle follow-ups when something's live · reminders when you ask
+💸 Receipt snaps · payday runway · brain dumps in plain chat
 
-Most AI bots give everyone the same pep talk. Mauri is built for *your* week in Mauritius — rent, commute, family load, the messy middle.
+Squads, calendar sync, local alerts — reply help anytime for the full menu.
 
-What you unlock (examples — reply help anytime for the full menu):
-🌅 7am brief — traffic, weather, your tags
-⏰ "remind me to call mum at 6pm" · my reminders
-📅 calendar add dentist Tue 10am · my calendar (iCal sync when you're ready)
-📊 Sunday report — roast me / hype me from your week
-👥 Squads — mates accountability, weekly pacts, no group-chat drama
-💸 Snap receipts · my runway till payday
-🗣️ Brain dumps anytime — I pull out habits, spend, stress from plain chat
+Most Mauritians use me for rent pressure, family load, commute chaos — the messy middle. I'll tune to yours once I know you.
 
 30-second voice note is perfect. Rough is fine. Tell me whatever comes to mind:
 
