@@ -3,7 +3,16 @@ import { Router } from "express";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { getRequestId } from "../lib/request-tracing.js";
-import { extractStructuredContext, generateConversationalReply } from "../services/ai.service.js";
+import {
+  extractStructuredContext,
+  generateConversationalReply,
+  routeInboundMessage
+} from "../services/ai.service.js";
+import {
+  logShadowRouterComparison,
+  normalizeRouterExtraction,
+  shouldRunMessageRouterShadow
+} from "../services/message-router.service.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
 import { completeInboundEvent, registerInboundEvent } from "../services/inbound-event.service.js";
@@ -914,7 +923,28 @@ whatsappRouter.post("/", async (request, response, next) => {
     } catch (error) {
       logger.warn({ error, userId: user.id }, "Failed to store inbound conversation memory.");
     }
-    const extraction = await extractStructuredContext(normalizedMessageText);
+    const shadowRouterEnabled = shouldRunMessageRouterShadow();
+    const [extraction, routerRaw] = await Promise.all([
+      extractStructuredContext(normalizedMessageText),
+      shadowRouterEnabled
+        ? routeInboundMessage({
+            message: normalizedMessageText,
+            existingFactsSummary: context.userMindPrompt
+          }).catch((error) => {
+            logger.warn({ error, userId: user.id }, "Message router shadow call failed.");
+            return null;
+          })
+        : Promise.resolve(null)
+    ]);
+
+    if (shadowRouterEnabled && routerRaw) {
+      logShadowRouterComparison({
+        userId: user.id,
+        messagePreview: normalizedMessageText,
+        legacy: extraction,
+        router: normalizeRouterExtraction(routerRaw)
+      });
+    }
 
     await persistExtraction(user.id, extraction);
     await runSquadRelayAfterExtraction({
