@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockBuildLockedReplyForUser = vi.fn();
+const mockBuildPaywallReplyForUser = vi.fn();
 const mockUpdateUserState = vi.fn();
 
 vi.mock("../src/services/paywall.service.js", () => ({
-  buildLockedReplyForUser: mockBuildLockedReplyForUser
+  buildPaywallReplyForUser: mockBuildPaywallReplyForUser
 }));
 
 vi.mock("../src/services/user.service.js", () => ({
@@ -34,7 +34,7 @@ const baseUser = {
 describe("enforceAccessPolicy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockBuildLockedReplyForUser.mockResolvedValue("Vault locked. Pay to unlock.");
+    mockBuildPaywallReplyForUser.mockResolvedValue({ text: "Vault locked. Pay to unlock." });
   });
 
   it("allows active trial users through", async () => {
@@ -44,7 +44,7 @@ describe("enforceAccessPolicy", () => {
     });
 
     expect(result.handled).toBe(false);
-    expect(mockBuildLockedReplyForUser).not.toHaveBeenCalled();
+    expect(mockBuildPaywallReplyForUser).not.toHaveBeenCalled();
   });
 
   it("locks expired trial users and returns a paywall reply", async () => {
@@ -70,9 +70,10 @@ describe("enforceAccessPolicy", () => {
         subscription_status: "Locked"
       })
     );
-    expect(mockBuildLockedReplyForUser).toHaveBeenCalledWith(
+    expect(mockBuildPaywallReplyForUser).toHaveBeenCalledWith(
       expect.objectContaining({ subscription_status: "Locked" }),
-      "req-lock-1"
+      "req-lock-1",
+      "locked"
     );
   });
 
@@ -88,6 +89,6 @@ describe("enforceAccessPolicy", () => {
 
     expect(result.handled).toBe(true);
     expect(mockUpdateUserState).not.toHaveBeenCalled();
-    expect(mockBuildLockedReplyForUser).toHaveBeenCalled();
+    expect(mockBuildPaywallReplyForUser).toHaveBeenCalled();
   });
 });

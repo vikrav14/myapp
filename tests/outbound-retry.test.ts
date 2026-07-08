@@ -13,7 +13,7 @@ const mockMarkOutboundMessageSent = vi.fn();
 vi.mock("../src/services/whatsapp.service.js", () => ({
   deliverWhatsAppText: mockDeliverWhatsAppText,
   deliverWhatsAppInteractive: mockDeliverWhatsAppInteractive,
-  humanTextFromInteractiveLogBody: (body: string) => body.replace(/^\[interactive:(?:list|buttons)\]\s*/, "").trim(),
+  humanTextFromInteractiveLogBody: (body: string) => body.replace(/^\[interactive:(?:list|buttons|cta_url)\]\s*/, "").trim(),
   parseStoredInteractivePayload: (metadata: Record<string, unknown> | null | undefined) =>
     metadata?.interactive_payload ?? null
 }));

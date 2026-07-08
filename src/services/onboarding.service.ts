@@ -1,6 +1,6 @@
-import type { MauriModuleKey, MauriUser, WhatsAppInteractiveOutbound } from "../types.js";
+import type { MauriModuleKey, MauriUser, WhatsAppImageOutbound, WhatsAppInteractiveOutbound } from "../types.js";
 
-import { buildLockedReplyForUser } from "./paywall.service.js";
+import { buildPaywallReplyForUser } from "./paywall.service.js";
 import { buildExpressStartInteractive } from "./whatsapp-interactive.service.js";
 import {
   buildExpressActivationReply,
@@ -37,12 +37,15 @@ import { assignHelpFocusFromFacts } from "./help-focus.service.js";
 import { buildHelpFocusActivationExplanation } from "./help-focus-inference.service.js";
 import { buildHelpFocusActivationInteractive } from "./whatsapp-interactive.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
+import { buildWelcomeImagePayload } from "./rich-media.service.js";
 import { updateUserState } from "./user.service.js";
 
 export interface OnboardingResult {
   handled: boolean;
   reply?: string | undefined;
   interactive?: WhatsAppInteractiveOutbound | undefined;
+  secondaryInteractive?: WhatsAppInteractiveOutbound | undefined;
+  image?: WhatsAppImageOutbound | undefined;
   sendTextBeforeInteractive?: boolean | undefined;
   outboundFlow?: string | undefined;
   user: MauriUser;
@@ -208,18 +211,28 @@ export async function enforceAccessPolicy(
       locked_at: new Date().toISOString()
     });
 
+    const paywallReply = await buildPaywallReplyForUser(updatedPaidUser, requestId, "locked");
+
     return {
       handled: true,
       user: updatedPaidUser,
-      reply: await buildLockedReplyForUser(updatedPaidUser, requestId)
+      reply: paywallReply.text,
+      interactive: paywallReply.interactive,
+      secondaryInteractive: paywallReply.secondaryInteractive,
+      sendTextBeforeInteractive: paywallReply.sendTextBeforeInteractive
     };
   }
 
   if (user.subscription_status === "Locked") {
+    const paywallReply = await buildPaywallReplyForUser(user, requestId, "locked");
+
     return {
       handled: true,
       user,
-      reply: await buildLockedReplyForUser(user, requestId)
+      reply: paywallReply.text,
+      interactive: paywallReply.interactive,
+      secondaryInteractive: paywallReply.secondaryInteractive,
+      sendTextBeforeInteractive: paywallReply.sendTextBeforeInteractive
     };
   }
 
@@ -243,10 +256,15 @@ export async function enforceAccessPolicy(
     locked_at: new Date().toISOString()
   });
 
+  const paywallReply = await buildPaywallReplyForUser(updatedUser, requestId, "locked");
+
   return {
     handled: true,
     user: updatedUser,
-    reply: await buildLockedReplyForUser(updatedUser, requestId)
+    reply: paywallReply.text,
+    interactive: paywallReply.interactive,
+    secondaryInteractive: paywallReply.secondaryInteractive,
+    sendTextBeforeInteractive: paywallReply.sendTextBeforeInteractive
   };
 }
 
@@ -292,7 +310,9 @@ export async function handleOnboardingMessage(input: {
       return {
         handled: true,
         user,
-        reply: buildKnowYouPrompt(user)
+        reply: buildKnowYouPrompt(user),
+        image: input.isNewUser ? buildWelcomeImagePayload(user) ?? undefined : undefined,
+        outboundFlow: "know_you_welcome"
       };
     }
 
@@ -352,6 +372,8 @@ export async function handleOnboardingMessage(input: {
   return {
     handled: true,
     user,
-    reply: buildKnowYouPrompt(user)
+    reply: buildKnowYouPrompt(user),
+    image: input.isNewUser ? buildWelcomeImagePayload(user) ?? undefined : undefined,
+    outboundFlow: "know_you_welcome"
   };
 }

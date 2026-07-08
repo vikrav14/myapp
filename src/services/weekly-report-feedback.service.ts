@@ -30,7 +30,7 @@ function weeksSince(date: Date, reference = new Date()): number {
   return daysBetween(date, reference) / 7;
 }
 
-function weekActivityScore(summary: WeeklyDiagnosticSummary): number {
+export function weekActivityScore(summary: WeeklyDiagnosticSummary): number {
   return (
     summary.finance.entry_count +
     summary.habits.total_logs +

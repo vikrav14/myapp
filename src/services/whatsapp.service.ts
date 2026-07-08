@@ -1,6 +1,6 @@
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
-import type { InboundMessage, WhatsAppInteractiveOutbound } from "../types.js";
+import type { InboundMessage, MauriReplyPayload, WhatsAppInteractiveOutbound } from "../types.js";
 import {
   appendOutboundMessageMetadata,
   createOutboundMessage,
@@ -12,8 +12,13 @@ import {
 } from "./outbound-message.service.js";
 import { resolveInteractiveReplyId } from "./whatsapp-interactive.service.js";
 import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
+import { isRichMediaEnabled } from "./rich-media.service.js";
 
 function summarizeInteractiveForLog(interactive: WhatsAppInteractiveOutbound): string {
+  if (interactive.ctaUrl) {
+    return `[interactive:cta_url] ${interactive.body}`;
+  }
+
   if (interactive.buttons?.length) {
     return `[interactive:buttons] ${interactive.body}`;
   }
@@ -22,7 +27,7 @@ function summarizeInteractiveForLog(interactive: WhatsAppInteractiveOutbound): s
 }
 
 export function humanTextFromInteractiveLogBody(body: string): string | null {
-  const match = body.match(/^\[interactive:(?:list|buttons)\]\s*(.+)$/s);
+  const match = body.match(/^\[interactive:(?:list|buttons|cta_url)\]\s*(.+)$/s);
   return match?.[1]?.trim() ?? null;
 }
 
@@ -43,10 +48,33 @@ export function parseStoredInteractivePayload(
 }
 
 export function isInteractiveLogBody(body: string): boolean {
-  return body.startsWith("[interactive:list]") || body.startsWith("[interactive:buttons]");
+  return (
+    body.startsWith("[interactive:list]") ||
+    body.startsWith("[interactive:buttons]") ||
+    body.startsWith("[interactive:cta_url]")
+  );
 }
 
 function buildInteractivePayload(interactive: WhatsAppInteractiveOutbound): Record<string, unknown> {
+  if (interactive.ctaUrl) {
+    return {
+      type: "interactive",
+      interactive: {
+        type: "cta_url",
+        header: interactive.header ? { type: "text", text: interactive.header } : undefined,
+        body: { text: interactive.body },
+        footer: interactive.footer ? { text: interactive.footer } : undefined,
+        action: {
+          name: "cta_url",
+          parameters: {
+            display_text: interactive.ctaUrl.displayText.slice(0, 20),
+            url: interactive.ctaUrl.url
+          }
+        }
+      }
+    };
+  }
+
   if (interactive.buttons?.length) {
     return {
       type: "interactive",
@@ -537,36 +565,125 @@ export async function sendWhatsAppInteractive(
   return { outboundId: outbound.id, delivered: false };
 }
 
+export async function deliverWhatsAppImage(
+  to: string,
+  image: { url: string; caption?: string | undefined }
+): Promise<void> {
+  await postWhatsAppMessage({
+    to,
+    payload: {
+      type: "image",
+      image: {
+        link: image.url,
+        caption: image.caption
+      }
+    }
+  });
+}
+
+export async function sendWhatsAppImage(
+  to: string,
+  image: { url: string; caption?: string | undefined },
+  options?: {
+    userId?: string | null | undefined;
+    requestId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }
+): Promise<void> {
+  const body = image.caption?.trim()
+    ? `[image] ${image.caption}`
+    : `[image] ${image.url}`;
+
+  const outbound = await createOutboundMessage({
+    phoneNumber: to,
+    body,
+    userId: options?.userId ?? null,
+    requestId: options?.requestId,
+    metadata: {
+      ...options?.metadata,
+      rich_media: true,
+      image_url: image.url,
+      image_caption: image.caption ?? null
+    }
+  });
+
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    logger.info({ to, body }, "WhatsApp credentials missing. Image logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return;
+  }
+
+  if (!isRichMediaEnabled()) {
+    logger.info({ to, body }, "WhatsApp rich media disabled. Image logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return;
+  }
+
+  let delivered = false;
+  try {
+    await markOutboundMessageSending(outbound.id);
+    await deliverWhatsAppImage(to, image);
+    delivered = true;
+    await markOutboundMessageSent(outbound.id);
+  } catch (error) {
+    if (delivered) {
+      logger.error(
+        { error, outboundMessageId: outbound.id },
+        "WhatsApp image delivery succeeded but outbound finalization failed."
+      );
+      throw error;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : "Unknown image send error";
+    await markOutboundMessageFailed({
+      messageId: outbound.id,
+      errorMessage
+    });
+    throw error;
+  }
+}
+
 export async function sendMauriReply(
   to: string,
-  payload: { text?: string | undefined; interactive?: WhatsAppInteractiveOutbound | undefined },
+  payload: MauriReplyPayload,
   options?: {
     userId?: string | null | undefined;
     requestId?: string | undefined;
     metadata?: Record<string, unknown> | undefined;
     sendTextBeforeInteractive?: boolean | undefined;
+    secondaryInteractive?: WhatsAppInteractiveOutbound | undefined;
   }
 ): Promise<void> {
-  if (payload.interactive && env.WHATSAPP_INTERACTIVE_ENABLED) {
-    if (options?.sendTextBeforeInteractive && payload.text?.trim()) {
-      await sendWhatsAppMessage(to, payload.text.trim(), {
-        ...options,
-        metadata: {
-          ...options?.metadata,
-          pairedWithInteractive: true
-        }
-      });
+  if (payload.image?.url && isRichMediaEnabled()) {
+    try {
+      await sendWhatsAppImage(to, payload.image, options);
       await sleep(OUTBOUND_PAIR_DELAY_MS);
+    } catch (error) {
+      logger.warn({ error, to, userId: options?.userId }, "Rich media image send failed; continuing with text.");
     }
+  }
 
-    let interactiveResult: { outboundId: string; delivered: boolean } | undefined;
+  const interactiveEnabled = Boolean(payload.interactive && env.WHATSAPP_INTERACTIVE_ENABLED);
+  const textBeforeInteractive = Boolean(options?.sendTextBeforeInteractive && payload.text?.trim());
 
-    interactiveResult = await sendWhatsAppInteractive(to, payload.interactive, options);
+  if (interactiveEnabled && textBeforeInteractive && payload.text) {
+    await sendWhatsAppMessage(to, payload.text.trim(), {
+      ...options,
+      metadata: {
+        ...options?.metadata,
+        pairedWithInteractive: true
+      }
+    });
+    await sleep(OUTBOUND_PAIR_DELAY_MS);
+  }
+
+  if (interactiveEnabled && payload.interactive) {
+    const interactiveResult = await sendWhatsAppInteractive(to, payload.interactive, options);
 
     if (!interactiveResult.delivered) {
       logger.warn(
         { to, userId: options?.userId, flow: options?.metadata?.flow, outboundId: interactiveResult.outboundId },
-        "WhatsApp interactive send failed after text; discarding retry and sending fallback."
+        "WhatsApp interactive send failed; discarding retry and sending fallback."
       );
 
       try {
@@ -578,21 +695,56 @@ export async function sendMauriReply(
         );
       }
 
-      await sendWhatsAppMessage(
-        to,
-        "Reply help focus to confirm or change your advice lane.",
-        options
-      );
+      if (payload.interactive.ctaUrl) {
+        await sendWhatsAppMessage(
+          to,
+          `${payload.interactive.ctaUrl.url}\n\nReply pay anytime if the button didn't show.`,
+          options
+        );
+      } else {
+        await sendWhatsAppMessage(
+          to,
+          "Reply help focus to confirm or change your advice lane.",
+          options
+        );
+      }
+    } else if (options?.secondaryInteractive) {
+      await sleep(OUTBOUND_PAIR_DELAY_MS);
+      const secondaryResult = await sendWhatsAppInteractive(to, options.secondaryInteractive, {
+        ...options,
+        metadata: {
+          ...options?.metadata,
+          pairedSecondaryInteractive: true
+        }
+      });
+
+      if (!secondaryResult.delivered) {
+        try {
+          await discardOutboundMessage(secondaryResult.outboundId);
+        } catch (discardError) {
+          logger.warn({ discardError, outboundId: secondaryResult.outboundId }, "Failed to discard secondary CTA.");
+        }
+
+        if (options.secondaryInteractive.ctaUrl) {
+          await sendWhatsAppMessage(
+            to,
+            `${options.secondaryInteractive.ctaUrl.url}\n\nReply pay blink anytime.`,
+            options
+          );
+        }
+      }
     }
+
+    if (!textBeforeInteractive) {
+      return;
+    }
+
     return;
   }
 
-  if (payload.text) {
-    await sendWhatsAppMessage(to, payload.text, options);
-    return;
+  if (payload.text?.trim()) {
+    await sendWhatsAppMessage(to, payload.text.trim(), options);
   }
-
-  throw new Error("Mauri reply requires text or interactive content.");
 }
 
 export async function sendWhatsAppMessage(

@@ -23,6 +23,7 @@ import { handleUserModuleMessage } from "../services/user-module-command.service
 import { handleProactiveCheckInMessage } from "../services/proactive-checkin.service.js";
 import { handleQuietHoursCommandMessage } from "../services/quiet-hours-command.service.js";
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
+import { handlePaywallMessage } from "../services/paywall.service.js";
 import {
   deliverActivationReactionAck,
   handleActivationReactionMessage
@@ -135,15 +136,24 @@ whatsappRouter.post("/", async (request, response, next) => {
       });
     }
 
-    if (accessPolicyResult.handled && accessPolicyResult.reply) {
-      await sendWhatsAppMessage(inboundMessage.from, accessPolicyResult.reply, {
-        userId: accessPolicyResult.user.id,
-        requestId,
-        metadata: {
-          sourceType: inboundMessage.kind,
-          flow: "access_policy"
+    if (accessPolicyResult.handled && (accessPolicyResult.reply || accessPolicyResult.interactive)) {
+      await sendMauriReply(
+        inboundMessage.from,
+        {
+          text: accessPolicyResult.reply,
+          interactive: accessPolicyResult.interactive
+        },
+        {
+          userId: accessPolicyResult.user.id,
+          requestId,
+          sendTextBeforeInteractive: accessPolicyResult.sendTextBeforeInteractive,
+          secondaryInteractive: accessPolicyResult.secondaryInteractive,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "access_policy"
+          }
         }
-      });
+      );
 
       await respondOk({
         ok: true,
@@ -151,7 +161,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         sourceType: inboundMessage.kind,
         onboardingState: accessPolicyResult.user.onboarding_state,
         subscriptionStatus: accessPolicyResult.user.subscription_status,
-        replyPreview: accessPolicyResult.reply
+        replyPreview: accessPolicyResult.reply ?? accessPolicyResult.interactive?.body
       });
       return;
     }
@@ -296,6 +306,43 @@ whatsappRouter.post("/", async (request, response, next) => {
       return;
     }
 
+    const paywallResult = await handlePaywallMessage({
+      user: accessPolicyResult.user,
+      message: normalizedMessageText,
+      requestId
+    });
+
+    if (paywallResult && (paywallResult.text || paywallResult.interactive)) {
+      await sendMauriReply(
+        inboundMessage.from,
+        {
+          text: paywallResult.text,
+          interactive: paywallResult.interactive
+        },
+        {
+          userId: accessPolicyResult.user.id,
+          requestId,
+          sendTextBeforeInteractive: paywallResult.sendTextBeforeInteractive,
+          secondaryInteractive: paywallResult.secondaryInteractive,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "paywall_command"
+          }
+        }
+      );
+
+      await respondOk({
+        ok: true,
+        userId: accessPolicyResult.user.id,
+        sourceType: inboundMessage.kind,
+        onboardingState: accessPolicyResult.user.onboarding_state,
+        subscriptionStatus: accessPolicyResult.user.subscription_status,
+        transcriptPreview,
+        replyPreview: paywallResult.text ?? paywallResult.interactive?.body
+      });
+      return;
+    }
+
     const helpFocusResult = await handleHelpFocusMessage({
       user: accessPolicyResult.user,
       message: normalizedMessageText
@@ -372,17 +419,19 @@ whatsappRouter.post("/", async (request, response, next) => {
     });
 
     if (onboardingResult.handled) {
-      if (onboardingResult.reply || onboardingResult.interactive) {
+      if (onboardingResult.reply || onboardingResult.interactive || onboardingResult.image) {
         await sendMauriReply(
           inboundMessage.from,
           {
             text: onboardingResult.reply,
-            interactive: onboardingResult.interactive
+            interactive: onboardingResult.interactive,
+            image: onboardingResult.image
           },
           {
             userId: onboardingResult.user.id,
             requestId,
             sendTextBeforeInteractive: onboardingResult.sendTextBeforeInteractive,
+            secondaryInteractive: onboardingResult.secondaryInteractive,
             metadata: {
               sourceType: inboundMessage.kind,
               flow: onboardingResult.outboundFlow ?? "onboarding"
@@ -399,7 +448,7 @@ whatsappRouter.post("/", async (request, response, next) => {
         subscriptionStatus: onboardingResult.user.subscription_status,
         transcriptPreview,
         replyPreview: onboardingResult.reply ?? onboardingResult.interactive?.body,
-        suppressed: !onboardingResult.reply && !onboardingResult.interactive
+        suppressed: !onboardingResult.reply && !onboardingResult.interactive && !onboardingResult.image
       });
       return;
     }
