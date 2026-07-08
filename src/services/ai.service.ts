@@ -252,15 +252,29 @@ ${message}
 export async function routeInboundMessage(input: {
   message: string;
   existingFactsSummary?: string | undefined;
+  mode?: "chat" | "onboarding" | undefined;
 }): Promise<MessageRouterExtraction> {
   const factsBlock = input.existingFactsSummary?.trim()
     ? `Known profile facts:\n${input.existingFactsSummary}`
     : "No profile facts loaded.";
 
+  const onboardingRules =
+    input.mode === "onboarding"
+      ? `
+ONBOARDING MODE — this is the user's first know-you message.
+- intent must be "profile_delta".
+- Extract generously: age, location, work, goals, stressors, relationships, interests, tone, boundaries.
+- Emit many profile_deltas (up to 20) with user-voice fact_value phrases.
+- Use categories: identity, location, life_context, interests, goals, stressors, relationships, preferences, boundaries.
+- fact_key snake_case (preferred_name, area, work, wedding_loan, dad, side_hustle, etc.).
+- Do not invent facts. Omit structured logs unless clearly present in the message.
+`
+      : "";
+
   const routingPrompt = `
 You are Mauri's message router for a Mauritian lifestyle companion on WhatsApp.
 Classify the inbound message and extract only what the user clearly stated.
-
+${onboardingRules}
 Rules:
 - Return a single JSON object matching the schema.
 - intent "chat_only" — vent, question, banter, no measurable log or profile change.

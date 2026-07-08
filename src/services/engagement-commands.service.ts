@@ -2,7 +2,7 @@ import { env } from "../lib/env.js";
 import type { MauriUser, WhatsAppInteractiveOutbound } from "../types.js";
 import { generatePersonalityFeedback } from "./ai.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
-import { buildRecentActivitySnapshot } from "./engagement-stats.service.js";
+import { buildEngagementActivitySnapshot } from "./engagement-stats.service.js";
 import { buildHelpMenu, parseHelpCommand } from "./help-menu.service.js";
 import { buildHabitStreakReply, loadHabitStreakSnapshot } from "./habit-streak.service.js";
 import { buildDailyMicroLesson, buildOnDemandLessonReply } from "./micro-lesson.service.js";
@@ -118,7 +118,7 @@ export async function handleEngagementCommandMessage(input: {
     };
   }
 
-  const snapshot = await buildRecentActivitySnapshot(input.user.id);
+  const snapshot = await buildEngagementActivitySnapshot(input.user.id);
   const reply = await generatePersonalityFeedback({
     user: input.user,
     mode: command.type,

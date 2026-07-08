@@ -6,9 +6,8 @@ import {
   type ProfileDelta
 } from "../schemas/message-router.js";
 import type { MauriBrainDumpExtraction } from "../types.js";
-import type { UserMindSource } from "../types.js";
 import { completeMatchedTodos, persistExtraction } from "./logging.service.js";
-import { upsertUserMindFacts } from "./user-mind.service.js";
+import { profileDeltasToFactRows, upsertUserMindFacts } from "./user-mind.service.js";
 
 export type MessageRouterMode = "off" | "shadow" | "commit";
 
@@ -31,23 +30,6 @@ const MATERIAL_PROFILE_CATEGORIES = new Set<ProfileDelta["category"]>([
   "life_context",
   "location"
 ]);
-
-export function profileDeltasToFactRows(
-  deltas: ProfileDelta[],
-  source: UserMindSource = "inferred"
-): Array<{
-  category: string;
-  fact_key: string;
-  fact_value: string;
-  source: UserMindSource;
-}> {
-  return deltas.map((delta) => ({
-    category: delta.category,
-    fact_key: delta.fact_key,
-    fact_value: delta.fact_value,
-    source
-  }));
-}
 
 export function hasMaterialProfileDeltas(deltas: ProfileDelta[] | undefined): boolean {
   if (!deltas?.length) {

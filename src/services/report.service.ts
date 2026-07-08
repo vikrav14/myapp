@@ -17,6 +17,7 @@ import { recordAuditEventBestEffort } from "./audit.service.js";
 import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
 import {
   buildSundayImagePayload,
+  buildReportWebUrl,
   shouldSendSundayReportImage
 } from "./rich-media.service.js";
 import { buildTrialCliffhangerPaymentReply } from "./paywall.service.js";
@@ -503,6 +504,9 @@ export async function generateWeeklyDiagnosticReport(input: {
     }
   }
 
+  const reportWebUrl = buildReportWebUrl({ userId: user.id, weekStart: window.weekStart });
+  const deliveryText = reportWebUrl ? `${reportText.trim()}\n\n📊 Full report: ${reportWebUrl}` : reportText;
+
   let deliveryStatus = sendMessage ? "queued" : "stored_only";
   let sentAt: string | undefined;
 
@@ -534,7 +538,7 @@ export async function generateWeeklyDiagnosticReport(input: {
         user.phone_number,
         {
           image: sundayImage ?? undefined,
-          text: reportText
+          text: deliveryText
         },
         {
           userId: user.id,

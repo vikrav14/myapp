@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGeneratePersonalityFeedback = vi.fn();
-const mockBuildRecentActivitySnapshot = vi.fn();
+const mockBuildEngagementActivitySnapshot = vi.fn();
 const mockLoadHabitStreakSnapshot = vi.fn();
 const mockBuildDailyMicroLesson = vi.fn();
 const mockHasEngagementDelivery = vi.fn();
@@ -12,7 +12,7 @@ vi.mock("../src/services/ai.service.js", () => ({
 }));
 
 vi.mock("../src/services/engagement-stats.service.js", () => ({
-  buildRecentActivitySnapshot: mockBuildRecentActivitySnapshot
+  buildEngagementActivitySnapshot: mockBuildEngagementActivitySnapshot
 }));
 
 vi.mock("../src/services/habit-streak.service.js", () => ({
@@ -60,7 +60,7 @@ const activeUser = {
 describe("handleEngagementCommandMessage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockBuildRecentActivitySnapshot.mockResolvedValue({
+    mockBuildEngagementActivitySnapshot.mockResolvedValue({
       financeEntries: 2,
       totalSpent: 300,
       habitLogs: 3,

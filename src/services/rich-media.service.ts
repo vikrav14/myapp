@@ -107,6 +107,16 @@ export function buildSundayCardImageUrl(input: { userId: string; weekStart: stri
   return `${base}/media/sunday/${token}.png`;
 }
 
+export function buildReportWebUrl(input: { userId: string; weekStart: string }): string | null {
+  const base = resolvePublicBaseUrl();
+  const token = signSundayCardToken(input);
+  if (!base || !token) {
+    return null;
+  }
+
+  return `${base}/report/${token}`;
+}
+
 export function shouldSendSundayReportImage(input: {
   summary: WeeklyDiagnosticSummary;
   priorReportCount: number;
