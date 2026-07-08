@@ -10,7 +10,9 @@ vi.mock("../src/lib/env.js", () => ({
     MCB_JUICE_PAYMENT_LINK: "https://pay.example.com/juice",
     BLINK_PAYMENT_LINK: "https://pay.example.com/blink",
     PEACH_ENTITY_ID: "test-peach-entity",
-    BLINK_PAYLINK_API_URL: "https://api.blinkpayment.co.uk/api/paylink/v1/paylinks"
+    BLINK_PAYLINK_API_URL: "https://api.blinkpayment.co.uk/api/paylink/v1/paylinks",
+    WHATSAPP_RICH_MEDIA_ENABLED: false,
+    WHATSAPP_INTERACTIVE_ENABLED: false
   }
 }));
 

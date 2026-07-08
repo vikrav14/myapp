@@ -11,7 +11,13 @@ import type {
 import { generateWeeklyDiagnosticCopy, generateWeeklyFeedbackSection } from "./ai.service.js";
 import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
-import { sendWhatsAppMessage, sendWhatsAppInteractive } from "./whatsapp.service.js";
+import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
+import {
+  buildSundayImagePayload,
+  shouldSendSundayReportImage
+} from "./rich-media.service.js";
+import { buildTrialCliffhangerPaymentReply } from "./paywall.service.js";
+import { sendMauriReply, sendWhatsAppInteractive } from "./whatsapp.service.js";
 import {
   buildSundayContextInteractive,
   buildSundayFeedbackInteractive,
@@ -366,22 +372,52 @@ export async function generateWeeklyDiagnosticReport(input: {
     }
   }
 
-  let deliveryStatus = sendMessage ? "generated" : "stored_only";
+  let deliveryStatus = sendMessage ? "queued" : "stored_only";
   let sentAt: string | undefined;
 
   if (sendMessage) {
+    await upsertWeeklyReport({
+      userId: user.id,
+      window,
+      reportText,
+      summary,
+      deliveryStatus,
+      feedbackPrompt: feedbackPrompt.include ? feedbackPrompt : null
+    });
+
     try {
-      await sendWhatsAppMessage(user.phone_number, reportText, {
-        userId: user.id,
-        requestId,
-        metadata: {
-          flow: "weekly_report",
-          weekStart: window.weekStart,
-          weekEnd: window.weekEnd
+      const sundayImage =
+        shouldSendSundayReportImage({
+          summary,
+          priorReportCount: feedbackPrompt.prior_report_count,
+          messageCountThisWeek: feedbackPrompt.message_count_this_week
+        })
+          ? buildSundayImagePayload({
+              user,
+              summary,
+              weekStart: window.weekStart
+            })
+          : null;
+
+      await sendMauriReply(
+        user.phone_number,
+        {
+          image: sundayImage ?? undefined,
+          text: reportText
+        },
+        {
+          userId: user.id,
+          requestId,
+          metadata: {
+            flow: "weekly_report",
+            weekStart: window.weekStart,
+            weekEnd: window.weekEnd
+          }
         }
-      });
+      );
 
       if (useInteractiveFeedback) {
+        await sleep(OUTBOUND_PAIR_DELAY_MS);
         const ratingInteractive =
           feedbackPrompt.variant === "rating"
             ? buildSundayRatingInteractive()
@@ -400,6 +436,29 @@ export async function generateWeeklyDiagnosticReport(input: {
               variant: feedbackPrompt.variant
             }
           });
+        }
+      }
+
+      if (summary.trial_cliffhanger) {
+        const cliffhangerPayment = await buildTrialCliffhangerPaymentReply(user, requestId);
+        if (cliffhangerPayment?.text || cliffhangerPayment?.interactive) {
+          await sleep(OUTBOUND_PAIR_DELAY_MS);
+          await sendMauriReply(
+            user.phone_number,
+            {
+              text: cliffhangerPayment.text,
+              interactive: cliffhangerPayment.interactive
+            },
+            {
+              userId: user.id,
+              requestId,
+              sendTextBeforeInteractive: cliffhangerPayment.sendTextBeforeInteractive,
+              secondaryInteractive: cliffhangerPayment.secondaryInteractive,
+              metadata: {
+                flow: "trial_cliffhanger_payment"
+              }
+            }
+          );
         }
       }
 

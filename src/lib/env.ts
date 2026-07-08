@@ -137,7 +137,10 @@ const envSchema = z.object({
   PROACTIVE_CHECKIN_HOUR: z.coerce.number().int().min(0).max(23).default(16),
   PROACTIVE_CHECKIN_MINUTE: z.coerce.number().int().min(0).max(59).default(0),
   RELATIONSHIP_ENGAGEMENT_ENABLED: envBoolean.default(true),
-  RELATIONSHIP_EVENING_CRON: z.string().default("0 19 * * *")
+  RELATIONSHIP_EVENING_CRON: z.string().default("0 19 * * *"),
+  WHATSAPP_RICH_MEDIA_ENABLED: envBoolean.default(true),
+  MAURI_PUBLIC_BASE_URL: optionalSecret,
+  MAURI_WELCOME_IMAGE_URL: optionalSecret
 });
 
 export const env = envSchema.parse(process.env);

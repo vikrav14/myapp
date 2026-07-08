@@ -418,3 +418,30 @@ export function buildHelpFocusPickerInteractive(input: {
     ]
   };
 }
+
+export function buildPaymentCtaInteractive(input: {
+  provider: "juice" | "blink";
+  firstName?: string | null;
+  amountRs: number;
+  checkoutUrl: string;
+  variant?: "locked" | "trial_cliffhanger" | "voluntary";
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+  const providerLabel = input.provider === "juice" ? "Pay with Juice" : "Pay with Blink";
+  const body =
+    input.variant === "trial_cliffhanger"
+      ? `${name} — your trial window is closing. Rs ${input.amountRs}/month keeps memory, runway, and Sunday reports live.`
+      : input.variant === "voluntary"
+        ? `${name} — premium is Rs ${input.amountRs}/month. Tap below when you're ready.`
+        : `${name} — your vault is locked. Rs ${input.amountRs}/month unlocks memory, runway, and Sunday reports.`;
+
+  return {
+    header: "Keep Mauri unlocked",
+    body,
+    footer: "Questions? Just ask. Reply pay anytime.",
+    ctaUrl: {
+      displayText: providerLabel,
+      url: input.checkoutUrl
+    }
+  };
+}

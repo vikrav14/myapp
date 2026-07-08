@@ -14,6 +14,7 @@ import { supabase } from "./lib/supabase.js";
 import { adminRouter } from "./routes/admin.js";
 import { paymentsRouter, paymentWebhooksRouter } from "./routes/payments.js";
 import { reportsRouter } from "./routes/reports.js";
+import { handleSundayCardImageRequest, handleWelcomeImageRequest } from "./routes/media.js";
 import { whatsappRouter } from "./routes/whatsapp.js";
 
 export function createApp(): express.Express {
@@ -67,6 +68,9 @@ export function createApp(): express.Express {
       }
     }
   );
+
+  app.get("/media/welcome.png", handleWelcomeImageRequest);
+  app.get("/media/sunday/:token.png", handleSundayCardImageRequest);
 
   app.use(
     "/internal/admin",

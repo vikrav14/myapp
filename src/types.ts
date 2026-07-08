@@ -469,18 +469,30 @@ export interface WhatsAppListSection {
   rows: WhatsAppListRow[];
 }
 
+export interface WhatsAppCtaUrlButton {
+  displayText: string;
+  url: string;
+}
+
 export interface WhatsAppInteractiveOutbound {
   body: string;
   header?: string | undefined;
   footer?: string | undefined;
   buttons?: WhatsAppReplyButton[] | undefined;
+  ctaUrl?: WhatsAppCtaUrlButton | undefined;
   listButtonLabel?: string | undefined;
   sections?: WhatsAppListSection[] | undefined;
+}
+
+export interface WhatsAppImageOutbound {
+  url: string;
+  caption?: string | undefined;
 }
 
 export interface MauriReplyPayload {
   text?: string | undefined;
   interactive?: WhatsAppInteractiveOutbound | undefined;
+  image?: WhatsAppImageOutbound | undefined;
 }
 
 export interface InboundMessage {
