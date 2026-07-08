@@ -37,8 +37,15 @@ export function parseHelpFocusCommand(
     normalized === "help focus" ||
     normalized === "my help focus" ||
     normalized === "change help focus" ||
-    normalized === "advice focus"
+    normalized === "advice focus" ||
+    normalized === "change your advice lane" ||
+    normalized === "switch advice lane" ||
+    normalized === "pick advice lane"
   ) {
+    return { type: "show" };
+  }
+
+  if (/\b(change|switch|pick)\b/.test(normalized) && /\b(advice|help)\b/.test(normalized) && /\b(focus|lane)\b/.test(normalized)) {
     return { type: "show" };
   }
 

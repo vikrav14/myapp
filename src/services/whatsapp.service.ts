@@ -565,6 +565,41 @@ export async function sendWhatsAppInteractive(
   return { outboundId: outbound.id, delivered: false };
 }
 
+export function buildInteractiveDeliveryFallback(input: {
+  payload: MauriReplyPayload;
+  flow?: string | undefined;
+  textAlreadySent?: boolean | undefined;
+}): string {
+  if (input.payload.interactive?.ctaUrl) {
+    return `${input.payload.interactive.ctaUrl.url}\n\nReply pay anytime if the button didn't show.`;
+  }
+
+  if (input.textAlreadySent) {
+    return "Buttons didn't load — reply help focus, help domain <lane>, or tell me in your own words.";
+  }
+
+  if (input.payload.text?.trim()) {
+    const tail =
+      input.flow === "help_focus"
+        ? "\n\n(List didn't load — reply help domain <lane>, e.g. help domain career.)"
+        : input.flow === "express_activation"
+          ? "\n\n(Buttons didn't load — reply help focus confirm or help focus.)"
+          : "\n\n(Buttons didn't load — just reply in chat.)";
+
+    return `${input.payload.text.trim()}${tail}`;
+  }
+
+  if (input.flow === "help_focus") {
+    return "Reply help focus to see advice lanes, or help domain <lane> — e.g. help domain personal finance.";
+  }
+
+  if (input.flow === "express_activation") {
+    return "Reply help focus confirm to lock your lane, or help focus to switch.";
+  }
+
+  return "Reply help for options.";
+}
+
 export async function deliverWhatsAppImage(
   to: string,
   image: { url: string; caption?: string | undefined }
@@ -695,19 +730,15 @@ export async function sendMauriReply(
         );
       }
 
-      if (payload.interactive.ctaUrl) {
-        await sendWhatsAppMessage(
-          to,
-          `${payload.interactive.ctaUrl.url}\n\nReply pay anytime if the button didn't show.`,
-          options
-        );
-      } else {
-        await sendWhatsAppMessage(
-          to,
-          "Reply help focus to confirm or change your advice lane.",
-          options
-        );
-      }
+      await sendWhatsAppMessage(
+        to,
+        buildInteractiveDeliveryFallback({
+          payload,
+          flow: typeof options?.metadata?.flow === "string" ? options.metadata.flow : undefined,
+          textAlreadySent: textBeforeInteractive
+        }),
+        options
+      );
     } else if (options?.secondaryInteractive) {
       await sleep(OUTBOUND_PAIR_DELAY_MS);
       const secondaryResult = await sendWhatsAppInteractive(to, options.secondaryInteractive, {

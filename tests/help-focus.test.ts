@@ -7,7 +7,7 @@ import {
   normalizeHelpFocusKey
 } from "../src/services/help-focus-inference.service.js";
 import { parseHelpFocusCommand } from "../src/services/help-focus.service.js";
-import { buildHelpFocusActivationInteractive, buildHelpFocusPickerInteractive } from "../src/services/whatsapp-interactive.service.js";
+import { buildHelpFocusActivationInteractive, buildHelpFocusPickerInteractive, buildHelpFocusPickerRows, WHATSAPP_LIST_MAX_ROWS } from "../src/services/whatsapp-interactive.service.js";
 import type { UserMindFact } from "../src/types.js";
 
 function fact(overrides: Partial<UserMindFact> & Pick<UserMindFact, "category" | "fact_value">): UserMindFact {
@@ -44,6 +44,7 @@ describe("help focus inference", () => {
     expect(normalizeHelpFocusKey("Personal Finance")).toBe("personal_finance");
     expect(parseHelpFocusCommand("help focus confirm")).toEqual({ type: "confirm" });
     expect(parseHelpFocusCommand("help focus")).toEqual({ type: "show" });
+    expect(parseHelpFocusCommand("change your advice lane")).toEqual({ type: "show" });
     expect(parseHelpFocusCommand("help domain discipline")).toEqual({ type: "set", key: "discipline" });
   });
 
@@ -117,5 +118,13 @@ describe("help focus inference", () => {
     expect(picker.body).toContain("confirm or switch");
     expect(picker.body).not.toContain("Personal Finance");
     expect(picker.body).not.toContain("Parenting");
+
+    const rows = buildHelpFocusPickerRows({
+      suggestedPrimary: "personal_finance",
+      suggestedSecondary: "parenting"
+    });
+    expect(rows.length).toBeLessThanOrEqual(WHATSAPP_LIST_MAX_ROWS);
+    expect(rows.some((row) => row.id === "help_domain_personal_finance")).toBe(true);
+    expect(rows.some((row) => row.id === "help_domain_parenting")).toBe(true);
   });
 });

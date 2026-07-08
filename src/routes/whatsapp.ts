@@ -358,6 +358,9 @@ whatsappRouter.post("/", async (request, response, next) => {
         {
           userId: (helpFocusResult.user ?? accessPolicyResult.user).id,
           requestId,
+          sendTextBeforeInteractive: Boolean(
+            helpFocusResult.reply?.trim() && helpFocusResult.interactive
+          ),
           metadata: {
             sourceType: inboundMessage.kind,
             flow: "help_focus"
