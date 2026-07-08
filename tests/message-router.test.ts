@@ -7,7 +7,8 @@ import {
   hasMaterialProfileDeltas,
   mergeStructuredExtractions,
   normalizeRouterExtraction,
-  profileDeltasToFactRows
+  profileDeltasToFactRows,
+  routerToStructuredExtraction
 } from "../src/services/message-router.service.js";
 
 describe("message router schema", () => {
@@ -186,5 +187,37 @@ describe("message router helpers", () => {
     });
 
     expect(diff).toContain("router_only:profile_delta.relationships.brother");
+  });
+
+  it("maps router structured output for commit writes", () => {
+    const extraction = routerToStructuredExtraction({
+      intent: "structured_log",
+      structured: {
+        finance: {
+          amount: 8000,
+          category: "family",
+          raw_source_text: "Paid Rs 8k to parents"
+        }
+      },
+      confidence: "high"
+    });
+
+    expect(extraction.finance?.amount).toBe(8000);
+  });
+
+  it("drops structured writes when router confidence is low", () => {
+    const extraction = routerToStructuredExtraction({
+      intent: "mixed",
+      confidence: "low",
+      structured: {
+        finance: {
+          amount: 100,
+          category: "food",
+          raw_source_text: "snack"
+        }
+      }
+    });
+
+    expect(extraction).toEqual({});
   });
 });

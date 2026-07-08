@@ -9,8 +9,11 @@ import {
   routeInboundMessage
 } from "../services/ai.service.js";
 import {
+  appendProfileDeltaAck,
+  commitRouterExtraction,
   logShadowRouterComparison,
   normalizeRouterExtraction,
+  shouldCommitMessageRouterWrites,
   shouldRunMessageRouterShadow
 } from "../services/message-router.service.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
@@ -923,42 +926,71 @@ whatsappRouter.post("/", async (request, response, next) => {
     } catch (error) {
       logger.warn({ error, userId: user.id }, "Failed to store inbound conversation memory.");
     }
+    let extraction: Awaited<ReturnType<typeof extractStructuredContext>>;
+    let profileDeltaAck: string | null = null;
+    const commitRouterEnabled = shouldCommitMessageRouterWrites();
     const shadowRouterEnabled = shouldRunMessageRouterShadow();
-    const [extraction, routerRaw] = await Promise.all([
-      extractStructuredContext(normalizedMessageText),
-      shadowRouterEnabled
-        ? routeInboundMessage({
-            message: normalizedMessageText,
-            existingFactsSummary: context.userMindPrompt
-          }).catch((error) => {
-            logger.warn({ error, userId: user.id }, "Message router shadow call failed.");
-            return null;
-          })
-        : Promise.resolve(null)
-    ]);
 
-    if (shadowRouterEnabled && routerRaw) {
-      logShadowRouterComparison({
-        userId: user.id,
-        messagePreview: normalizedMessageText,
-        legacy: extraction,
-        router: normalizeRouterExtraction(routerRaw)
-      });
+    if (commitRouterEnabled) {
+      try {
+        const routerRaw = await routeInboundMessage({
+          message: normalizedMessageText,
+          existingFactsSummary: context.userMindPrompt
+        });
+        const committed = await commitRouterExtraction({
+          userId: user.id,
+          router: routerRaw
+        });
+        extraction = committed.extraction;
+        profileDeltaAck = committed.profileDeltaAck;
+      } catch (error) {
+        logger.warn({ error, userId: user.id }, "Message router commit failed; falling back to legacy extractor.");
+        extraction = await extractStructuredContext(normalizedMessageText);
+        await persistExtraction(user.id, extraction);
+      }
+    } else {
+      const [legacyExtraction, routerRaw] = await Promise.all([
+        extractStructuredContext(normalizedMessageText),
+        shadowRouterEnabled
+          ? routeInboundMessage({
+              message: normalizedMessageText,
+              existingFactsSummary: context.userMindPrompt
+            }).catch((error) => {
+              logger.warn({ error, userId: user.id }, "Message router shadow call failed.");
+              return null;
+            })
+          : Promise.resolve(null)
+      ]);
+
+      extraction = legacyExtraction;
+
+      if (shadowRouterEnabled && routerRaw) {
+        logShadowRouterComparison({
+          userId: user.id,
+          messagePreview: normalizedMessageText,
+          legacy: legacyExtraction,
+          router: normalizeRouterExtraction(routerRaw)
+        });
+      }
+
+      await persistExtraction(user.id, extraction);
     }
 
-    await persistExtraction(user.id, extraction);
     await runSquadRelayAfterExtraction({
       user,
       extraction,
       requestId
     });
 
-    const reply = await generateConversationalReply({
-      user,
-      message: normalizedMessageText,
-      extraction,
-      context
-    });
+    const reply = appendProfileDeltaAck(
+      await generateConversationalReply({
+        user,
+        message: normalizedMessageText,
+        extraction,
+        context
+      }),
+      profileDeltaAck
+    );
 
     try {
       await storeConversationMemory({

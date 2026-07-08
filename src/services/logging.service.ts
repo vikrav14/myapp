@@ -3,6 +3,97 @@ import { supabase } from "../lib/supabase.js";
 import type { MauriBrainDumpExtraction } from "../types.js";
 import { buildEmotionEmbedding } from "./memory.service.js";
 
+export function matchesTodoTask(taskDescription: string, taskMatch: string): boolean {
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const description = normalize(taskDescription);
+  const match = normalize(taskMatch);
+
+  if (!description || !match) {
+    return false;
+  }
+
+  if (description.includes(match) || match.includes(description)) {
+    return true;
+  }
+
+  const tokens = match.split(" ").filter((token) => token.length > 2);
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  const hits = tokens.filter((token) => description.includes(token));
+  return hits.length >= Math.ceil(tokens.length * 0.6);
+}
+
+export async function completeMatchedTodos(input: {
+  userId: string;
+  taskMatches: string[];
+  lookbackDays?: number | undefined;
+}): Promise<number> {
+  const matches = input.taskMatches.map((taskMatch) => taskMatch.trim()).filter(Boolean);
+  if (matches.length === 0) {
+    return 0;
+  }
+
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - (input.lookbackDays ?? 14));
+
+  const { data, error } = await supabase
+    .from("todo_logs")
+    .select("id, task_description")
+    .eq("user_id", input.userId)
+    .eq("is_completed", false)
+    .gte("created_at", cutoff.toISOString())
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    throw new Error(`Failed to load open todos for completion: ${error.message}`);
+  }
+
+  const openTodos = data ?? [];
+  const completedIds = new Set<string>();
+  const completedAt = new Date().toISOString();
+
+  for (const taskMatch of matches) {
+    const todo = openTodos.find(
+      (row) => !completedIds.has(String(row.id)) && matchesTodoTask(String(row.task_description), taskMatch)
+    );
+
+    if (!todo) {
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from("todo_logs")
+      .update({
+        is_completed: true,
+        completed_at: completedAt
+      })
+      .eq("id", todo.id)
+      .eq("user_id", input.userId)
+      .eq("is_completed", false);
+
+    if (updateError) {
+      logger.warn(
+        { error: updateError, userId: input.userId, todoId: todo.id, taskMatch },
+        "Failed to complete matched todo."
+      );
+      continue;
+    }
+
+    completedIds.add(String(todo.id));
+  }
+
+  return completedIds.size;
+}
+
 export async function persistExtraction(userId: string, extraction: MauriBrainDumpExtraction): Promise<void> {
   const writes: Array<Promise<unknown>> = [];
 
