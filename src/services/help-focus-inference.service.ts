@@ -134,7 +134,7 @@ export function buildHelpFocusActivationExplanation(input: {
     `How I'll help: ${lenses}.`,
     mauriSignatureLine("Classic frameworks woven in — I won't quiz you on book titles."),
     "",
-    "Tap Pick lane below to confirm or switch. Reply help focus anytime."
+    "Next message — tap Looks good or Pick lane. Reply help focus anytime to change later."
   ].join("\n");
 }
 

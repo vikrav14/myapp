@@ -225,7 +225,8 @@ describe("handleOnboardingMessage express flow", () => {
     expect(result.reply).toContain("You're in, Vik");
     expect(result.reply).toContain("7am pulse");
     expect(result.reply).toContain("For advice I'll lean into");
-    expect(result.interactive?.listButtonLabel).toBe("Pick lane");
+    expect(result.interactive?.buttons?.[0]?.title).toBe("Looks good");
+    expect(result.interactive?.buttons?.[1]?.title).toBe("Pick lane");
     expect(result.reply).not.toContain("Corporate / Career shapes");
     expect(mockUpdateUserState).toHaveBeenCalledWith(
       baseUser.id,

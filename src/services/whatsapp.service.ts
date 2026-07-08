@@ -4,12 +4,14 @@ import type { InboundMessage, WhatsAppInteractiveOutbound } from "../types.js";
 import {
   appendOutboundMessageMetadata,
   createOutboundMessage,
+  discardOutboundMessage,
   markOutboundMessageFailed,
   markOutboundMessageSending,
   markOutboundMessageLoggedOnly,
   markOutboundMessageSent
 } from "./outbound-message.service.js";
 import { resolveInteractiveReplyId } from "./whatsapp-interactive.service.js";
+import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
 
 function summarizeInteractiveForLog(interactive: WhatsAppInteractiveOutbound): string {
   if (interactive.buttons?.length) {
@@ -17,6 +19,31 @@ function summarizeInteractiveForLog(interactive: WhatsAppInteractiveOutbound): s
   }
 
   return `[interactive:list] ${interactive.body}`;
+}
+
+export function humanTextFromInteractiveLogBody(body: string): string | null {
+  const match = body.match(/^\[interactive:(?:list|buttons)\]\s*(.+)$/s);
+  return match?.[1]?.trim() ?? null;
+}
+
+export function parseStoredInteractivePayload(
+  metadata: Record<string, unknown> | null | undefined
+): WhatsAppInteractiveOutbound | null {
+  const payload = metadata?.interactive_payload;
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as WhatsAppInteractiveOutbound;
+  if (!candidate.body?.trim()) {
+    return null;
+  }
+
+  return candidate;
+}
+
+export function isInteractiveLogBody(body: string): boolean {
+  return body.startsWith("[interactive:list]") || body.startsWith("[interactive:buttons]");
 }
 
 function buildInteractivePayload(interactive: WhatsAppInteractiveOutbound): Record<string, unknown> {
@@ -450,7 +477,7 @@ export async function sendWhatsAppInteractive(
     requestId?: string | undefined;
     metadata?: Record<string, unknown> | undefined;
   }
-): Promise<void> {
+): Promise<{ outboundId: string; delivered: boolean }> {
   const body = summarizeInteractiveForLog(interactive);
   const outbound = await createOutboundMessage({
     phoneNumber: to,
@@ -459,44 +486,55 @@ export async function sendWhatsAppInteractive(
     requestId: options?.requestId,
     metadata: {
       ...options?.metadata,
-      interactive: true
+      interactive: true,
+      interactive_payload: interactive
     }
   });
 
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
     logger.info({ to, body }, "WhatsApp credentials missing. Interactive reply logged instead of sent.");
     await markOutboundMessageLoggedOnly(outbound.id);
-    return;
+    return { outboundId: outbound.id, delivered: false };
   }
 
   if (!env.WHATSAPP_INTERACTIVE_ENABLED) {
     logger.info({ to, body }, "WhatsApp interactive messages disabled. Logged instead of sent.");
     await markOutboundMessageLoggedOnly(outbound.id);
-    return;
+    return { outboundId: outbound.id, delivered: false };
   }
 
   let delivered = false;
-  try {
-    await markOutboundMessageSending(outbound.id);
-    await deliverWhatsAppInteractive(to, interactive);
-    delivered = true;
-    await markOutboundMessageSent(outbound.id);
-  } catch (error) {
-    if (delivered) {
-      logger.error(
-        { error, outboundMessageId: outbound.id },
-        "WhatsApp interactive delivery succeeded but outbound finalization failed."
-      );
-      throw error;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      await sleep(2000);
     }
 
-    const errorMessage = error instanceof Error ? error.message : "Unknown interactive send error";
-    await markOutboundMessageFailed({
-      messageId: outbound.id,
-      errorMessage
-    });
-    throw error;
+    try {
+      await markOutboundMessageSending(outbound.id);
+      await deliverWhatsAppInteractive(to, interactive);
+      delivered = true;
+      await markOutboundMessageSent(outbound.id);
+      return { outboundId: outbound.id, delivered: true };
+    } catch (error) {
+      lastError = error;
+      if (delivered) {
+        logger.error(
+          { error, outboundMessageId: outbound.id },
+          "WhatsApp interactive delivery succeeded but outbound finalization failed."
+        );
+        throw error;
+      }
+    }
   }
+
+  const errorMessage = lastError instanceof Error ? lastError.message : "Unknown interactive send error";
+  await markOutboundMessageFailed({
+    messageId: outbound.id,
+    errorMessage
+  });
+  return { outboundId: outbound.id, delivered: false };
 }
 
 export async function sendMauriReply(
@@ -518,9 +556,34 @@ export async function sendMauriReply(
           pairedWithInteractive: true
         }
       });
+      await sleep(OUTBOUND_PAIR_DELAY_MS);
     }
 
-    await sendWhatsAppInteractive(to, payload.interactive, options);
+    let interactiveResult: { outboundId: string; delivered: boolean } | undefined;
+
+    interactiveResult = await sendWhatsAppInteractive(to, payload.interactive, options);
+
+    if (!interactiveResult.delivered) {
+      logger.warn(
+        { to, userId: options?.userId, flow: options?.metadata?.flow, outboundId: interactiveResult.outboundId },
+        "WhatsApp interactive send failed after text; discarding retry and sending fallback."
+      );
+
+      try {
+        await discardOutboundMessage(interactiveResult.outboundId);
+      } catch (discardError) {
+        logger.warn(
+          { discardError, outboundId: interactiveResult.outboundId },
+          "Failed to discard failed interactive outbound."
+        );
+      }
+
+      await sendWhatsAppMessage(
+        to,
+        "Reply help focus to confirm or change your advice lane.",
+        options
+      );
+    }
     return;
   }
 

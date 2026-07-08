@@ -1,6 +1,13 @@
 import { logger } from "../lib/logger.js";
-import { deliverWhatsAppText } from "./whatsapp.service.js";
+import type { OutboundMessageRecord } from "../types.js";
 import {
+  deliverWhatsAppInteractive,
+  deliverWhatsAppText,
+  humanTextFromInteractiveLogBody,
+  parseStoredInteractivePayload
+} from "./whatsapp.service.js";
+import {
+  discardOutboundMessage,
   getOutboundMessageById,
   getRetryableOutboundMessages,
   isRetryableStatus,
@@ -8,6 +15,28 @@ import {
   markOutboundMessageRetrying,
   markOutboundMessageSent
 } from "./outbound-message.service.js";
+
+async function deliverRetryableOutbound(message: OutboundMessageRecord): Promise<void> {
+  const interactivePayload = parseStoredInteractivePayload(message.metadata);
+
+  if (interactivePayload) {
+    await deliverWhatsAppInteractive(message.phone_number, interactivePayload);
+    return;
+  }
+
+  if (message.body.startsWith("[interactive:")) {
+    const human = humanTextFromInteractiveLogBody(message.body);
+    await deliverWhatsAppText(
+      message.phone_number,
+      human
+        ? `${human}\n\nReply help focus to pick your advice lane.`
+        : "Reply help focus to pick your advice lane."
+    );
+    return;
+  }
+
+  await deliverWhatsAppText(message.phone_number, message.body);
+}
 
 export async function retryOutboundMessageById(messageId: string): Promise<{
   messageId: string;
@@ -21,11 +50,19 @@ export async function retryOutboundMessageById(messageId: string): Promise<{
     };
   }
 
+  if (message.metadata?.interactive === true && !parseStoredInteractivePayload(message.metadata)) {
+    await discardOutboundMessage(messageId);
+    return {
+      messageId,
+      status: "skipped"
+    };
+  }
+
   await markOutboundMessageRetrying(messageId);
 
   let delivered = false;
   try {
-    await deliverWhatsAppText(message.phone_number, message.body);
+    await deliverRetryableOutbound(message);
     delivered = true;
     await markOutboundMessageSent(messageId);
     return {

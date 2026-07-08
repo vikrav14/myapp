@@ -4,6 +4,7 @@ import {
   buildHelpFocusActivationExplanation,
   buildHelpFocusEnginePrompt,
   buildHelpFocusStatusReply,
+  formatHelpFocusLabel,
   inferHelpFocusFromFacts,
   normalizeHelpFocusKey
 } from "./help-focus-inference.service.js";
@@ -23,8 +24,14 @@ function normalize(message: string): string {
   return message.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-export function parseHelpFocusCommand(message: string): { type: "show" } | { type: "set"; key: HelpFocusKey } | null {
+export function parseHelpFocusCommand(
+  message: string
+): { type: "show" } | { type: "set"; key: HelpFocusKey } | { type: "confirm" } | null {
   const normalized = normalize(message);
+
+  if (normalized === "help focus confirm") {
+    return { type: "confirm" };
+  }
 
   if (
     normalized === "help focus" ||
@@ -108,19 +115,38 @@ export async function handleHelpFocusMessage(input: {
     };
   }
 
-  const updatedUser = await setHelpFocusPrimary(input.user, command.key);
-  const label = HELP_FOCUS_CATALOG.find((entry) => entry.key === command.key)?.label ?? command.key;
+  if (command.type === "confirm") {
+    const labels =
+      input.user.help_focus_primary && input.user.help_focus_secondary
+        ? `${formatHelpFocusLabel(input.user.help_focus_primary)} + ${formatHelpFocusLabel(input.user.help_focus_secondary)}`
+        : input.user.help_focus_primary
+          ? formatHelpFocusLabel(input.user.help_focus_primary)
+          : "your setup";
 
-  return {
-    handled: true,
-    user: updatedUser,
-    reply: `Got it — I'll lean into ${label} when I advise you. Personal stuff still stays out of your 7am brief. Reply help focus anytime to switch.`,
-    interactive: buildHelpFocusPickerInteractive({
-      firstName: updatedUser.first_name,
-      suggestedPrimary: updatedUser.help_focus_primary,
-      suggestedSecondary: updatedUser.help_focus_secondary
-    })
-  };
+    return {
+      handled: true,
+      user: input.user,
+      reply: `Locked in — I'll lean into ${labels} for advice. Reply help focus anytime to switch.`
+    };
+  }
+
+  if (command.type === "set") {
+    const updatedUser = await setHelpFocusPrimary(input.user, command.key);
+    const label = HELP_FOCUS_CATALOG.find((entry) => entry.key === command.key)?.label ?? command.key;
+
+    return {
+      handled: true,
+      user: updatedUser,
+      reply: `Got it — I'll lean into ${label} when I advise you. Personal stuff still stays out of your 7am brief. Reply help focus anytime to switch.`,
+      interactive: buildHelpFocusPickerInteractive({
+        firstName: updatedUser.first_name,
+        suggestedPrimary: updatedUser.help_focus_primary,
+        suggestedSecondary: updatedUser.help_focus_secondary
+      })
+    };
+  }
+
+  return { handled: false };
 }
 
 export { inferHelpFocusFromFacts, buildHelpFocusStatusReply, buildHelpFocusActivationExplanation };

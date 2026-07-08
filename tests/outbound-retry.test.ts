@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockDeliverWhatsAppText = vi.fn();
+const mockDeliverWhatsAppInteractive = vi.fn();
+const mockDiscardOutboundMessage = vi.fn();
 const mockGetOutboundMessageById = vi.fn();
 const mockGetRetryableOutboundMessages = vi.fn();
 const mockIsRetryableStatus = vi.fn();
@@ -9,7 +11,11 @@ const mockMarkOutboundMessageRetrying = vi.fn();
 const mockMarkOutboundMessageSent = vi.fn();
 
 vi.mock("../src/services/whatsapp.service.js", () => ({
-  deliverWhatsAppText: mockDeliverWhatsAppText
+  deliverWhatsAppText: mockDeliverWhatsAppText,
+  deliverWhatsAppInteractive: mockDeliverWhatsAppInteractive,
+  humanTextFromInteractiveLogBody: (body: string) => body.replace(/^\[interactive:(?:list|buttons)\]\s*/, "").trim(),
+  parseStoredInteractivePayload: (metadata: Record<string, unknown> | null | undefined) =>
+    metadata?.interactive_payload ?? null
 }));
 
 vi.mock("../src/services/outbound-message.service.js", () => ({
@@ -18,7 +24,8 @@ vi.mock("../src/services/outbound-message.service.js", () => ({
   isRetryableStatus: mockIsRetryableStatus,
   markOutboundMessageFailed: mockMarkOutboundMessageFailed,
   markOutboundMessageRetrying: mockMarkOutboundMessageRetrying,
-  markOutboundMessageSent: mockMarkOutboundMessageSent
+  markOutboundMessageSent: mockMarkOutboundMessageSent,
+  discardOutboundMessage: mockDiscardOutboundMessage
 }));
 
 const { retryOutboundMessageById, runOutboundMessageRetryLoop } = await import(
@@ -87,6 +94,85 @@ describe("outbound retry service", () => {
       messageId: "message-3",
       errorMessage: "Meta API unavailable"
     });
+  });
+
+  it("retries interactive outbound with stored payload instead of raw log text", async () => {
+    const interactivePayload = {
+      body: "Vik — happy with that advice lane, or want to switch?",
+      buttons: [
+        { id: "help_focus_confirm", title: "Looks good" },
+        { id: "help_advice_focus", title: "Pick lane" }
+      ]
+    };
+
+    mockGetOutboundMessageById.mockResolvedValue({
+      id: "message-interactive",
+      status: "failed",
+      phone_number: "23052222222",
+      body: "[interactive:buttons] Vik — happy with that advice lane, or want to switch?",
+      metadata: {
+        interactive: true,
+        interactive_payload: interactivePayload
+      }
+    });
+    mockIsRetryableStatus.mockReturnValue(true);
+    mockDeliverWhatsAppInteractive.mockResolvedValue(undefined);
+    mockMarkOutboundMessageSent.mockResolvedValue(undefined);
+
+    const result = await retryOutboundMessageById("message-interactive");
+
+    expect(result).toEqual({
+      messageId: "message-interactive",
+      status: "sent"
+    });
+    expect(mockDeliverWhatsAppInteractive).toHaveBeenCalledWith("23052222222", interactivePayload);
+    expect(mockDeliverWhatsAppText).not.toHaveBeenCalled();
+  });
+
+  it("discards legacy interactive logs without stored payload", async () => {
+    mockGetOutboundMessageById.mockResolvedValue({
+      id: "message-legacy",
+      status: "failed",
+      phone_number: "23053333333",
+      body: "[interactive:list] Vik — tap Pick lane to confirm or switch advice focus.",
+      metadata: { interactive: true }
+    });
+    mockIsRetryableStatus.mockReturnValue(true);
+    mockDiscardOutboundMessage.mockResolvedValue(undefined);
+
+    const result = await retryOutboundMessageById("message-legacy");
+
+    expect(result).toEqual({
+      messageId: "message-legacy",
+      status: "skipped"
+    });
+    expect(mockDiscardOutboundMessage).toHaveBeenCalledWith("message-legacy");
+    expect(mockDeliverWhatsAppText).not.toHaveBeenCalled();
+    expect(mockDeliverWhatsAppInteractive).not.toHaveBeenCalled();
+  });
+
+  it("falls back to human text for interactive logs missing payload but not flagged interactive", async () => {
+    mockGetOutboundMessageById.mockResolvedValue({
+      id: "message-fallback",
+      status: "failed",
+      phone_number: "23054444444",
+      body: "[interactive:list] Vik — tap Pick lane to confirm or switch advice focus."
+    });
+    mockIsRetryableStatus.mockReturnValue(true);
+    mockDeliverWhatsAppText.mockResolvedValue(undefined);
+    mockMarkOutboundMessageSent.mockResolvedValue(undefined);
+
+    const result = await retryOutboundMessageById("message-fallback");
+
+    expect(result).toEqual({
+      messageId: "message-fallback",
+      status: "sent"
+    });
+    expect(mockDeliverWhatsAppText).toHaveBeenCalledWith(
+      "23054444444",
+      "Vik — tap Pick lane to confirm or switch advice focus.\n\nReply help focus to pick your advice lane."
+    );
+    expect(mockDeliverWhatsAppInteractive).not.toHaveBeenCalled();
   });
 
   it("aggregates loop results across retryable messages", async () => {
