@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
+import { MAURI_SMART_ADVICE_VALUE_LINE, mauriSignatureLine } from "../lib/mauri-voice.js";
 import type { UserMindExtraction } from "../schemas/user-mind.js";
 import type { MauriUser, UserMindFact, UserMindSource } from "../types.js";
 import { buildArchetypeLaneList } from "./archetype-catalog.js";
@@ -151,6 +152,7 @@ Before I track anything, I want to know you like a friend who's around all week 
 What that looks like week to week:
 🌅 7am brief — traffic, weather, stories matched to you (personal stuff never in that)
 📊 Sunday report — roast me or hype me on how the week actually landed
+${mauriSignatureLine(MAURI_SMART_ADVICE_VALUE_LINE)}
 🔔 Gentle follow-ups when something's live · reminders when you ask
 💸 Receipt snaps · payday runway · brain dumps in plain chat
 

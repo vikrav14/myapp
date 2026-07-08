@@ -275,6 +275,8 @@ describe("user mind helpers", () => {
     expect(prompt).toContain("week to week");
     expect(prompt).toContain("Sunday report");
     expect(prompt).toContain("roast me or hype me");
+    expect(prompt).toContain("one practical next step");
+    expect(prompt).toContain("no book lists");
     expect(prompt).toContain("spot patterns over time");
     expect(prompt).toContain("reply help anytime");
     expect(prompt).toContain("👋");
