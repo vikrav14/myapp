@@ -245,7 +245,7 @@ export function buildExpressStartSummary(input: {
 🔧 Also watching: ${watching}
 📰 Tags: ${formatTopicList(input.setup.topics)}
 
-Here's what makes Mauri different: the more I know you, the sharper I get on *your* next step — not generic bot advice. Personal stuff stays private (never in your 7am pulse). We build the rest together, week by week — that's the relationship other apps don't offer.
+Here's what makes Mauri different: the more I know you, the sharper I get on *your* next step — habits, money, hard calls in plain language, not generic bot advice. Personal stuff stays private (never in your 7am pulse). We build the rest together, week by week — that's the relationship other apps don't offer.
 
 Tap Start my trial below — or reply start.`;
 }

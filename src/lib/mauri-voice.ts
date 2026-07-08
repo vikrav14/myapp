@@ -8,6 +8,10 @@ export const MAURI_SIGNATURE_EMOJI = "🦤";
  * High-signal lines only: privacy pledges, how Mauri advises, trust-before-setup.
  * Max 1–2 per conversation beat — if everything gets 🦤, nothing feels special.
  */
+/** Plain-language flagship — use in know-you / express preview, not insider jargon at activation. */
+export const MAURI_SMART_ADVICE_VALUE_LINE =
+  "Stuck on money, habits, or a hard call? I turn proven thinking into one practical next step for your life — no book lists, no homework.";
+
 export function mauriSignatureLine(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) {
