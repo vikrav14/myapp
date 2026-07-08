@@ -4,6 +4,7 @@ import {
   buildHeavyShareTrustBridge,
   buildLifeThreadActivationNote,
   buildLifeThreadCandidatesFromFacts,
+  humanizeLifeThreadLoopText,
   isHeavyKnowYouShare
 } from "../src/services/life-thread.service.js";
 import { buildHeavyShareArchetypePickerInteractive } from "../src/services/whatsapp-interactive.service.js";
@@ -99,6 +100,17 @@ describe("life thread classification", () => {
     expect(candidates[0]?.loopText).toBe("Potential family drama over helping granddaughter");
     expect(candidates[0]?.loopText).not.toContain("potential_family_drama");
   });
+
+  it("humanizes clinical AI stressor labels for follow-up copy", () => {
+    expect(humanizeLifeThreadLoopText("Emotional manipulation from mother")).toBe(
+      "Mum guilt trips when you push back"
+    );
+    expect(
+      humanizeLifeThreadLoopText(
+        "Experiencing significant financial strain and emotional pressure from family, leading to feelings of bitterness despite a good income."
+      )
+    ).toBe("Family money pressure despite good income");
+  });
 });
 
 describe("heavy know-you detection", () => {
@@ -126,10 +138,22 @@ describe("life thread copy helpers", () => {
     );
     expect(
       buildLifeThreadActivationNote([
-        { loop_text: "Jeshna — awaiting biopsy results" },
-        { loop_text: "Mum — not doing great" }
+        { loop_text: "Emotional manipulation from mother" },
+        {
+          loop_text:
+            "Experiencing significant financial strain and emotional pressure from family, leading to feelings of bitterness despite a good income."
+        }
       ])
-    ).toContain("check-ins");
+    ).toContain("Mum guilt trips");
+    expect(
+      buildLifeThreadActivationNote([
+        { loop_text: "Emotional manipulation from mother" },
+        {
+          loop_text:
+            "Experiencing significant financial strain and emotional pressure from family, leading to feelings of bitterness despite a good income."
+        }
+      ])
+    ).toContain("Family money pressure");
   });
 
   it("builds heavy-share picker with brief-lane button", () => {

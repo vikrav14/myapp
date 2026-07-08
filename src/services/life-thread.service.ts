@@ -123,7 +123,43 @@ function factClassificationBlob(fact: UserMindFact): string {
 }
 
 function factLoopText(fact: UserMindFact): string {
-  return fact.fact_value.replace(/\s+/g, " ").trim();
+  return humanizeLifeThreadLoopText(fact.fact_value.replace(/\s+/g, " ").trim()) ?? "";
+}
+
+const CLINICAL_LOOP_PATTERN =
+  /\b(experiencing|significant|leading to feelings|emotional manipulation from|financial strain and emotional|despite a good income)\b/i;
+
+export function humanizeLifeThreadLoopText(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed.length < 8) {
+    return null;
+  }
+
+  if (!CLINICAL_LOOP_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+
+  const manipulationMatch = trimmed.match(/emotional manipulation from (mother|mum|mom|dad|father|parent)/i);
+  if (manipulationMatch?.[1]) {
+    const raw = manipulationMatch[1].toLowerCase();
+    const who =
+      raw === "mother" || raw === "mom" || raw === "mum"
+        ? "Mum"
+        : raw === "father" || raw === "dad"
+          ? "Dad"
+          : "Family";
+    return `${who} guilt trips when you push back`;
+  }
+
+  if (/financial strain/i.test(trimmed) && /family/i.test(trimmed)) {
+    return "Family money pressure despite good income";
+  }
+
+  if (trimmed.length > 72) {
+    return null;
+  }
+
+  return trimmed;
 }
 
 export function buildLifeThreadCandidatesFromExtraction(
@@ -228,13 +264,18 @@ export function buildLifeThreadActivationNote(threads: Array<{ loop_text: string
     return null;
   }
 
-  if (threads.length === 1) {
-    return `I've got a gentle check-in queued on ${threads[0]!.loop_text} — reply followups off anytime to pause those.`;
+  const previewThreads = threads
+    .map((thread) => humanizeLifeThreadLoopText(thread.loop_text) ?? thread.loop_text.trim())
+    .filter((text) => text.length >= 8)
+    .slice(0, 2);
+
+  if (previewThreads.length === 0) {
+    return null;
   }
 
-  const preview = threads
-    .slice(0, 2)
-    .map((thread) => thread.loop_text)
-    .join("; ");
-  return `I've got gentle check-ins queued (${preview}) — reply followups off anytime to pause those.`;
+  if (previewThreads.length === 1) {
+    return `I've got a gentle check-in queued on ${previewThreads[0]!} — reply followups off anytime to pause those.`;
+  }
+
+  return `I've got gentle check-ins queued (${previewThreads.join("; ")}) — reply followups off anytime to pause those.`;
 }

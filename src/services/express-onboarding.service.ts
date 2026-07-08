@@ -2,7 +2,14 @@ import type { MauriArchetype, MauriModuleKey, MauriUser, MorningBriefTopicKey, U
 import { MODULE_CATALOG } from "./user-modules.constants.js";
 import { defaultTopicsForArchetype, formatTopicList } from "./morning-brief-topics.service.js";
 import { formatModuleLabels, suggestModulesFromFacts } from "./user-modules.service.js";
-import { hasPrivateFinanceSignal, isRetiredOrElderProfile } from "./profile-inference.service.js";
+import {
+  combinedFactBlob,
+  hasBoundaryGoal,
+  hasFamilyMoneyPressure,
+  hasPrivateFinanceSignal,
+  isRemoteWorkerProfile,
+  isRetiredOrElderProfile
+} from "./profile-inference.service.js";
 import { generateExpressSetupQuestionReply } from "./ai.service.js";
 import { formatUserMindForPrompt } from "./user-mind.service.js";
 import { logger } from "../lib/logger.js";
@@ -48,7 +55,14 @@ function isDependentContext(blob: string): boolean {
   return /\b(daughter|son|child|kid|saving for|their uni|their university|her uni|his uni)\b/.test(blob);
 }
 
-export { hasPrivateFinanceSignal, isRetiredOrElderProfile } from "./profile-inference.service.js";
+export {
+  combinedFactBlob,
+  hasBoundaryGoal,
+  hasFamilyMoneyPressure,
+  hasPrivateFinanceSignal,
+  isRemoteWorkerProfile,
+  isRetiredOrElderProfile
+} from "./profile-inference.service.js";
 
 export function isExpressCardEchoMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
@@ -101,7 +115,7 @@ export function inferArchetypeFromFacts(facts: UserMindFact[]): MauriArchetype {
     const blob = factBlob(fact);
 
     if (
-      /\b(finance|corporate|office|job|salary|commute|manager|tech lead|developer|employed|analyst|accountant|ébène|ebene|cybercity|work in)\b/.test(
+      /\b(finance|corporate|office|job|salary|commute|manager|tech lead|developer|dev|remote|employed|analyst|accountant|ébène|ebene|cybercity|work in|eu company)\b/.test(
         blob
       )
     ) {
@@ -156,6 +170,17 @@ export function buildMorningPulseLabel(archetype: MauriArchetype, facts: UserMin
     return "local life + calm routines";
   }
 
+  const remote = isRemoteWorkerProfile(facts);
+  const familyMoney = hasFamilyMoneyPressure(facts);
+
+  if (remote && familyMoney) {
+    return "remote work + money pressure";
+  }
+
+  if (remote) {
+    return "remote work + money + focus";
+  }
+
   const base = MORNING_PULSE_LABELS[archetype] ?? MORNING_PULSE_LABELS["Life & Habit Tracking"];
   const hasMoneyPressure = facts.some((fact) => {
     const blob = factBlob(fact);
@@ -177,6 +202,10 @@ export function buildMorningPulseLabel(archetype: MauriArchetype, facts: UserMin
 function inferTopicsFromFacts(facts: UserMindFact[], archetype: MauriArchetype): MorningBriefTopicKey[] {
   if (isRetiredOrElderProfile(facts)) {
     return ["LocalBuzz", "Money", "Traffic"];
+  }
+
+  if (isRemoteWorkerProfile(facts)) {
+    return ["Tech", "Money", "LocalBuzz"];
   }
 
   if (hasPrivateFinanceSignal(facts)) {
