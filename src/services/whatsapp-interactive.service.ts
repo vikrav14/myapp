@@ -2,6 +2,7 @@ import type { MauriModuleKey, WhatsAppInteractiveOutbound } from "../types.js";
 import { buildArchetypePickerRows } from "./archetype-catalog.js";
 import { HELP_FOCUS_CATALOG } from "./help-focus.constants.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
+import { HELP_FOCUS_BY_KEY } from "./help-focus.constants.js";
 import { formatHelpFocusLabel } from "./help-focus-inference.service.js";
 import { MODULE_CATALOG } from "./user-modules.constants.js";
 
@@ -377,6 +378,42 @@ export function buildHelpFocusActivationInteractive(input: {
   };
 }
 
+export const WHATSAPP_LIST_MAX_ROWS = 10;
+
+export function buildHelpFocusPickerRows(input: {
+  suggestedPrimary?: HelpFocusKey | null;
+  suggestedSecondary?: HelpFocusKey | null;
+}): Array<{ id: string; title: string; description: string }> {
+  const prioritized = [];
+  const seen = new Set<HelpFocusKey>();
+
+  for (const key of [input.suggestedPrimary, input.suggestedSecondary]) {
+    if (!key || seen.has(key)) {
+      continue;
+    }
+
+    prioritized.push(HELP_FOCUS_BY_KEY[key]);
+    seen.add(key);
+  }
+
+  for (const entry of HELP_FOCUS_CATALOG) {
+    if (seen.has(entry.key)) {
+      continue;
+    }
+
+    prioritized.push(entry);
+    if (prioritized.length >= WHATSAPP_LIST_MAX_ROWS) {
+      break;
+    }
+  }
+
+  return prioritized.map((entry) => ({
+    id: `help_domain_${entry.key}`,
+    title: entry.label.slice(0, 24),
+    description: entry.description.slice(0, 72)
+  }));
+}
+
 export function buildHelpFocusPickerInteractive(input: {
   firstName?: string | null;
   suggestedPrimary?: HelpFocusKey | null;
@@ -395,26 +432,21 @@ export function buildHelpFocusPickerInteractive(input: {
           ? `${name} — for advice I'm leaning into ${formatHelpFocusLabel(input.suggestedPrimary)}. Pick a different lane if you want.`
           : `${name} — what do you want me to help with most?`;
 
-  const firstSection = HELP_FOCUS_CATALOG.slice(0, 7).map((entry) => ({
-    id: `help_domain_${entry.key}`,
-    title: entry.label.slice(0, 24),
-    description: entry.description.slice(0, 72)
-  }));
-
-  const secondSection = HELP_FOCUS_CATALOG.slice(7).map((entry) => ({
-    id: `help_domain_${entry.key}`,
-    title: entry.label.slice(0, 24),
-    description: entry.description.slice(0, 72)
-  }));
+  const rows = buildHelpFocusPickerRows({
+    suggestedPrimary: input.suggestedPrimary,
+    suggestedSecondary: input.suggestedSecondary
+  });
 
   return {
     header: "Advice focus",
     body,
-    footer: "Changes how I advise — not your 7am news tags",
+    footer: "Not listed? Reply help domain <lane> — e.g. help domain philosophy",
     listButtonLabel: "Pick lane",
     sections: [
-      { title: "Life & work", rows: firstSection },
-      { title: "Mind & people", rows: secondSection }
+      {
+        title: "Advice lanes",
+        rows
+      }
     ]
   };
 }
