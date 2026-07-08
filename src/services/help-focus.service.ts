@@ -1,6 +1,7 @@
 import type { MauriUser, WhatsAppInteractiveOutbound } from "../types.js";
 import { updateUserState } from "./user.service.js";
 import {
+  buildHelpFocusActivationExplanation,
   buildHelpFocusEnginePrompt,
   buildHelpFocusStatusReply,
   inferHelpFocusFromFacts,
@@ -101,7 +102,8 @@ export async function handleHelpFocusMessage(input: {
       interactive: buildHelpFocusPickerInteractive({
         firstName: input.user.first_name,
         suggestedPrimary: input.user.help_focus_primary,
-        suggestedSecondary: input.user.help_focus_secondary
+        suggestedSecondary: input.user.help_focus_secondary,
+        variant: "status"
       })
     };
   }
@@ -121,4 +123,4 @@ export async function handleHelpFocusMessage(input: {
   };
 }
 
-export { inferHelpFocusFromFacts, buildHelpFocusStatusReply };
+export { inferHelpFocusFromFacts, buildHelpFocusStatusReply, buildHelpFocusActivationExplanation };

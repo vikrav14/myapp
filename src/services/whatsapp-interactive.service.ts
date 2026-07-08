@@ -364,18 +364,19 @@ export function buildHelpFocusPickerInteractive(input: {
   firstName?: string | null;
   suggestedPrimary?: HelpFocusKey | null;
   suggestedSecondary?: HelpFocusKey | null;
+  /** activation = no repeat of focus labels (explanation already sent in text) */
+  variant?: "activation" | "status" | undefined;
 }): WhatsAppInteractiveOutbound {
   const name = input.firstName?.trim() || "there";
-  const suggested =
-    input.suggestedPrimary && input.suggestedSecondary
-      ? `${formatHelpFocusLabel(input.suggestedPrimary)} + ${formatHelpFocusLabel(input.suggestedSecondary)}`
-      : input.suggestedPrimary
-        ? formatHelpFocusLabel(input.suggestedPrimary)
-        : null;
 
-  const body = suggested
-    ? `${name} — for advice I'm leaning into ${suggested}. Pick a different lane if you want.`
-    : `${name} — what do you want me to help with most?`;
+  const body =
+    input.variant === "activation"
+      ? `${name} — tap Pick lane to confirm or switch advice focus.`
+      : input.suggestedPrimary && input.suggestedSecondary
+        ? `${name} — for advice I'm leaning into ${formatHelpFocusLabel(input.suggestedPrimary)} + ${formatHelpFocusLabel(input.suggestedSecondary)}. Pick a different lane if you want.`
+        : input.suggestedPrimary
+          ? `${name} — for advice I'm leaning into ${formatHelpFocusLabel(input.suggestedPrimary)}. Pick a different lane if you want.`
+          : `${name} — what do you want me to help with most?`;
 
   const firstSection = HELP_FOCUS_CATALOG.slice(0, 7).map((entry) => ({
     id: `help_domain_${entry.key}`,

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildHelpFocusActivationExplanation,
   buildHelpFocusEnginePrompt,
   inferHelpFocusFromFacts,
   normalizeHelpFocusKey
 } from "../src/services/help-focus-inference.service.js";
 import { parseHelpFocusCommand } from "../src/services/help-focus.service.js";
+import { buildHelpFocusPickerInteractive } from "../src/services/whatsapp-interactive.service.js";
 import type { UserMindFact } from "../src/types.js";
 
 function fact(overrides: Partial<UserMindFact> & Pick<UserMindFact, "category" | "fact_value">): UserMindFact {
@@ -68,5 +70,44 @@ describe("help focus inference", () => {
 
     expect(inferred.primary).toBe("personal_finance");
     expect(["communication", "relationship"]).toContain(inferred.secondary);
+  });
+
+  it("explains help focus rationale without repeating labels in activation picker", () => {
+    const facts = [
+      fact({ category: "life_context", fact_key: "work", fact_value: "Remote dev in Tamarin" }),
+      fact({
+        category: "stressors",
+        fact_key: "brother",
+        fact_value: "Primary carer for brother with severe special needs"
+      }),
+      fact({
+        category: "stressors",
+        fact_key: "money",
+        fact_value: "Good salary but bank account stays flat — family bleeding me dry"
+      })
+    ];
+
+    const explanation = buildHelpFocusActivationExplanation({
+      primary: "personal_finance",
+      secondary: "parenting",
+      facts
+    });
+
+    expect(explanation).toContain("Personal Finance + Parenting");
+    expect(explanation).toContain("Shame-free money habits");
+    expect(explanation).toContain("Connection before correction");
+    expect(explanation).toContain("Classic frameworks woven in");
+    expect(explanation).not.toContain("Psychology of Money");
+
+    const picker = buildHelpFocusPickerInteractive({
+      firstName: "Vik",
+      suggestedPrimary: "personal_finance",
+      suggestedSecondary: "parenting",
+      variant: "activation"
+    });
+
+    expect(picker.body).toContain("confirm or switch");
+    expect(picker.body).not.toContain("Personal Finance");
+    expect(picker.body).not.toContain("Parenting");
   });
 });
