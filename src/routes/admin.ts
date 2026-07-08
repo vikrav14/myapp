@@ -38,6 +38,7 @@ import {
 } from "../services/user-mind-snapshot.service.js";
 import { getRequestId } from "../lib/request-tracing.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
+import { buildVikSilentWeekPreview } from "../services/report-preview.fixture.js";
 import { getMetricsSnapshot } from "../services/metrics.service.js";
 import { retryOutboundMessageById } from "../services/outbound-retry.service.js";
 import { getDeadLetterById, updateDeadLetterStatus } from "../services/dead-letter.service.js";
@@ -2030,6 +2031,12 @@ adminRouter.post("/outbound-messages/:messageId/discard", async (request, respon
   } catch (error) {
     next(error);
   }
+});
+
+adminRouter.get("/report-preview/vik", (_request, response) => {
+  const { html } = buildVikSilentWeekPreview();
+  response.setHeader("content-type", "text/html; charset=utf-8");
+  response.status(200).send(html);
 });
 
 adminRouter.get("/reports", async (request, response, next) => {
