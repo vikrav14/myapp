@@ -107,10 +107,79 @@ export function profileDeltasToFactRows(
 }> {
   return deltas.map((delta) => ({
     category: delta.category,
-    fact_key: delta.fact_key,
-    fact_value: delta.fact_value,
+    fact_key: delta.fact_key.trim().slice(0, 48),
+    fact_value: delta.fact_value.trim().slice(0, 500),
     source
   }));
+}
+
+export function extractBasicKnowYouFactsFromMessage(
+  message: string,
+  source: UserMindSource = "onboarding"
+): Array<{
+  category: string;
+  fact_key: string;
+  fact_value: string;
+  source: UserMindSource;
+}> {
+  const trimmed = message.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const rows: Array<{
+    category: string;
+    fact_key: string;
+    fact_value: string;
+    source: UserMindSource;
+  }> = [];
+
+  const push = (category: string, fact_key: string, fact_value: string | null | undefined) => {
+    const value = fact_value?.trim();
+    if (!value) {
+      return;
+    }
+
+    rows.push({
+      category,
+      fact_key: fact_key.slice(0, 48),
+      fact_value: value.slice(0, 500),
+      source
+    });
+  };
+
+  const ageMatch = trimmed.match(/\b(?:i['’]?m|i am)\s*(\d{1,2})\b/i);
+  if (ageMatch?.[1]) {
+    push("identity", "age", ageMatch[1]);
+  }
+
+  const areaMatch =
+    trimmed.match(/\bbased in\s+([^.,\n]+)/i) ??
+    trimmed.match(/\blive in\s+([^.,\n]+)/i) ??
+    trimmed.match(/\bfrom\s+([^.,\n]+)/i);
+  if (areaMatch?.[1]) {
+    push("location", "area", areaMatch[1].trim());
+  }
+
+  const workMatch =
+    trimmed.match(/\b(?:i run|i own)\s+(?:a\s+)?([^.,\n]+)/i) ??
+    trimmed.match(/\b(?:working in|work in|i['’]?m a)\s+([^.,\n]+)/i);
+  if (workMatch?.[1]) {
+    push("life_context", "work", workMatch[1].trim());
+  }
+
+  const goalMatch = trimmed.match(/\b(?:i just need|i need|working toward|trying to)\s+([^.,\n]+)/i);
+  if (goalMatch?.[1]) {
+    push("goals", "primary_goal", goalMatch[1].trim());
+  }
+
+  if (/\b(rent|drowning|debt|loan|uncle|tension|no sleep|new dad|baby|son|daughter|collapsed)\b/i.test(trimmed)) {
+    push("stressors", "onboarding_pressure", trimmed.slice(0, 200));
+  }
+
+  push("user_stated", "onboarding_intro", trimmed.slice(0, 500));
+
+  return rows;
 }
 
 export async function loadUserMindFacts(userId: string): Promise<UserMindFact[]> {
@@ -421,21 +490,42 @@ export async function ingestUserMindMessage(input: {
         message: input.message,
         mode: "onboarding"
       });
-      const normalized = messageRouterExtractionSchema.parse(routerRaw);
-      if (normalized.confidence !== "low" && normalized.profile_deltas?.length) {
-        const rows = profileDeltasToFactRows(normalized.profile_deltas, input.source);
-        if (rows.length >= 1) {
-          return upsertUserMindFacts({ userId: input.userId, rows });
+      const parsed = messageRouterExtractionSchema.safeParse(routerRaw);
+      if (parsed.success) {
+        const normalized = parsed.data;
+        if (normalized.confidence !== "low" && normalized.profile_deltas?.length) {
+          const rows = profileDeltasToFactRows(normalized.profile_deltas, input.source);
+          if (rows.length >= 1) {
+            return upsertUserMindFacts({ userId: input.userId, rows });
+          }
         }
+      } else {
+        logger.warn(
+          { userId: input.userId, issues: parsed.error.issues },
+          "Know-you router response failed schema validation."
+        );
       }
     } catch (error) {
       logger.warn({ error, userId: input.userId }, "Know-you router ingest failed; falling back to legacy extractor.");
     }
   }
 
-  const extraction = await extractUserMindProfile(input.message);
-  const rows = extractionToFactRows(extraction, input.source);
-  return upsertUserMindFacts({ userId: input.userId, rows });
+  try {
+    const extraction = await extractUserMindProfile(input.message);
+    const rows = extractionToFactRows(extraction, input.source);
+    if (rows.length >= 1) {
+      return upsertUserMindFacts({ userId: input.userId, rows });
+    }
+  } catch (error) {
+    logger.warn({ error, userId: input.userId }, "Legacy know-you extract failed; using basic fallback.");
+  }
+
+  const basicRows = extractBasicKnowYouFactsFromMessage(input.message, input.source);
+  if (basicRows.length === 0) {
+    throw new Error("Could not extract any know-you facts from the message.");
+  }
+
+  return upsertUserMindFacts({ userId: input.userId, rows: basicRows });
 }
 
 export async function storeFreeformUserMindFact(input: {

@@ -17,12 +17,14 @@ import {
 import {
   buildKnowYouAcknowledgement,
   buildKnowYouPrompt,
+  extractBasicKnowYouFactsFromMessage,
   ingestUserMindMessage,
   isKnowYouSkipMessage,
   isKnowYouTooShort,
   loadUserMindFacts,
   preferredNameFromFacts,
-  resetProfileForKnowYouOnboarding
+  resetProfileForKnowYouOnboarding,
+  upsertUserMindFacts
 } from "./user-mind.service.js";
 import {
   buildHeavyShareTrustBridge,
@@ -364,15 +366,47 @@ export async function handleOnboardingMessage(input: {
         sendTextBeforeInteractive: true
       };
     } catch (error) {
-      logger.error({ error, userId: user.id }, "Know-you submission failed.");
-      const name = user.first_name?.trim() || "there";
+      logger.error(
+        {
+          error,
+          userId: user.id,
+          errorMessage: error instanceof Error ? error.message : "unknown"
+        },
+        "Know-you submission failed."
+      );
 
-      return {
-        handled: true,
-        user,
-        reply: `${name} — got your message. I hit a brief snag on my side.\n\nReply skip to jump in, or send a shorter note and I'll tune as we go.`,
-        outboundFlow: "know_you_error"
-      };
+      try {
+        const rows = extractBasicKnowYouFactsFromMessage(message, "onboarding");
+        const facts =
+          rows.length > 0
+            ? await upsertUserMindFacts({ userId: user.id, rows })
+            : [];
+        const preferredName = preferredNameFromFacts(facts);
+        const updatedUser = await updateUserState(user.id, {
+          onboarding_state: "awaiting_express_start",
+          ...(preferredName ? { first_name: preferredName } : {})
+        });
+
+        return beginExpressStartStep(
+          updatedUser,
+          buildKnowYouAcknowledgement({
+            user: updatedUser,
+            facts,
+            skipped: facts.length === 0,
+            compact: true
+          })
+        );
+      } catch (recoveryError) {
+        logger.error({ error: recoveryError, userId: user.id }, "Know-you recovery failed.");
+        const name = user.first_name?.trim() || "there";
+
+        return {
+          handled: true,
+          user,
+          reply: `${name} — got your message. I hit a brief snag on my side.\n\nReply skip to jump in, or send a shorter note and I'll tune as we go.`,
+          outboundFlow: "know_you_error"
+        };
+      }
     }
   }
 

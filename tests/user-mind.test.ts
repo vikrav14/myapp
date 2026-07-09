@@ -4,6 +4,7 @@ import {
   buildKnowYouAcknowledgement,
   buildKnowYouPrompt,
   buildUserMindProfileReply,
+  extractBasicKnowYouFactsFromMessage,
   extractionToFactRows,
   isKnowYouSkipMessage,
   isKnowYouTooShort,
@@ -31,6 +32,22 @@ describe("user mind helpers", () => {
         expect.objectContaining({ category: "location", fact_value: "Beau Bassin" }),
         expect.objectContaining({ category: "life_context", fact_value: "printing shop owner" }),
         expect.objectContaining({ category: "preferences", fact_value: "direct, no lectures" })
+      ])
+    );
+  });
+
+  it("extracts basic know-you facts without Gemini", () => {
+    const rows = extractBasicKnowYouFactsFromMessage(
+      "I'm 29, based in Grand Baie. I run a small retail shop. Tourism collapsed and I'm drowning in rent. I just need control."
+    );
+
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: "identity", fact_key: "age", fact_value: "29" }),
+        expect.objectContaining({ category: "location", fact_key: "area", fact_value: "Grand Baie" }),
+        expect.objectContaining({ category: "life_context", fact_key: "work", fact_value: "small retail shop" }),
+        expect.objectContaining({ category: "goals", fact_key: "primary_goal", fact_value: "control" }),
+        expect.objectContaining({ category: "user_stated", fact_key: "onboarding_intro" })
       ])
     );
   });
