@@ -2,6 +2,7 @@ import type { UserMindFact } from "../types.js";
 import { formatStrategyTrackBlock } from "./mauri-memory-view.service.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY, HELP_FOCUS_CATALOG, HELP_FOCUS_KEYS } from "./help-focus.constants.js";
+import { HELP_FOCUS_FRAMEWORKS } from "./help-focus-frameworks.js";
 import { combinedFactBlob, hasBoundaryGoal, hasFamilyMoneyPressure } from "./profile-inference.service.js";
 
 export interface InferredHelpFocus {
@@ -141,7 +142,8 @@ export function buildHelpFocusActivationExplanation(input: {
     "",
     ...trackBlock,
     "",
-    "Next message — tap Looks good or Pick lane. Reply help focus anytime to change later."
+    "Next message — tap Looks good or Pick lane. Reply help focus anytime to change later.",
+    "Curious what's behind a lane? Reply help focus sources."
   ].join("\n");
 }
 
@@ -252,8 +254,94 @@ export function buildHelpFocusEnginePrompt(input: {
   }
 
   lines.push(
-    "Never name-drop books. Synthesize frameworks into ≤60 words of localized advice. Personal stuff stays out of the 7am brief."
+    "Never name-drop books unless the user asked for sources. Synthesize frameworks into ≤60 words of localized advice. Personal stuff stays out of the 7am brief."
   );
 
   return lines.join("\n");
 }
+
+export function buildHelpFocusSourcesReply(input: {
+  firstName?: string | null;
+  primary: HelpFocusKey | null;
+  secondary: HelpFocusKey | null;
+  lane?: HelpFocusKey | null | undefined;
+}): string {
+  const name = input.firstName?.trim() || "there";
+  const lanes: HelpFocusKey[] = [];
+
+  if (input.lane) {
+    lanes.push(input.lane);
+  } else if (input.primary) {
+    lanes.push(input.primary);
+    if (input.secondary && input.secondary !== input.primary) {
+      lanes.push(input.secondary);
+    }
+  }
+
+  if (lanes.length === 0) {
+    return `${name} — no advice lane set yet. Reply help focus to pick one, then help focus sources to see what's behind it.`;
+  }
+
+  const sections = lanes.map((key, index) => {
+    const label = formatHelpFocusLabel(key);
+    const role =
+      !input.lane && lanes.length > 1 ? (index === 0 ? " (primary)" : " (secondary)") : "";
+    const books = HELP_FOCUS_FRAMEWORKS[key];
+
+    return `*${label}${role}*\n${books.map((book) => `• ${book}`).join("\n")}`;
+  });
+
+  return [
+    `${name} — thinking behind your advice lane${lanes.length > 1 ? "s" : ""}:`,
+    "",
+    sections.join("\n\n"),
+    "",
+    "I turn these into one practical step for your life — not homework. Reply help focus sources <lane> for another domain (e.g. help focus sources psychology), or help focus to switch."
+  ].join("\n");
+}
+
+export function parseHelpFocusSourcesRequest(
+  message: string
+): { lane: HelpFocusKey | null; invalidLane?: string | undefined } | null {
+  const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
+
+  const laneFromPrefix = normalized.match(/^help focus sources (.+)$/);
+  if (laneFromPrefix?.[1]) {
+    const key = normalizeHelpFocusKey(laneFromPrefix[1]);
+    if (key) {
+      return { lane: key };
+    }
+
+    return { lane: null, invalidLane: laneFromPrefix[1] };
+  }
+
+  if (
+    normalized === "help focus sources" ||
+    normalized === "advice sources" ||
+    normalized === "framework sources" ||
+    normalized === "name the books" ||
+    normalized === "framework behind this" ||
+    normalized === "thinking behind this" ||
+    normalized === "what book is that" ||
+    normalized === "what book is that from" ||
+    normalized === "which book is that" ||
+    normalized === "which book is that from" ||
+    normalized === "what framework is that" ||
+    normalized === "which framework is that" ||
+    normalized === "where did that come from" ||
+    normalized === "what's the source" ||
+    normalized === "whats the source"
+  ) {
+    return { lane: null };
+  }
+
+  if (
+    (/\b(which|what)\b/.test(normalized) && /\b(book|framework|source)\b/.test(normalized)) ||
+    (/\bwhere\b/.test(normalized) && /\b(from|come from)\b/.test(normalized) && /\b(that|this|advice)\b/.test(normalized))
+  ) {
+    return { lane: null };
+  }
+
+  return null;
+}
+
