@@ -72,6 +72,8 @@ vi.mock("../src/services/whatsapp.service.js", async () => {
   };
 });
 
+import { flushInboundProcessingForTests } from "../src/services/inbound-processing-queue.service.js";
+
 const { createApp } = await import("../src/app.js");
 
 const baseUser = {
@@ -124,9 +126,11 @@ describe("WhatsApp webhook route", () => {
       .post("/webhooks/whatsapp")
       .send({ from: baseUser.phone_number, text: "hello mauri", profileName: "Ava", messageId: "wamid-1" });
 
+    await flushInboundProcessingForTests();
+
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
-    expect(response.body.replyPreview).toContain("Before I track anything");
+    expect(response.body.accepted).toBe(true);
     expect(mockSendMauriReply).toHaveBeenCalledWith(
       baseUser.phone_number,
       expect.objectContaining({
@@ -192,10 +196,11 @@ describe("WhatsApp webhook route", () => {
       .post("/webhooks/whatsapp")
       .send({ from: activeUser.phone_number, text: "I spent 150 on food and studied for 90 minutes", messageId: "wamid-2" });
 
+    await flushInboundProcessingForTests();
+
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
-    expect(response.body.extraction.finance.amount).toBe(150);
-    expect(response.body.replyPreview).toContain("Good.");
+    expect(response.body.accepted).toBe(true);
     expect(mockLoadUserContext).toHaveBeenCalledWith(activeUser.id, expect.any(String));
     expect(mockPersistExtraction).toHaveBeenCalledWith(
       activeUser.id,
@@ -255,8 +260,10 @@ describe("WhatsApp webhook route", () => {
       .post("/webhooks/whatsapp")
       .send({ from: paidUser.phone_number, text: "create squad Study Crew", messageId: "wamid-squad-1" });
 
+    await flushInboundProcessingForTests();
+
     expect(response.status).toBe(200);
-    expect(response.body.replyPreview).toContain("Squad live");
+    expect(response.body.accepted).toBe(true);
     expect(mockHandleSquadMessage).toHaveBeenCalled();
     expect(mockExtractStructuredContext).not.toHaveBeenCalled();
     expect(mockSendWhatsAppMessage).toHaveBeenCalledWith(

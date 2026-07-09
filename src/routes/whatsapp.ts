@@ -19,6 +19,7 @@ import {
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
 import { completeInboundEvent, registerInboundEvent } from "../services/inbound-event.service.js";
+import { flushInboundProcessingForTests, scheduleInboundProcessing } from "../services/inbound-processing-queue.service.js";
 import { persistExtraction } from "../services/logging.service.js";
 import { storeConversationMemory } from "../services/memory.service.js";
 import { handleLocalAlertsCommandMessage } from "../services/local-alerts-delivery.service.js";
@@ -51,7 +52,7 @@ import { runSquadRelayAfterExtraction } from "../services/squad-relay.service.js
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
-import { parseInboundMessage, sendMauriReply, sendWhatsAppMessage, sendWhatsAppTypingIndicator } from "../services/whatsapp.service.js";
+import { parseInboundMessage, acknowledgeInboundWhatsAppMessageBestEffort, sendMauriReply, sendWhatsAppMessage } from "../services/whatsapp.service.js";
 import { reactToInboundMessageBestEffort } from "../services/whatsapp-reaction.service.js";
 import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
 
@@ -117,6 +118,35 @@ whatsappRouter.post("/", async (request, response, next) => {
       }
     }
 
+    response.status(200).json({
+      ok: true,
+      accepted: true,
+      messageId: inboundMessage.messageId ?? null
+    });
+
+    scheduleInboundProcessing(async () => {
+      await processInboundWhatsAppMessage({
+        inboundMessage,
+        requestId
+      });
+    });
+  } catch (error) {
+    if (response.headersSent) {
+      logger.error({ error, requestId: getRequestId(response) }, "Inbound WhatsApp enqueue failed after webhook ack.");
+      return;
+    }
+
+    next(error);
+  }
+});
+
+async function processInboundWhatsAppMessage(input: {
+  inboundMessage: NonNullable<ReturnType<typeof parseInboundMessage>>;
+  requestId: string | undefined;
+}): Promise<void> {
+  const { inboundMessage, requestId } = input;
+
+  try {
     const inboundEventId = inboundMessage.messageId;
     const finishInbound = () =>
       finishInboundEvent({
@@ -124,9 +154,19 @@ whatsappRouter.post("/", async (request, response, next) => {
         eventId: inboundEventId,
         requestId
       });
+
+    await acknowledgeInboundWhatsAppMessageBestEffort(inboundMessage.messageId);
+
     const respondOk = async (body: Record<string, unknown>) => {
       await finishInbound();
-      response.status(200).json(body);
+      logger.info(
+        {
+          requestId,
+          messageId: inboundMessage.messageId,
+          ...body
+        },
+        "Inbound WhatsApp message processed."
+      );
     };
 
     const { user: initialUser, isNewUser } = await getOrCreateUser(inboundMessage.from, inboundMessage.profileName);
@@ -1010,14 +1050,6 @@ whatsappRouter.post("/", async (request, response, next) => {
       await sleep(OUTBOUND_PAIR_DELAY_MS);
     }
 
-    if (inboundMessage.messageId && env.WHATSAPP_TYPING_INDICATOR_ENABLED) {
-      try {
-        await sendWhatsAppTypingIndicator(inboundMessage.messageId);
-      } catch (error) {
-        logger.warn({ error, messageId: inboundMessage.messageId }, "Failed to send typing indicator.");
-      }
-    }
-
     await sendWhatsAppMessage(inboundMessage.from, reply, {
       userId: user.id,
       requestId,
@@ -1066,6 +1098,9 @@ whatsappRouter.post("/", async (request, response, next) => {
       replyPreview: reply
     });
   } catch (error) {
-    next(error);
+    logger.error(
+      { error, requestId, messageId: inboundMessage.messageId },
+      "Inbound WhatsApp processing failed after webhook ack."
+    );
   }
-});
+}

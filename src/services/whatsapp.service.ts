@@ -473,6 +473,29 @@ export async function sendWhatsAppTypingIndicator(messageId: string): Promise<vo
   }
 }
 
+export async function acknowledgeInboundWhatsAppMessageBestEffort(messageId: string | undefined): Promise<void> {
+  if (!messageId?.trim()) {
+    return;
+  }
+
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    return;
+  }
+
+  try {
+    if (env.WHATSAPP_TYPING_INDICATOR_ENABLED) {
+      await sendWhatsAppTypingIndicator(messageId);
+      return;
+    }
+
+    if (env.WHATSAPP_MARK_READ_ENABLED) {
+      await markWhatsAppMessageRead(messageId);
+    }
+  } catch (error) {
+    logger.warn({ error, messageId }, "Failed to acknowledge inbound WhatsApp message.");
+  }
+}
+
 export async function deliverWhatsAppReaction(input: {
   to: string;
   messageId: string;
