@@ -4,6 +4,8 @@ const mockEnv = vi.hoisted(() => ({
   NODE_ENV: "production" as "development" | "test" | "production",
   PAYMENT_CALLBACK_BASE_URL: "https://mauri.example.com",
   PAYMENT_RETURN_URL: "https://mauri.example.com/payments/return",
+  GOOGLE_AI_API_KEY: "test-google-ai-key",
+  GEMINI_MODEL: "gemini-2.5-flash",
   WHATSAPP_ACCESS_TOKEN: "wa-token",
   WHATSAPP_PHONE_NUMBER_ID: "123456",
   INTERNAL_ADMIN_API_KEY: "secure-admin-key",
