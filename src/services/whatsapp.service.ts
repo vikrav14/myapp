@@ -853,6 +853,24 @@ export async function sendWhatsAppMessage(
   }
 }
 
+export async function sendWhatsAppMessageBestEffort(
+  to: string,
+  body: string,
+  options?: {
+    userId?: string | null | undefined;
+    requestId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }
+): Promise<boolean> {
+  try {
+    await sendWhatsAppMessage(to, body, options);
+    return true;
+  } catch (error) {
+    logger.warn({ error, to, userId: options?.userId }, "Best-effort WhatsApp message failed.");
+    return false;
+  }
+}
+
 async function authorizedFetch(url: string): Promise<Response> {
   if (!env.WHATSAPP_ACCESS_TOKEN) {
     throw new Error("WhatsApp access token is required to fetch media.");

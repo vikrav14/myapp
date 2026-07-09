@@ -75,39 +75,55 @@ async function callGemini(input: {
   parts?: GeminiPart[] | undefined;
   responseMimeType?: "application/json" | "text/plain";
   responseSchema?: object;
+  timeoutMs?: number | undefined;
 }): Promise<string> {
-  const { prompt, parts, responseMimeType, responseSchema } = input;
+  const { prompt, parts, responseMimeType, responseSchema, timeoutMs = 25_000 } = input;
   const requestParts = parts ?? (prompt ? [{ text: prompt }] : []);
 
   if (requestParts.length === 0) {
     throw new Error("Gemini request requires prompt text or parts.");
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GOOGLE_AI_API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: requestParts
-          }
-        ],
-        generationConfig: responseMimeType
-          ? {
-              responseMimeType,
-              ...(responseSchema
-                ? { responseSchema: sanitizeGeminiResponseSchema(responseSchema) }
-                : {})
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GOOGLE_AI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: requestParts
             }
-          : undefined
-      })
+          ],
+          generationConfig: responseMimeType
+            ? {
+                responseMimeType,
+                ...(responseSchema
+                  ? { responseSchema: sanitizeGeminiResponseSchema(responseSchema) }
+                  : {})
+              }
+            : undefined
+        })
+      }
+    );
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Gemini request timed out after ${timeoutMs}ms.`);
     }
-  );
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();

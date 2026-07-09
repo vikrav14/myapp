@@ -52,7 +52,8 @@ import { runSquadRelayAfterExtraction } from "../services/squad-relay.service.js
 import { handleSquadMessage } from "../services/squad.service.js";
 import { getOrCreateUser } from "../services/user.service.js";
 import { resolveInboundMessageText } from "../services/voice-note.service.js";
-import { parseInboundMessage, acknowledgeInboundWhatsAppMessageBestEffort, sendMauriReply, sendWhatsAppMessage } from "../services/whatsapp.service.js";
+import { parseInboundMessage, acknowledgeInboundWhatsAppMessageBestEffort, sendMauriReply, sendWhatsAppMessage, sendWhatsAppMessageBestEffort } from "../services/whatsapp.service.js";
+import { isKnowYouSkipMessage, isKnowYouTooShort } from "../services/user-mind.service.js";
 import { reactToInboundMessageBestEffort } from "../services/whatsapp-reaction.service.js";
 import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
 
@@ -467,6 +468,25 @@ async function processInboundWhatsAppMessage(input: {
       return;
     }
 
+    if (
+      accessPolicyResult.user.onboarding_state === "awaiting_know_you" &&
+      !isKnowYouSkipMessage(normalizedMessageText) &&
+      !isKnowYouTooShort(normalizedMessageText)
+    ) {
+      await sendWhatsAppMessageBestEffort(
+        inboundMessage.from,
+        "Got it — reading that now. One sec.",
+        {
+          userId: accessPolicyResult.user.id,
+          requestId,
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "know_you_processing"
+          }
+        }
+      );
+    }
+
     const onboardingResult = await handleOnboardingMessage({
       user: accessPolicyResult.user,
       isNewUser,
@@ -475,24 +495,44 @@ async function processInboundWhatsAppMessage(input: {
 
     if (onboardingResult.handled) {
       if (onboardingResult.reply || onboardingResult.interactive || onboardingResult.image) {
-        await sendMauriReply(
-          inboundMessage.from,
-          {
-            text: onboardingResult.reply,
-            interactive: onboardingResult.interactive,
-            image: onboardingResult.image
-          },
-          {
+        try {
+          await sendMauriReply(
+            inboundMessage.from,
+            {
+              text: onboardingResult.reply,
+              interactive: onboardingResult.interactive,
+              image: onboardingResult.image
+            },
+            {
+              userId: onboardingResult.user.id,
+              requestId,
+              sendTextBeforeInteractive: onboardingResult.sendTextBeforeInteractive,
+              secondaryInteractive: onboardingResult.secondaryInteractive,
+              metadata: {
+                sourceType: inboundMessage.kind,
+                flow: onboardingResult.outboundFlow ?? "onboarding"
+              }
+            }
+          );
+        } catch (error) {
+          logger.error(
+            { error, userId: onboardingResult.user.id, flow: onboardingResult.outboundFlow },
+            "Onboarding reply delivery failed."
+          );
+
+          const fallbackText =
+            onboardingResult.reply?.trim() ||
+            "I'm here — reply skip to start your trial, or try sending that again.";
+
+          await sendWhatsAppMessageBestEffort(inboundMessage.from, fallbackText, {
             userId: onboardingResult.user.id,
             requestId,
-            sendTextBeforeInteractive: onboardingResult.sendTextBeforeInteractive,
-            secondaryInteractive: onboardingResult.secondaryInteractive,
             metadata: {
               sourceType: inboundMessage.kind,
-              flow: onboardingResult.outboundFlow ?? "onboarding"
+              flow: "onboarding_delivery_fallback"
             }
-          }
-        );
+          });
+        }
       }
 
       await respondOk({
