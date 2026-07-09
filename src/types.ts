@@ -61,7 +61,9 @@ export type HelpFocusKey =
   | "communication"
   | "health"
   | "career"
-  | "parenting";
+  | "parenting"
+  | "psychology"
+  | "art";
 
 export interface MauriUser {
   id: string;

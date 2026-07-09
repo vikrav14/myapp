@@ -11,7 +11,9 @@ export const HELP_FOCUS_KEYS = [
   "communication",
   "health",
   "career",
-  "parenting"
+  "parenting",
+  "psychology",
+  "art"
 ] as const;
 
 export type HelpFocusKey = (typeof HELP_FOCUS_KEYS)[number];
@@ -129,6 +131,22 @@ export const HELP_FOCUS_CATALOG: HelpFocusCatalogEntry[] = [
     userLens: "Connection before correction — tuition load, carer stress, sandwich-generation pressure",
     enginePrompt:
       "Lens: Parenting (connection before correction). Tuition pressure, sandwich generation, elder plus child load. No judging parenting styles."
+  },
+  {
+    key: "psychology",
+    label: "Psychology",
+    description: "Patterns, triggers, emotional regulation",
+    userLens: "Name the pattern behind the spiral — triggers, nervous system, small resets; not therapy cosplay",
+    enginePrompt:
+      "Lens: Psychology (Feeling Good CBT, Body Keeps the Score, Emotional Intelligence, Happiness Trap ACT). Patterns over labels. Trauma-aware without diagnosing. Defer crisis and meds to professionals."
+  },
+  {
+    key: "art",
+    label: "Art",
+    description: "Creative work, craft, resistance",
+    userLens: "Ritual beats muse-chasing — ship small, beat resistance, protect the craft alongside real life",
+    enginePrompt:
+      "Lens: Art & creativity (War of Art, Artist's Way, Steal Like an Artist, Big Magic). Resistance is normal. Consistency beats inspiration. Side projects after work; no starving-artist guilt in Mauritius."
   }
 ];
 

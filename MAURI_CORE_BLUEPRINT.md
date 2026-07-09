@@ -38,7 +38,7 @@ Dynamically adjust conversational frequency and register based on user profile:
 
 Users may choose what they want help with — independent of archetype and morning brief tags.
 
-**Catalog (13 domains):**
+**Catalog (15 domains):**
 
 1. Productivity  
 2. Personal Finance  
@@ -53,6 +53,8 @@ Users may choose what they want help with — independent of archetype and morni
 11. Health  
 12. Career  
 13. Parenting  
+14. Psychology  
+15. Art  
 
 * Store as `help_focus_primary` (+ optional `help_focus_secondary`) on user profile.  
 * Infer a suggested default from know-you facts; never force at signup.  
@@ -232,6 +234,32 @@ Do **not** write RAG databases or upload file attachments for global non-fiction
 
 ---
 
+### 3.14 Psychology
+
+**Ideas behind:** *Feeling Good* (CBT), *The Body Keeps the Score*, *Emotional Intelligence*, *The Happiness Trap* (ACT)
+
+| When active | User names patterns, triggers, rumination, anxiety spirals, therapy-adjacent language |
+|-------------|----------------------------------------------------------------------------------------|
+| Core lens | Name patterns not labels. Thoughts → feelings → behavior loops. Nervous system before pep talks. Small regulation reps. |
+| Mauritius fit | Family shame around mental health, cost of private therapy, faith + psychology both valid, commute decompression |
+| Avoid | Diagnosing, playing therapist, meds advice, dismissing trauma with stoic quotes |
+
+**Hard rule:** Crisis, self-harm, or acute symptoms → defer to GP, therapist, or emergency services.
+
+---
+
+### 3.15 Art
+
+**Ideas behind:** *The War of Art*, *The Artist's Way*, *Steal Like an Artist*, *Big Magic*
+
+| When active | User paints, writes, makes music, designs, builds a creative side practice |
+|-------------|----------------------------------------------------------------------------|
+| Core lens | Resistance is normal. Show up before inspiration. Steal structure, not soul. Ship small ugly drafts. Protect creative time like a meeting. |
+| Mauritius fit | Side hustle creativity after work, tourism-season income swings, family "get a real job" pressure, local craft and music scenes |
+| Avoid | Starving-artist romanticism, guilt for not monetizing, perfectionism that never ships |
+
+---
+
 ## 4. Engine Selection Logic (Runtime)
 
 ```text
@@ -285,11 +313,11 @@ Incoming message
 Cache these blocks with long TTL; inject user-specific facts dynamically:
 
 1. Global voice + EQ + 60-word rule  
-2. All 13 Knowledge Engine summaries (Section 3) — single cached doc  
+2. All 15 Knowledge Engine summaries (Section 3) — single cached doc  
 3. Active engine excerpt — only the 1–2 domains matching `help_focus` (smaller per-request append)  
 
 Do **not** cache per-user emotional vents or facts.
 
 ---
 
-*Last updated: 2026-07-07 — v1.1 (full 13-domain knowledge engines)*
+*Last updated: 2026-07-09 — v1.2 (15-domain knowledge engines: Psychology + Art)*
