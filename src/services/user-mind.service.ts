@@ -211,7 +211,9 @@ export async function resetProfileForKnowYouOnboarding(userId: string): Promise<
     throw new Error(`Failed to reset user mind snapshot for onboarding: ${snapshotError.message}`);
   }
 
-  await cancelPendingOpenLoopFollowUps(userId);
+  await cancelPendingOpenLoopFollowUps(userId).catch((error) => {
+    logger.warn({ error, userId }, "Failed to cancel pending follow-ups during know-you reset.");
+  });
 }
 
 export function formatUserMindForPrompt(facts: UserMindFact[]): string {
@@ -479,6 +481,14 @@ export async function upsertUserMindFacts(input: {
   return (data ?? []).map((row) => mapFact(row as Record<string, unknown>));
 }
 
+function formatProcessingError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
 export async function ingestUserMindMessage(input: {
   userId: string;
   message: string;
@@ -506,7 +516,15 @@ export async function ingestUserMindMessage(input: {
         );
       }
     } catch (error) {
-      logger.warn({ error, userId: input.userId }, "Know-you router ingest failed; falling back to legacy extractor.");
+      logger.warn(
+        {
+          error,
+          userId: input.userId,
+          stage: "router_call",
+          errorMessage: formatProcessingError(error)
+        },
+        "Know-you router ingest failed; falling back to legacy extractor."
+      );
     }
   }
 
@@ -516,8 +534,21 @@ export async function ingestUserMindMessage(input: {
     if (rows.length >= 1) {
       return upsertUserMindFacts({ userId: input.userId, rows });
     }
+
+    logger.warn(
+      { userId: input.userId, stage: "legacy_empty" },
+      "Legacy know-you extract returned no fact rows; using basic fallback."
+    );
   } catch (error) {
-    logger.warn({ error, userId: input.userId }, "Legacy know-you extract failed; using basic fallback.");
+    logger.warn(
+      {
+        error,
+        userId: input.userId,
+        stage: "legacy_call",
+        errorMessage: formatProcessingError(error)
+      },
+      "Legacy know-you extract failed; using basic fallback."
+    );
   }
 
   const basicRows = extractBasicKnowYouFactsFromMessage(input.message, input.source);

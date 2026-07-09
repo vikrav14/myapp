@@ -131,6 +131,22 @@ export function getDeployPreflightReport(): DeployPreflightReport {
     });
   }
 
+  if (!env.GOOGLE_AI_API_KEY?.trim()) {
+    pushCheck(checks, {
+      key: "google_ai_api_key",
+      label: "GOOGLE_AI_API_KEY",
+      status: "error",
+      message: "Required for know-you onboarding, chat replies, and morning brief curation."
+    });
+  } else {
+    pushCheck(checks, {
+      key: "google_ai_api_key",
+      label: "GOOGLE_AI_API_KEY",
+      status: "ok",
+      message: `Configured for model ${env.GEMINI_MODEL}. Run /internal/admin/gemini-health for a live probe.`
+    });
+  }
+
   if (!env.WHATSAPP_ACCESS_TOKEN?.trim() || !env.WHATSAPP_PHONE_NUMBER_ID?.trim()) {
     pushCheck(checks, {
       key: "whatsapp_delivery",

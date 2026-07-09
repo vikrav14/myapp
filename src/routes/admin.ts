@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { hasAdminAccess } from "../lib/internal-auth.js";
 import { getDeployPreflightReport } from "../lib/deploy-preflight.js";
+import { probeGeminiHealth } from "../lib/gemini-health.js";
 import { escapeHtml } from "../lib/html-escape.js";
 import { getSecurityPostureSummary } from "../lib/network-security.js";
 import { evaluateAndPersistOperationalAlerts, listOperationalAlerts } from "../services/alerting.service.js";
@@ -1437,6 +1438,14 @@ adminRouter.get("/deploy-preflight", (_request, response) => {
   response.status(200).json({
     ok: true,
     deployPreflight: getDeployPreflightReport()
+  });
+});
+
+adminRouter.get("/gemini-health", async (_request, response) => {
+  const report = await probeGeminiHealth();
+  response.status(report.status === "ok" ? 200 : 503).json({
+    ok: report.status === "ok",
+    gemini: report
   });
 });
 
