@@ -92,4 +92,23 @@ describe("morning brief personalization", () => {
     expect(message).not.toContain("coworking space");
     expect(message).not.toContain("Your brief:");
   });
+
+  it("uses a personalized weather line override when provided", () => {
+    const curated: CuratedMorningBrief = {
+      brief_date: "2026-06-22",
+      weather_line: "Generic island weather.",
+      traffic_line: "Traffic is normal.",
+      stories: []
+    };
+
+    const message = buildPersonalizedMorningBriefMessage({
+      firstName: "Vik",
+      topics: ["Traffic"],
+      curated,
+      weatherLine: "Central Plateau: 18°C, drizzle — light rain possible (45%). Cooler inland (18°C in Central Plateau) and warmer on the coast (22°C in North)."
+    });
+
+    expect(message).toContain("Central Plateau: 18°C");
+    expect(message).not.toContain("Generic island weather.");
+  });
 });

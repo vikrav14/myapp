@@ -44,10 +44,81 @@ export const MAURITIUS_TRAFFIC_CORRIDORS = [
   }
 ] as const;
 
+export const MAURITIUS_WEATHER_ZONES = [
+  {
+    id: "west",
+    label: "West / Port Louis",
+    latitude: -20.1609,
+    longitude: 57.5012,
+    aliases: [
+      "port louis",
+      "port-louis",
+      "tamarin",
+      "flic en flac",
+      "albion",
+      "black river",
+      "riviere noire",
+      "cascavelle"
+    ]
+  },
+  {
+    id: "central",
+    label: "Central Plateau",
+    latitude: -20.298,
+    longitude: 57.478,
+    aliases: [
+      "vacoas",
+      "phoenix",
+      "curepipe",
+      "quatre bornes",
+      "rose hill",
+      "beau bassin",
+      "moka",
+      "ebene",
+      "floreal",
+      "midlands",
+      "highlands"
+    ]
+  },
+  {
+    id: "north",
+    label: "North / Grand Baie",
+    latitude: -20.009,
+    longitude: 57.58,
+    aliases: [
+      "grand baie",
+      "grand bay",
+      "pamplemousses",
+      "triolet",
+      "goodlands",
+      "cap malheureux",
+      "pereybere",
+      "roche bois"
+    ]
+  },
+  {
+    id: "south",
+    label: "South Coast",
+    latitude: -20.408,
+    longitude: 57.7,
+    aliases: ["mahebourg", "souillac", "chemin grenier", "surinam", "bel air", "saint aubin", "plaine magnien"]
+  },
+  {
+    id: "east",
+    label: "East Coast",
+    latitude: -20.198,
+    longitude: 57.777,
+    aliases: ["belle mare", "flacq", "poste de flacq", "centre de flacq", "palmar", "trou d'eau douce"]
+  }
+] as const;
+
+export type MauritiusWeatherZoneDefinition = (typeof MAURITIUS_WEATHER_ZONES)[number];
+
+/** @deprecated Use MAURITIUS_WEATHER_ZONES — kept for backward compatibility. */
 export const MAURITIUS_WEATHER_COORDS = {
-  latitude: -20.1609,
-  longitude: 57.5012,
-  label: "Port Louis"
+  latitude: MAURITIUS_WEATHER_ZONES[0].latitude,
+  longitude: MAURITIUS_WEATHER_ZONES[0].longitude,
+  label: MAURITIUS_WEATHER_ZONES[0].label
 } as const;
 
 export const ARCHETYPE_DEFAULT_TOPICS: Record<string, MorningBriefTopicKey[]> = {
