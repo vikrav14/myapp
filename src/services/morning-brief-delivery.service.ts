@@ -4,6 +4,11 @@ import type { CuratedMorningBrief, DailyBriefRunRecord, MauriUser, MorningBriefT
 import { mapUser } from "./user.service.js";
 import { buildPersonalizedMorningBriefMessage } from "./morning-brief-curation.service.js";
 import { parseCuratedMorningBrief } from "./morning-brief-run.service.js";
+import {
+  buildPersonalizedWeatherLine,
+  parseMauritiusWeatherSummary
+} from "./mauritius-weather.service.js";
+import { loadUserMindFacts } from "./user-mind.service.js";
 import { appendMicroLessonToBriefMessage } from "./trial-engagement.service.js";
 import { hasModule } from "./user-modules.service.js";
 import { loadPayCycleSpend, buildPaydayRunwaySnippet } from "./payday-runway.service.js";
@@ -47,6 +52,11 @@ export async function listMorningDigestRecipients(): Promise<MauriUser[]> {
   );
 }
 
+function resolveUserArea(facts: Awaited<ReturnType<typeof loadUserMindFacts>>): string | null {
+  const areaFact = facts.find((fact) => fact.category === "location" && fact.fact_key === "area");
+  return areaFact?.fact_value?.trim() || null;
+}
+
 export async function deliverMorningBriefRun(input: {
   run: DailyBriefRunRecord;
   requestId?: string | undefined;
@@ -56,6 +66,7 @@ export async function deliverMorningBriefRun(input: {
     throw new Error("Daily brief run is missing curated payload.");
   }
 
+  const weatherSummary = parseMauritiusWeatherSummary(input.run.weather_snapshot);
   const recipients = await listMorningDigestRecipients();
   let sent = 0;
   let failed = 0;
@@ -63,10 +74,20 @@ export async function deliverMorningBriefRun(input: {
 
   for (const user of recipients) {
     const topics = user.topic_preferences as MorningBriefTopicKey[];
+    let userArea: string | null = null;
+    try {
+      const facts = await loadUserMindFacts(user.id);
+      userArea = resolveUserArea(facts);
+    } catch {
+      // Best-effort — island-wide weather line still sends.
+    }
+
+    const weatherLine = buildPersonalizedWeatherLine(weatherSummary, userArea);
     let baseMessage = buildPersonalizedMorningBriefMessage({
       firstName: user.first_name,
       topics,
-      curated
+      curated,
+      weatherLine
     });
 
     if (hasModule(user, "career") && user.payday_day_of_month) {
@@ -130,10 +151,16 @@ export async function deliverMorningBriefRun(input: {
 export function previewMorningBriefMessage(input: {
   user: MauriUser;
   curated: CuratedMorningBrief;
+  weatherSnapshot?: Record<string, unknown> | null | undefined;
+  userArea?: string | null | undefined;
 }): string {
+  const weatherSummary = parseMauritiusWeatherSummary(input.weatherSnapshot ?? null);
+  const weatherLine = buildPersonalizedWeatherLine(weatherSummary, input.userArea ?? null);
+
   return buildPersonalizedMorningBriefMessage({
     firstName: input.user.first_name,
     topics: input.user.topic_preferences as MorningBriefTopicKey[],
-    curated: input.curated
+    curated: input.curated,
+    weatherLine
   });
 }

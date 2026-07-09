@@ -2,9 +2,12 @@ import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import {
   DEFAULT_MORNING_BRIEF_RSS_FEEDS,
-  MAURITIUS_TRAFFIC_CORRIDORS,
-  MAURITIUS_WEATHER_COORDS
+  MAURITIUS_TRAFFIC_CORRIDORS
 } from "./morning-brief.constants.js";
+import {
+  fetchMauritiusWeatherSummary,
+  type MauritiusWeatherSummary
+} from "./mauritius-weather.service.js";
 
 export interface ScrapedNewsItem {
   title: string;
@@ -23,7 +26,7 @@ export interface MorningBriefScrapeResult {
     error?: string | undefined;
   }>;
   articles: ScrapedNewsItem[];
-  weather: Record<string, unknown> | null;
+  weather: MauritiusWeatherSummary | null;
   traffic: Record<string, unknown> | null;
 }
 
@@ -81,31 +84,8 @@ function resolveRssFeedUrls(): string[] {
   return configured.length > 0 ? configured : DEFAULT_MORNING_BRIEF_RSS_FEEDS;
 }
 
-async function fetchWeatherSnapshot(): Promise<Record<string, unknown> | null> {
-  const params = new URLSearchParams({
-    latitude: String(MAURITIUS_WEATHER_COORDS.latitude),
-    longitude: String(MAURITIUS_WEATHER_COORDS.longitude),
-    current: "temperature_2m,weather_code,precipitation,wind_speed_10m",
-    timezone: env.MORNING_BRIEF_TIMEZONE
-  });
-
-  try {
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = (await response.json()) as Record<string, unknown>;
-    const current = payload.current;
-    return {
-      location: MAURITIUS_WEATHER_COORDS.label,
-      current: typeof current === "object" && current !== null ? current : null,
-      fetched_at: new Date().toISOString()
-    };
-  } catch (error) {
-    logger.warn({ error }, "Morning brief weather fetch failed.");
-    return null;
-  }
+async function fetchWeatherSnapshot(): Promise<MauritiusWeatherSummary | null> {
+  return fetchMauritiusWeatherSummary(env.MORNING_BRIEF_TIMEZONE);
 }
 
 async function fetchTrafficSnapshot(): Promise<Record<string, unknown> | null> {

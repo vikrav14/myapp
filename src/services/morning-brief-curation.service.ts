@@ -6,6 +6,9 @@ import { MAURI_ENGLISH_ONLY_LANGUAGE_RULE } from "../lib/mauri-voice.js";
 import { parseStructuredJson } from "../schemas/extraction.js";
 import type { CuratedMorningBrief, MorningBriefTopicKey } from "../types.js";
 import type { MorningBriefScrapeResult } from "./morning-brief-scraper.service.js";
+import {
+  MAURITIUS_WEATHER_FALLBACK_LINE
+} from "./mauritius-weather.service.js";
 import { MORNING_BRIEF_TOPIC_KEYS } from "./morning-brief.constants.js";
 
 const curatedStorySchema = z.object({
@@ -85,6 +88,19 @@ export async function curateMorningBrief(input: {
   briefDate: string;
   scrape: MorningBriefScrapeResult;
 }): Promise<CuratedMorningBrief> {
+  const deterministicWeatherLine = input.scrape.weather?.island_line ?? MAURITIUS_WEATHER_FALLBACK_LINE;
+  const weatherContext = input.scrape.weather
+    ? {
+        island_line: input.scrape.weather.island_line,
+        zones: input.scrape.weather.zones.map((zone) => ({
+          id: zone.id,
+          label: zone.label,
+          now: `${zone.current.temperature_c}°C, ${zone.current.condition}`,
+          today: `${zone.today.temp_min_c}-${zone.today.temp_max_c}°C, rain chance ${zone.today.precip_probability_max}%`
+        }))
+      }
+    : null;
+
   const articleSample = input.scrape.articles
     .slice(0, 25)
     .map(
@@ -101,14 +117,14 @@ Rules:
 - Filter political noise, toxicity, and low-signal gossip.
 - Keep summaries short, sharp, and useful for students and young professionals.
 ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
-- weather_line: one sentence about today's weather in Mauritius.
+- weather_line: use this exact sentence — "${deterministicWeatherLine}"
 - traffic_line: one sentence about commute pressure using the traffic snapshot when available.
 - stories: up to 8 high-signal stories tagged with one topic each from: Traffic, Tech, Money, LocalBuzz, Entertainment.
 - Do not invent stories that are not grounded in the article list.
 - brief_date must be ${input.briefDate}
 
-Weather snapshot:
-${JSON.stringify(input.scrape.weather, null, 2)}
+Weather snapshot (Open-Meteo zones — do not rewrite weather_line):
+${JSON.stringify(weatherContext, null, 2)}
 
 Traffic snapshot:
 ${JSON.stringify(input.scrape.traffic, null, 2)}
@@ -121,7 +137,7 @@ ${articleSample || "No articles fetched. Return a brief with practical weather/t
 
   return {
     brief_date: parsed.brief_date,
-    weather_line: parsed.weather_line,
+    weather_line: deterministicWeatherLine,
     traffic_line: parsed.traffic_line,
     stories: parsed.stories.map((story) => ({
       topic: story.topic as MorningBriefTopicKey,
@@ -137,17 +153,19 @@ export function buildPersonalizedMorningBriefMessage(input: {
   firstName: string | null;
   topics: MorningBriefTopicKey[];
   curated: CuratedMorningBrief;
+  weatherLine?: string | undefined;
 }): string {
   const name = input.firstName?.trim() || "there";
   const topicSet = new Set(input.topics);
   const stories = input.curated.stories
     .filter((story) => topicSet.has(story.topic as MorningBriefTopicKey))
     .slice(0, 3);
+  const weatherLine = input.weatherLine?.trim() || input.curated.weather_line;
 
   const lines = [
     `Morning ${name}`,
     "",
-    `☁️ ${input.curated.weather_line}`,
+    `☁️ ${weatherLine}`,
     `🚗 ${input.curated.traffic_line}`
   ];
 
