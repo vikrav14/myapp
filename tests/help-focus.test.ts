@@ -42,10 +42,39 @@ describe("help focus inference", () => {
 
   it("normalizes labels and command phrases", () => {
     expect(normalizeHelpFocusKey("Personal Finance")).toBe("personal_finance");
+    expect(normalizeHelpFocusKey("Psychology")).toBe("psychology");
+    expect(normalizeHelpFocusKey("Art")).toBe("art");
     expect(parseHelpFocusCommand("help focus confirm")).toEqual({ type: "confirm" });
     expect(parseHelpFocusCommand("help focus")).toEqual({ type: "show" });
     expect(parseHelpFocusCommand("change your advice lane")).toEqual({ type: "show" });
     expect(parseHelpFocusCommand("help domain discipline")).toEqual({ type: "set", key: "discipline" });
+    expect(parseHelpFocusCommand("help domain psychology")).toEqual({ type: "set", key: "psychology" });
+    expect(parseHelpFocusCommand("help domain art")).toEqual({ type: "set", key: "art" });
+  });
+
+  it("infers psychology for therapy-adjacent shares", () => {
+    const inferred = inferHelpFocusFromFacts([
+      fact({
+        category: "stressors",
+        fact_key: "anxiety",
+        fact_value: "Panic attacks before work — rumination all night"
+      })
+    ]);
+
+    expect(inferred.primary).toBe("psychology");
+  });
+
+  it("infers art for creative practice shares", () => {
+    const inferred = inferHelpFocusFromFacts([
+      fact({
+        category: "goals",
+        fact_key: "creative",
+        fact_value: "Building a painting portfolio after shop hours"
+      })
+    ]);
+
+    expect(["art", "business"]).toContain(inferred.primary);
+    expect(inferred.primary === "art" || inferred.secondary === "art").toBe(true);
   });
 
   it("builds compact engine prompt blocks", () => {

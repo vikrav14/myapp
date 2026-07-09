@@ -22,7 +22,10 @@ const DOMAIN_PATTERNS: Record<HelpFocusKey, RegExp> = {
   communication: /\b(confront|negotiat|raise|boundar(y|ies)|argument|talk to my|tell my boss|difficult conversation|say no|selfish)\b/i,
   health: /\b(sleep|exhaust|tired|health|doctor|hospital|dengue|burnout|no energy|sick)\b/i,
   career: /\b(career|job|promotion|interview|cv|resume|painter|developer|employed|unemployed|émigr|emigr|office in)\b/i,
-  parenting: /\b(parent|parenting|daughter|son|child|kid|grandchild|granddaughter|grandson|school|tuition|carer)\b/i
+  parenting: /\b(parent|parenting|daughter|son|child|kid|grandchild|granddaughter|grandson|school|tuition|carer)\b/i,
+  psychology:
+    /\b(psycholog|therapy|therapist|trauma|trigger|ruminat|panic|anxiety|anxious|depress|emotional regulation|nervous system|cbt|ptsd|counsell|counsel|mental health|overthink)\b/i,
+  art: /\b(art|artist|paint|painting|creative|creativity|music|musician|write|writing|poetry|photograph|design|craft|portfolio|gallery|illustrat|sculpt|songwriter|filmmaker|creative block)\b/i
 };
 
 function factBlob(fact: UserMindFact): string {
