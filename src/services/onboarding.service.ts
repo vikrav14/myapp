@@ -1,5 +1,6 @@
 import type { MauriModuleKey, MauriUser, WhatsAppImageOutbound, WhatsAppInteractiveOutbound } from "../types.js";
 
+import { logger } from "../lib/logger.js";
 import { buildPaywallReplyForUser } from "./paywall.service.js";
 import { buildExpressStartInteractive } from "./whatsapp-interactive.service.js";
 import {
@@ -21,8 +22,7 @@ import {
   isKnowYouTooShort,
   loadUserMindFacts,
   preferredNameFromFacts,
-  resetProfileForKnowYouOnboarding,
-  resolveKnowYouAcknowledgement
+  resetProfileForKnowYouOnboarding
 } from "./user-mind.service.js";
 import {
   buildHeavyShareTrustBridge,
@@ -316,53 +316,64 @@ export async function handleOnboardingMessage(input: {
       };
     }
 
-    await resetProfileForKnowYouOnboarding(user.id);
-    const facts = await ingestUserMindMessage({
-      userId: user.id,
-      message,
-      source: "onboarding"
-    });
-    const preferredName = preferredNameFromFacts(facts);
-    const updatedUser = await updateUserState(user.id, {
-      onboarding_state: "awaiting_express_start",
-      ...(preferredName ? { first_name: preferredName } : {})
-    });
-
     try {
-      await seedLifeThreadsFromOnboarding({ user: updatedUser, facts });
-    } catch {
-      // Best-effort — onboarding should not fail if follow-up scheduling fails.
-    }
+      await resetProfileForKnowYouOnboarding(user.id);
+      const facts = await ingestUserMindMessage({
+        userId: user.id,
+        message,
+        source: "onboarding"
+      });
+      const preferredName = preferredNameFromFacts(facts);
+      const updatedUser = await updateUserState(user.id, {
+        onboarding_state: "awaiting_express_start",
+        ...(preferredName ? { first_name: preferredName } : {})
+      });
 
-    const heavyShare = isHeavyKnowYouShare(message, facts);
-    const ack = await resolveKnowYouAcknowledgement({
-      user: updatedUser,
-      message,
-      facts,
-      skipped: false,
-      compact: true
-    });
-    const setup = inferExpressSetup(facts);
-    const summary = buildExpressStartSummary({ firstName: updatedUser.first_name, setup });
+      try {
+        await seedLifeThreadsFromOnboarding({ user: updatedUser, facts });
+      } catch {
+        // Best-effort — onboarding should not fail if follow-up scheduling fails.
+      }
 
-    if (heavyShare) {
-      const bridge = buildHeavyShareTrustBridge(updatedUser.first_name);
+      const heavyShare = isHeavyKnowYouShare(message, facts);
+      const ack = buildKnowYouAcknowledgement({
+        user: updatedUser,
+        facts,
+        skipped: false,
+        compact: true
+      });
+      const setup = inferExpressSetup(facts);
+      const summary = buildExpressStartSummary({ firstName: updatedUser.first_name, setup });
+
+      if (heavyShare) {
+        const bridge = buildHeavyShareTrustBridge(updatedUser.first_name);
+        return {
+          handled: true,
+          user: updatedUser,
+          reply: `${ack}\n\n${bridge}\n\n${summary}`,
+          interactive: buildExpressStartInteractive(),
+          sendTextBeforeInteractive: true
+        };
+      }
+
       return {
         handled: true,
         user: updatedUser,
-        reply: `${ack}\n\n${bridge}\n\n${summary}`,
+        reply: `${ack}\n\n${summary}`,
         interactive: buildExpressStartInteractive(),
         sendTextBeforeInteractive: true
       };
-    }
+    } catch (error) {
+      logger.error({ error, userId: user.id }, "Know-you submission failed.");
+      const name = user.first_name?.trim() || "there";
 
-    return {
-      handled: true,
-      user: updatedUser,
-      reply: `${ack}\n\n${summary}`,
-      interactive: buildExpressStartInteractive(),
-      sendTextBeforeInteractive: true
-    };
+      return {
+        handled: true,
+        user,
+        reply: `${name} — got your message. I hit a brief snag on my side.\n\nReply skip to jump in, or send a shorter note and I'll tune as we go.`,
+        outboundFlow: "know_you_error"
+      };
+    }
   }
 
   if (EXPRESS_SETUP_STATES.has(user.onboarding_state)) {

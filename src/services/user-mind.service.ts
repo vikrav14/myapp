@@ -424,7 +424,7 @@ export async function ingestUserMindMessage(input: {
       const normalized = messageRouterExtractionSchema.parse(routerRaw);
       if (normalized.confidence !== "low" && normalized.profile_deltas?.length) {
         const rows = profileDeltasToFactRows(normalized.profile_deltas, input.source);
-        if (rows.length >= 2) {
+        if (rows.length >= 1) {
           return upsertUserMindFacts({ userId: input.userId, rows });
         }
       }
