@@ -740,6 +740,76 @@ export async function sendWhatsAppImage(
   }
 }
 
+export async function deliverWhatsAppSticker(to: string, stickerUrl: string): Promise<void> {
+  await postWhatsAppMessage({
+    to,
+    payload: {
+      type: "sticker",
+      sticker: {
+        link: stickerUrl
+      }
+    }
+  });
+}
+
+export async function sendWhatsAppSticker(
+  to: string,
+  stickerUrl: string,
+  options?: {
+    userId?: string | null | undefined;
+    requestId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }
+): Promise<boolean> {
+  const outbound = await createOutboundMessage({
+    phoneNumber: to,
+    body: `[sticker] ${stickerUrl}`,
+    userId: options?.userId ?? null,
+    requestId: options?.requestId,
+    metadata: {
+      ...options?.metadata,
+      rich_media: true,
+      sticker_url: stickerUrl
+    }
+  });
+
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    logger.info({ to, stickerUrl }, "WhatsApp credentials missing. Sticker logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return false;
+  }
+
+  if (!isRichMediaEnabled() || !env.WHATSAPP_STICKERS_ENABLED) {
+    logger.info({ to, stickerUrl }, "WhatsApp stickers disabled. Sticker logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return false;
+  }
+
+  let delivered = false;
+  try {
+    await markOutboundMessageSending(outbound.id);
+    await deliverWhatsAppSticker(to, stickerUrl);
+    delivered = true;
+    await markOutboundMessageSent(outbound.id);
+    return true;
+  } catch (error) {
+    if (delivered) {
+      logger.error(
+        { error, outboundMessageId: outbound.id },
+        "WhatsApp sticker delivery succeeded but outbound finalization failed."
+      );
+      throw error;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : "Unknown sticker send error";
+    await markOutboundMessageFailed({
+      messageId: outbound.id,
+      errorMessage
+    });
+    return false;
+  }
+}
+
 export async function sendMauriReply(
   to: string,
   payload: MauriReplyPayload,

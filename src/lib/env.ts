@@ -139,8 +139,10 @@ const envSchema = z.object({
   RELATIONSHIP_ENGAGEMENT_ENABLED: envBoolean.default(true),
   RELATIONSHIP_EVENING_CRON: z.string().default("0 19 * * *"),
   WHATSAPP_RICH_MEDIA_ENABLED: envBoolean.default(true),
+  WHATSAPP_STICKERS_ENABLED: envBoolean.default(true),
   MAURI_PUBLIC_BASE_URL: optionalSecret,
   MAURI_WELCOME_IMAGE_URL: optionalSecret,
+  MAURI_LOCKED_IN_STICKER_URL: optionalSecret,
   MESSAGE_ROUTER_MODE: z.enum(["off", "shadow", "commit"]).default("off")
 });
 

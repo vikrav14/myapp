@@ -40,7 +40,7 @@ import { handleQuietHoursCommandMessage } from "../services/quiet-hours-command.
 import { enforceAccessPolicy, handleOnboardingMessage } from "../services/onboarding.service.js";
 import { handlePaywallMessage } from "../services/paywall.service.js";
 import {
-  deliverActivationReactionAck,
+  deliverInboundReactionAck,
   handleActivationReactionMessage
 } from "../services/activation-reaction.service.js";
 import { handleTopicPreferenceMessage } from "../services/morning-brief-preferences.service.js";
@@ -231,11 +231,12 @@ async function processInboundWhatsAppMessage(input: {
         requestId
       });
 
-      if (reactionResult.handled && reactionResult.reply) {
-        await deliverActivationReactionAck({
+      if (reactionResult.handled) {
+        await deliverInboundReactionAck({
           user: accessPolicyResult.user,
           phoneNumber: inboundMessage.from,
-          reply: reactionResult.reply,
+          targetMessageId: inboundMessage.reaction.targetMessageId,
+          result: reactionResult,
           requestId
         });
       }
@@ -246,8 +247,9 @@ async function processInboundWhatsAppMessage(input: {
         sourceType: inboundMessage.kind,
         onboardingState: accessPolicyResult.user.onboarding_state,
         subscriptionStatus: accessPolicyResult.user.subscription_status,
-        reactionAcknowledged: Boolean(reactionResult.reply),
-        replyPreview: reactionResult.reply
+        reactionAcknowledged: reactionResult.handled,
+        reactionMode: reactionResult.mode ?? null,
+        replyPreview: reactionResult.reply ?? null
       });
       return;
     }
