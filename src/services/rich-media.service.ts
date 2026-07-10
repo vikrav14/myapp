@@ -272,11 +272,12 @@ export async function renderLockedInStickerWebp(): Promise<Buffer | null> {
       frames.push(png);
     }
 
-    return await sharp(frames, {
-      animated: true,
-      delay: Array.from({ length: LOCKED_IN_STICKER_FRAMES }, () => LOCKED_IN_STICKER_DELAY_MS)
-    })
-      .webp({ quality: 82, effort: 4 })
+    return await sharp(frames, { animated: true })
+      .webp({
+        quality: 82,
+        effort: 4,
+        delay: Array.from({ length: LOCKED_IN_STICKER_FRAMES }, () => LOCKED_IN_STICKER_DELAY_MS)
+      })
       .toBuffer();
   } catch (error) {
     logger.warn({ error }, "Failed to render locked-in sticker WebP.");
