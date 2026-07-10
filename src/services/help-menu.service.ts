@@ -33,6 +33,7 @@ Morning brief
 - add habits / remove founder — toggle modules
 - my topics — show your tags
 - update topics Traffic Money Tech
+- my pace — unprompted check-in frequency (twice a day, every few hours, silent, etc.)
 - digest off / digest on
 
 Reminders

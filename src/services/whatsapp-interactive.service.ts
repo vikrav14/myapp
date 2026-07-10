@@ -4,10 +4,16 @@ import { HELP_FOCUS_CATALOG } from "./help-focus.constants.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY } from "./help-focus.constants.js";
 import { formatHelpFocusLabel } from "./help-focus-inference.service.js";
+import { PACE_PRESET_CATALOG } from "./notification-pace.constants.js";
+import type { ProactivePacePreset } from "./notification-pace.constants.js";
 import { MODULE_CATALOG } from "./user-modules.constants.js";
 
 const HELP_DOMAIN_REPLY_ENTRIES = Object.fromEntries(
   HELP_FOCUS_CATALOG.map((entry) => [`help_domain_${entry.key}`, `help domain ${entry.key.replace(/_/g, " ")}`])
+) as Record<string, string>;
+
+const PACE_REPLY_ENTRIES = Object.fromEntries(
+  PACE_PRESET_CATALOG.map((entry) => [`pace_${entry.key}`, `pace ${entry.key}`])
 ) as Record<string, string>;
 
 export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
@@ -63,6 +69,7 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
 };
 
 Object.assign(INTERACTIVE_REPLY_MAP, HELP_DOMAIN_REPLY_ENTRIES);
+Object.assign(INTERACTIVE_REPLY_MAP, PACE_REPLY_ENTRIES);
 
 export function resolveInteractiveReplyId(replyId: string): string | null {
   return INTERACTIVE_REPLY_MAP[replyId] ?? null;
@@ -487,5 +494,29 @@ export function buildPaymentCtaInteractive(input: {
       displayText: providerLabel,
       url: input.checkoutUrl
     }
+  };
+}
+
+export function buildPacePickerInteractive(input: {
+  firstName?: string | null;
+  suggestedPreset?: ProactivePacePreset | null;
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+
+  return {
+    header: "Your Mauri pace",
+    body: `${name} — how often should I check in unprompted? Replies when you message are always on.`,
+    footer: "Change anytime · reply my pace",
+    listButtonLabel: "Pick pace",
+    sections: [
+      {
+        title: "Unprompted check-ins",
+        rows: PACE_PRESET_CATALOG.map((entry) => ({
+          id: `pace_${entry.key}`,
+          title: entry.label.slice(0, 24),
+          description: entry.description.slice(0, 72)
+        }))
+      }
+    ]
   };
 }

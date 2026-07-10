@@ -1,7 +1,9 @@
 import { supabase } from "../lib/supabase.js";
-import type { MauriModuleKey, MauriUser, MorningBriefTopicKey, HelpFocusKey } from "../types.js";
+import type { MauriModuleKey, MauriUser, MorningBriefTopicKey, HelpFocusKey, NotificationConfig } from "../types.js";
 import { MAURI_MODULE_KEYS, MAX_ACTIVE_MODULES } from "./user-modules.constants.js";
 import { isHelpFocusKey } from "./help-focus-inference.service.js";
+import type { ProactivePacePreset } from "./notification-pace.constants.js";
+import { PACE_PRESET_CATALOG } from "./notification-pace.constants.js";
 
 function sanitizeUserModules(value: unknown): MauriModuleKey[] {
   if (!Array.isArray(value)) {
@@ -30,6 +32,33 @@ function sanitizeHelpFocus(value: unknown): HelpFocusKey | null {
   }
 
   return isHelpFocusKey(value) ? value : null;
+}
+
+function sanitizeNotificationConfig(value: unknown): NotificationConfig | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const preset = record.proactive_preset;
+  if (typeof preset !== "string" || !PACE_PRESET_CATALOG.some((entry) => entry.key === preset)) {
+    return null;
+  }
+
+  const definition = PACE_PRESET_CATALOG.find((entry) => entry.key === preset);
+  if (!definition) {
+    return null;
+  }
+
+  return {
+    proactive_preset: preset as ProactivePacePreset,
+    density_profile: definition.density_profile,
+    proactive_max_per_day: definition.proactive_max_per_day,
+    proactive_min_interval_minutes: definition.proactive_min_interval_minutes,
+    proactive_max_per_week: definition.proactive_max_per_week,
+    configured_at:
+      typeof record.configured_at === "string" && record.configured_at.trim() ? record.configured_at : undefined
+  };
 }
 
 export function mapUser(record: Record<string, unknown>): MauriUser {
@@ -84,6 +113,7 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
       record.quiet_hours_end_hour === null || record.quiet_hours_end_hour === undefined
         ? 7
         : Number(record.quiet_hours_end_hour),
+    notification_config: sanitizeNotificationConfig(record.notification_config),
     created_at: String(record.created_at),
     updated_at: String(record.updated_at)
   };

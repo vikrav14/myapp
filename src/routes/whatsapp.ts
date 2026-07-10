@@ -30,6 +30,8 @@ import { handleReceiptImageMessage } from "../services/receipt-scan.service.js";
 import { handleCalendarMessage } from "../services/calendar.service.js";
 import { handleEngagementCommandMessage } from "../services/engagement-commands.service.js";
 import { handleHelpFocusMessage } from "../services/help-focus.service.js";
+import { handlePaceMessage } from "../services/notification-pace.service.js";
+import { buildPostActivationPaceOffer } from "../services/notification-pace.service.js";
 import { handleUserMindCommandMessage } from "../services/user-mind.service.js";
 import { handleServiceFeedbackMessage } from "../services/weekly-report-feedback.service.js";
 import { handleMemoryResurfaceToggleMessage } from "../services/memory-resurfacing.service.js";
@@ -239,6 +241,28 @@ async function processInboundWhatsAppMessage(input: {
           result: reactionResult,
           requestId
         });
+
+        if (reactionResult.mode === "reaction") {
+          const paceOffer = await buildPostActivationPaceOffer(accessPolicyResult.user);
+          if (paceOffer?.reply || paceOffer?.interactive) {
+            await sendMauriReply(
+              inboundMessage.from,
+              {
+                text: paceOffer.reply,
+                interactive: paceOffer.interactive
+              },
+              {
+                userId: accessPolicyResult.user.id,
+                requestId,
+                sendTextBeforeInteractive: Boolean(paceOffer.reply?.trim() && paceOffer.interactive),
+                metadata: {
+                  sourceType: inboundMessage.kind,
+                  flow: "pace_setup"
+                }
+              }
+            );
+          }
+        }
       }
 
       await respondOk({
@@ -398,6 +422,41 @@ async function processInboundWhatsAppMessage(input: {
         subscriptionStatus: accessPolicyResult.user.subscription_status,
         transcriptPreview,
         replyPreview: paywallResult.text ?? paywallResult.interactive?.body
+      });
+      return;
+    }
+
+    const paceResult = await handlePaceMessage({
+      user: accessPolicyResult.user,
+      message: normalizedMessageText
+    });
+
+    if (paceResult.handled && (paceResult.reply || paceResult.interactive)) {
+      await sendMauriReply(
+        inboundMessage.from,
+        {
+          text: paceResult.reply,
+          interactive: paceResult.interactive
+        },
+        {
+          userId: (paceResult.user ?? accessPolicyResult.user).id,
+          requestId,
+          sendTextBeforeInteractive: Boolean(paceResult.reply?.trim() && paceResult.interactive),
+          metadata: {
+            sourceType: inboundMessage.kind,
+            flow: "pace_command"
+          }
+        }
+      );
+
+      await respondOk({
+        ok: true,
+        userId: (paceResult.user ?? accessPolicyResult.user).id,
+        sourceType: inboundMessage.kind,
+        onboardingState: (paceResult.user ?? accessPolicyResult.user).onboarding_state,
+        subscriptionStatus: (paceResult.user ?? accessPolicyResult.user).subscription_status,
+        transcriptPreview,
+        replyPreview: paceResult.reply ?? paceResult.interactive?.body
       });
       return;
     }

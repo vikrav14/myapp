@@ -3,10 +3,11 @@ import { supabase } from "../lib/supabase.js";
 import type { MauriUser } from "../types.js";
 import { getMauritiusLocalParts } from "./reminder-time.service.js";
 import { recordEngagementDelivery } from "./engagement-delivery.service.js";
+import { resolveNotificationConfig } from "./notification-pace.service.js";
 
 export type ProactiveOutboundFlow = "proactive_checkin" | "memory_resurface" | "open_loop_followup";
 
-export type ProactiveOutboundBlockReason = "paused" | "quiet_hours" | "daily_budget";
+export type ProactiveOutboundBlockReason = "paused" | "quiet_hours" | "daily_budget" | "min_interval" | "pace_silent";
 
 export interface ProactiveOutboundGateResult {
   allowed: boolean;
@@ -77,6 +78,28 @@ export async function countProactivePingsToday(
   return count ?? 0;
 }
 
+export async function getLastProactivePingAt(userId: string): Promise<Date | null> {
+  const { data, error } = await supabase
+    .from("engagement_deliveries")
+    .select("created_at")
+    .eq("user_id", userId)
+    .like("delivery_key", "proactive_ping_%")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load last proactive ping: ${error.message}`);
+  }
+
+  if (!data?.created_at) {
+    return null;
+  }
+
+  const parsed = new Date(String(data.created_at));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export async function canSendProactiveOutbound(
   user: MauriUser,
   _flow: ProactiveOutboundFlow
@@ -89,9 +112,25 @@ export async function canSendProactiveOutbound(
     return { allowed: false, reason: "quiet_hours" };
   }
 
+  const pace = resolveNotificationConfig(user);
+  if (pace.proactive_max_per_day <= 0) {
+    return { allowed: false, reason: "pace_silent" };
+  }
+
   const sentToday = await countProactivePingsToday(user.id);
-  if (sentToday >= env.PROACTIVE_DAILY_BUDGET) {
+  const dailyCap = pace.proactive_max_per_day;
+  if (sentToday >= dailyCap) {
     return { allowed: false, reason: "daily_budget" };
+  }
+
+  if (pace.proactive_min_interval_minutes > 0) {
+    const lastPing = await getLastProactivePingAt(user.id);
+    if (lastPing) {
+      const elapsedMinutes = (Date.now() - lastPing.getTime()) / (60 * 1000);
+      if (elapsedMinutes < pace.proactive_min_interval_minutes) {
+        return { allowed: false, reason: "min_interval" };
+      }
+    }
   }
 
   return { allowed: true };
@@ -108,14 +147,16 @@ export async function recordProactivePing(
 export function buildProactiveBudgetStatusReply(user: MauriUser, sentToday: number): string {
   const paused = isProactiveOutboundPaused(user);
   const quiet = user.quiet_hours_enabled;
+  const pace = resolveNotificationConfig(user);
 
   return [
     "Proactive ping settings",
     "",
+    `Pace: ${pace.proactive_preset} (${pace.proactive_max_per_day}/day max)`,
     `Quiet hours: ${quiet ? "on" : "off"}${quiet ? ` (${formatQuietHoursWindow(user)})` : ""}`,
     `Paused: ${paused ? `yes until ${user.proactive_checkins_paused_until?.slice(0, 16).replace("T", " ")}` : "no"}`,
-    `Today's unprompted pings: ${sentToday}/${env.PROACTIVE_DAILY_BUDGET}`,
+    `Today's unprompted pings: ${sentToday}/${pace.proactive_max_per_day}`,
     "",
-    "Commands: quiet hours on/off · not now (pause 7 days)"
+    "Commands: my pace · quiet hours on/off · not now (pause 7 days)"
   ].join("\n");
 }

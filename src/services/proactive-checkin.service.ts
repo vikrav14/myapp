@@ -29,9 +29,24 @@ import { hasModule } from "./user-modules.service.js";
 import { TRIAL_PROACTIVE_MIN_SILENCE_HOURS } from "./relationship-engagement.constants.js";
 import { isWithinTrialRelationshipWindow } from "./relationship-engagement.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
+import { resolveNotificationConfig } from "./notification-pace.service.js";
 
 function effectiveMinSilenceHours(user: MauriUser): number {
+  const paceMinutes = resolveNotificationConfig(user).proactive_min_interval_minutes;
+  if (paceMinutes > 0) {
+    return paceMinutes / 60;
+  }
+
   return isWithinTrialRelationshipWindow(user) ? TRIAL_PROACTIVE_MIN_SILENCE_HOURS : PROACTIVE_CHECKIN_MIN_SILENCE_HOURS;
+}
+
+function effectiveWeeklyCap(user: MauriUser): number {
+  const paceCap = resolveNotificationConfig(user).proactive_max_per_week;
+  if (paceCap > 0) {
+    return paceCap;
+  }
+
+  return 0;
 }
 
 export type ProactiveCheckInMode = "care" | "useful" | "curious";
@@ -476,7 +491,7 @@ export async function canSendProactiveCheckIn(input: {
     return { ok: false, reason: "recent_activity" };
   }
 
-  if (input.weeklyCount >= PROACTIVE_CHECKIN_MAX_PER_WEEK) {
+  if (input.weeklyCount >= effectiveWeeklyCap(input.user)) {
     return { ok: false, reason: "weekly_cap" };
   }
 
