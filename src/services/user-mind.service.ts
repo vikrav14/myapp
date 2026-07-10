@@ -272,7 +272,8 @@ Built for the Mauritian juggle. High corporate stakes, heavy family loads, and t
 • what's heavy right now (optional but helps)
 • how you want me to show up — and what to avoid
 
-Example: "I'm 26, dev in Moka, gym and football, building a side app. Grind mode. Keep it direct and short — no guilt trips about habits."
+Example (voice note or text — rough is fine):
+"Hey Mauri, I'm 31, working in a management company in Grand Baie but living in Vacoas. The winter rain and traffic are killing me. I make okay money, but my parents took a massive loan for my wedding last year and now they expect me to pay the monthly installments because my dad got laid off from his factory job. I want to build a side hustle in digital marketing at night to break out of this 9-to-5 loop, but by 8 PM my brain is completely fried and I just stare at the TV. I feel like a failure because I can't find the energy to change my life."
 
 This stays between us 🔒 and shapes how I remember you.
 
