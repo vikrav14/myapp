@@ -13,7 +13,10 @@ import { formatStrategyTrackReplyForUser } from "./mauri-memory-view.service.js"
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_CATALOG } from "./help-focus.constants.js";
 import { loadUserMindFacts } from "./user-mind.service.js";
-import { buildHelpFocusPickerInteractive } from "./whatsapp-interactive.service.js";
+import {
+  buildHelpFocusActivationInteractive,
+  buildHelpFocusPickerInteractive
+} from "./whatsapp-interactive.service.js";
 
 export interface HelpFocusCommandResult {
   handled: boolean;
@@ -74,6 +77,45 @@ export function parseHelpFocusCommand(
   return null;
 }
 
+function shouldResumeHelpFocusActivation(user: MauriUser): boolean {
+  if (!user.onboarding_completed_at) {
+    return false;
+  }
+
+  const completedAt = new Date(user.onboarding_completed_at).getTime();
+  if (Number.isNaN(completedAt)) {
+    return false;
+  }
+
+  const activationWindowMs = 6 * 60 * 60 * 1000;
+  return Date.now() - completedAt < activationWindowMs;
+}
+
+function buildPlaybookHelpFocusResult(
+  user: MauriUser,
+  lane?: HelpFocusKey | null
+): HelpFocusCommandResult {
+  const reply = buildHelpFocusSourcesReply({
+    firstName: user.first_name,
+    primary: user.help_focus_primary,
+    secondary: user.help_focus_secondary,
+    lane: lane ?? undefined
+  });
+
+  const resumeActivation = shouldResumeHelpFocusActivation(user);
+
+  return {
+    handled: true,
+    user,
+    reply: resumeActivation
+      ? `${reply.trim()}\n\nTap Looks good to lock this lane, or Pick lane to switch.`
+      : reply,
+    interactive: resumeActivation
+      ? buildHelpFocusActivationInteractive({ firstName: user.first_name })
+      : undefined
+  };
+}
+
 export async function assignHelpFocusFromFacts(user: MauriUser): Promise<MauriUser> {
   const facts = await loadUserMindFacts(user.id);
   const inferred = inferHelpFocusFromFacts(facts);
@@ -116,27 +158,10 @@ export async function handleHelpFocusMessage(input: {
     }
 
     if (sourcesRequest.lane) {
-      return {
-        handled: true,
-        user: input.user,
-        reply: buildHelpFocusSourcesReply({
-          firstName: input.user.first_name,
-          primary: input.user.help_focus_primary,
-          secondary: input.user.help_focus_secondary,
-          lane: sourcesRequest.lane
-        })
-      };
+      return buildPlaybookHelpFocusResult(input.user, sourcesRequest.lane);
     }
 
-    return {
-      handled: true,
-      user: input.user,
-      reply: buildHelpFocusSourcesReply({
-        firstName: input.user.first_name,
-        primary: input.user.help_focus_primary,
-        secondary: input.user.help_focus_secondary
-      })
-    };
+    return buildPlaybookHelpFocusResult(input.user);
   }
 
   const command = parseHelpFocusCommand(input.message);

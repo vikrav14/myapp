@@ -225,13 +225,21 @@ export function formatMemorySectionHeader(emoji: string, title: string): string 
   return `${emoji} ${title}`;
 }
 
-export function formatStrategyTrackBlock(track: MauriMemoryStrategyTrack): string[] {
-  return [
+export function formatStrategyTrackBlock(
+  track: MauriMemoryStrategyTrack,
+  options?: { includePlaybookCue?: boolean }
+): string[] {
+  const lines = [
     formatMemorySectionHeader("🛡️", "Strategy track"),
     track.laneLabels,
-    `How I help: ${track.howIHelp}`,
-    "Reply my playbook to see what's behind this lane."
+    `How I help: ${track.howIHelp}`
   ];
+
+  if (options?.includePlaybookCue !== false) {
+    lines.push("Reply my playbook to see what's behind this lane.");
+  }
+
+  return lines;
 }
 
 export function formatMauriMemoryViewForWhatsApp(user: MauriUser, view: MauriMemoryView): string {
