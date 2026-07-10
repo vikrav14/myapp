@@ -54,6 +54,8 @@ describe("user mind helpers", () => {
 
   it("parses profile and remember commands", () => {
     expect(parseUserMindCommand("what do you know about me")).toEqual({ type: "profile" });
+    expect(parseUserMindCommand("my memory")).toEqual({ type: "profile" });
+    expect(parseUserMindCommand("how do you see me")).toEqual({ type: "profile" });
     expect(parseUserMindCommand("remember that I live in Quatre Bornes")).toEqual({
       type: "remember",
       text: "I live in Quatre Bornes"
@@ -96,6 +98,8 @@ describe("user mind helpers", () => {
         monthly_income_rs: null,
         weekly_focus_habit: null,
         weekly_focus_set_at: null,
+        help_focus_primary: null,
+        help_focus_secondary: null,
         created_at: "2026-01-01T00:00:00.000Z",
         updated_at: "2026-01-01T00:00:00.000Z"
       },
@@ -116,7 +120,8 @@ describe("user mind helpers", () => {
     );
 
     expect(reply).toContain("Rose Hill");
-    expect(reply).toContain("not just this week's logs");
+    expect(reply).toContain("Mauri Memory");
+    expect(reply).toContain("📋 What you told me");
   });
 
   it("builds know-you acknowledgement with saved facts", () => {
@@ -145,6 +150,8 @@ describe("user mind helpers", () => {
         monthly_income_rs: null,
         weekly_focus_habit: null,
         weekly_focus_set_at: null,
+        help_focus_primary: null,
+        help_focus_secondary: null,
         created_at: "2026-01-01T00:00:00.000Z",
         updated_at: "2026-01-01T00:00:00.000Z"
       },
@@ -221,6 +228,8 @@ describe("user mind helpers", () => {
         monthly_income_rs: null,
         weekly_focus_habit: null,
         weekly_focus_set_at: null,
+        help_focus_primary: null,
+        help_focus_secondary: null,
         created_at: "2026-01-01T00:00:00.000Z",
         updated_at: "2026-01-01T00:00:00.000Z"
       },

@@ -3,11 +3,11 @@ import { updateUserState } from "./user.service.js";
 import {
   buildHelpFocusActivationExplanation,
   buildHelpFocusEnginePrompt,
-  buildHelpFocusStatusReply,
   formatHelpFocusLabel,
   inferHelpFocusFromFacts,
   normalizeHelpFocusKey
 } from "./help-focus-inference.service.js";
+import { formatStrategyTrackReplyForUser } from "./mauri-memory-view.service.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_CATALOG } from "./help-focus.constants.js";
 import { loadUserMindFacts } from "./user-mind.service.js";
@@ -108,11 +108,7 @@ export async function handleHelpFocusMessage(input: {
     return {
       handled: true,
       user: input.user,
-      reply: buildHelpFocusStatusReply({
-        firstName: input.user.first_name,
-        primary: input.user.help_focus_primary,
-        secondary: input.user.help_focus_secondary
-      }),
+      reply: formatStrategyTrackReplyForUser(input.user),
       interactive: buildHelpFocusPickerInteractive({
         firstName: input.user.first_name,
         suggestedPrimary: input.user.help_focus_primary,
@@ -156,4 +152,4 @@ export async function handleHelpFocusMessage(input: {
   return { handled: false };
 }
 
-export { inferHelpFocusFromFacts, buildHelpFocusStatusReply, buildHelpFocusActivationExplanation };
+export { inferHelpFocusFromFacts, buildHelpFocusActivationExplanation };

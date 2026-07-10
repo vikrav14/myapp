@@ -17,7 +17,24 @@ function summary(): WeeklyDiagnosticSummary {
     todos: { created_count: 1, completed_count: 0, open_count: 2 },
     emotions: { average_anxiety: 3, latest_anxiety: 3, dominant_driver: "money" },
     momentum_score: 42,
-    trial_cliffhanger: false
+    trial_cliffhanger: false,
+    memory: {
+      active_focus: "Balancing shop overheads vs newborn schedule",
+      open_loops: ["uncle loan follow-up"],
+      strategy_track: "Personal Finance + Parenting"
+    },
+    daily: {
+      labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      spend_rs: [null, 1200, null, 800, null, null, null],
+      habit_wins: [null, 1, 0, 1, null, null, null],
+      mood_avg: [null, null, null, null, null, null, null]
+    },
+    week_over_week: {
+      prior_week_start: "2026-06-23T00:00:00.000Z",
+      spend_delta_pct: 12,
+      habit_wins_delta: 1,
+      momentum_delta: 4
+    }
   };
 }
 
@@ -31,6 +48,11 @@ describe("report web UI", () => {
     });
 
     expect(html).toContain("Vik's week");
+    expect(html).toContain("Mauri Memory");
+    expect(html).toContain("Balancing shop overheads");
+    expect(html).toContain("Spend by day");
+    expect(html).toContain("Habit wins by day");
+    expect(html).toContain("Vs last week");
     expect(html).toContain("Momentum");
     expect(html).toContain("42");
     expect(html).toContain("roast me");

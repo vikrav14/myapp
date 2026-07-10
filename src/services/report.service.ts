@@ -11,7 +11,12 @@ import type {
 import { generateWeeklyDiagnosticCopy, generateWeeklyFeedbackSection } from "./ai.service.js";
 import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
 import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
-import { formatUserMindSnapshotForPrompt } from "./user-mind-prompt.js";
+import { buildMauriMemoryViewFromData } from "./mauri-memory-view.service.js";
+import {
+  buildWeekOverWeekComparison,
+  buildWeeklyDailySeries,
+  hasWeeklyReportCharts
+} from "./report-daily-series.service.js";
 import { listPendingFollowUpsForUser } from "./open-loop-follow-up.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import { OUTBOUND_PAIR_DELAY_MS, sleep } from "../lib/mauri-voice.js";
@@ -40,6 +45,8 @@ interface ReportWindow {
 
 export interface WeeklyReportNarrativeContext {
   userMindSnapshotPrompt: string | null;
+  activeFocus: string | null;
+  strategyTrack: string | null;
   openLoops: string[];
   weeklyFocusHabit: string | null;
   momentumDelta: number | null;
@@ -57,6 +64,14 @@ export function isQuietReportWeek(summary: WeeklyDiagnosticSummary): boolean {
 
 export function buildWeeklyReportNarrativePrompt(context: WeeklyReportNarrativeContext): string {
   const lines: string[] = [];
+
+  if (context.activeFocus) {
+    lines.push(`Mauri Memory — active focus: ${context.activeFocus}`);
+  }
+
+  if (context.strategyTrack) {
+    lines.push(`Mauri Memory — strategy track: ${context.strategyTrack}`);
+  }
 
   if (context.userMindSnapshotPrompt) {
     lines.push(`Reflection snapshot:\n${context.userMindSnapshotPrompt}`);
@@ -79,11 +94,11 @@ export function buildWeeklyReportNarrativePrompt(context: WeeklyReportNarrativeC
 
   if (context.isQuietWeek) {
     lines.push(
-      "Measurable logs were quiet this week — still write a human report using profile, snapshot, and open loops. Do not sound empty or robotic."
+      "Measurable logs were quiet this week — still write a human report using Mauri Memory, snapshot, and open loops. Do not sound empty or robotic."
     );
   }
 
-  return lines.length > 0 ? lines.join("\n\n") : "No reflection snapshot or open loops loaded.";
+  return lines.length > 0 ? lines.join("\n\n") : "No Mauri Memory or reflection snapshot loaded.";
 }
 
 export function buildQuietWeekFallbackSignal(
@@ -95,6 +110,10 @@ export function buildQuietWeekFallbackSignal(
 
   if (narrative.openLoops.length > 0) {
     return `A quiet week on the logs — ${narrative.openLoops[0]} is still live.`;
+  }
+
+  if (narrative.activeFocus) {
+    return `A quiet week on the logs — ${narrative.activeFocus.charAt(0).toLowerCase()}${narrative.activeFocus.slice(1)} still counts.`;
   }
 
   if (narrative.userMindSnapshotPrompt) {
@@ -121,8 +140,7 @@ async function buildWeeklyReportNarrativeContext(input: {
   window: ReportWindow;
   summary: WeeklyDiagnosticSummary;
 }): Promise<WeeklyReportNarrativeContext> {
-  const [mindRecord, pendingFollowUps, priorReportResult] = await Promise.all([
-    getUserMindSnapshot(input.user.id).catch(() => null),
+  const [pendingFollowUps, priorReportResult] = await Promise.all([
     listPendingFollowUpsForUser(input.user.id).catch(() => []),
     supabase
       .from("weekly_reports")
@@ -142,14 +160,21 @@ async function buildWeeklyReportNarrativeContext(input: {
   const priorMomentumScore =
     priorSummary && typeof priorSummary.momentum_score === "number" ? priorSummary.momentum_score : null;
   const momentumDelta =
-    priorMomentumScore !== null ? input.summary.momentum_score - priorMomentumScore : null;
+    input.summary.week_over_week?.momentum_delta ??
+    (priorMomentumScore !== null ? input.summary.momentum_score - priorMomentumScore : null);
 
-  const snapshotLoops = mindRecord?.snapshot.open_loops ?? [];
+  const memory = input.summary.memory;
   const followUpLoops = pendingFollowUps.map((followUp) => followUp.loop_text);
-  const openLoops = [...new Set([...snapshotLoops, ...followUpLoops])].slice(0, 8);
+  const openLoops = [
+    ...new Set([...(memory?.open_loops ?? []), ...followUpLoops])
+  ].slice(0, 8);
 
   return {
-    userMindSnapshotPrompt: mindRecord ? formatUserMindSnapshotForPrompt(mindRecord.snapshot) : null,
+    userMindSnapshotPrompt: memory?.active_focus
+      ? `Life summary: ${memory.active_focus}`
+      : null,
+    activeFocus: memory?.active_focus ?? null,
+    strategyTrack: memory?.strategy_track ?? null,
     openLoops,
     weeklyFocusHabit: input.user.weekly_focus_habit,
     momentumDelta,
@@ -278,17 +303,26 @@ function mapWeeklyReportRecord(record: Record<string, unknown>): WeeklyReportRec
 }
 
 async function buildWeeklyDiagnosticSummary(user: MauriUser, window: ReportWindow): Promise<WeeklyDiagnosticSummary> {
-  const [financeResult, habitsResult, createdTodosResult, completedTodosResult, openTodosResult, emotionsResult] =
-    await Promise.all([
+  const [
+    financeResult,
+    habitsResult,
+    createdTodosResult,
+    completedTodosResult,
+    openTodosResult,
+    emotionsResult,
+    facts,
+    mindRecord,
+    priorReportResult
+  ] = await Promise.all([
     supabase
       .from("finance_logs")
-      .select("amount, category")
+      .select("amount, category, logged_at")
       .eq("user_id", user.id)
       .gte("logged_at", window.weekStart)
       .lte("logged_at", window.weekEnd),
     supabase
       .from("habit_logs")
-      .select("activity_type, duration_minutes, is_success")
+      .select("activity_type, duration_minutes, is_success, logged_at")
       .eq("user_id", user.id)
       .gte("logged_at", window.weekStart)
       .lte("logged_at", window.weekEnd),
@@ -308,10 +342,20 @@ async function buildWeeklyDiagnosticSummary(user: MauriUser, window: ReportWindo
     supabase.from("todo_logs").select("id").eq("user_id", user.id).eq("is_completed", false),
     supabase
       .from("insights_vault")
-      .select("anxiety_score, core_emotional_driver")
+      .select("anxiety_score, core_emotional_driver, logged_at")
       .eq("user_id", user.id)
       .gte("logged_at", window.weekStart)
-      .lte("logged_at", window.weekEnd)
+      .lte("logged_at", window.weekEnd),
+    loadUserMindFacts(user.id),
+    getUserMindSnapshot(user.id).catch(() => null),
+    supabase
+      .from("weekly_reports")
+      .select("summary_json")
+      .eq("user_id", user.id)
+      .lt("week_end", window.weekStart)
+      .order("week_end", { ascending: false })
+      .limit(1)
+      .maybeSingle()
   ]);
 
   const errors = [
@@ -320,7 +364,8 @@ async function buildWeeklyDiagnosticSummary(user: MauriUser, window: ReportWindo
     createdTodosResult.error,
     completedTodosResult.error,
     openTodosResult.error,
-    emotionsResult.error
+    emotionsResult.error,
+    priorReportResult.error
   ].filter(Boolean);
 
   if (errors.length > 0) {
@@ -383,10 +428,35 @@ async function buildWeeklyDiagnosticSummary(user: MauriUser, window: ReportWindo
     )
   };
 
-  return {
+  const memoryView = buildMauriMemoryViewFromData({
+    user,
+    facts,
+    snapshot: mindRecord?.snapshot ?? null,
+    snapshotRefreshedAt: mindRecord?.generated_at ?? null
+  });
+
+  const summaryWithScore: WeeklyDiagnosticSummary = {
     ...summaryWithoutScore,
-    momentum_score: computeMomentumScore(summaryWithoutScore)
+    momentum_score: computeMomentumScore(summaryWithoutScore),
+    daily: buildWeeklyDailySeries({
+      weekStart: window.weekStart,
+      financeRows,
+      habitRows,
+      emotionRows
+    }),
+    memory: {
+      active_focus: memoryView.activeFocus,
+      open_loops: memoryView.openLoops,
+      strategy_track: memoryView.strategyTrack?.laneLabels ?? null
+    }
   };
+
+  summaryWithScore.week_over_week = buildWeekOverWeekComparison({
+    current: summaryWithScore,
+    prior: priorReportResult.data?.summary_json as WeeklyDiagnosticSummary | undefined
+  });
+
+  return summaryWithScore;
 }
 
 async function getExistingReport(userId: string, window: ReportWindow): Promise<WeeklyReportRecord | null> {
@@ -505,7 +575,10 @@ export async function generateWeeklyDiagnosticReport(input: {
   }
 
   const reportWebUrl = buildReportWebUrl({ userId: user.id, weekStart: window.weekStart });
-  const deliveryText = reportWebUrl ? `${reportText.trim()}\n\n📊 Full report: ${reportWebUrl}` : reportText;
+  const deliveryText =
+    reportWebUrl && hasWeeklyReportCharts(summary)
+      ? `${reportText.trim()}\n\n📈 Your week in numbers: ${reportWebUrl}`
+      : reportText;
 
   let deliveryStatus = sendMessage ? "queued" : "stored_only";
   let sentAt: string | undefined;

@@ -424,7 +424,7 @@ Trial and premium users can manage Mauri Squads directly in WhatsApp:
 - `digest on` / `digest off` (pause or resume the 7:00 morning brief)
 - `quantum pick 1 5` or `quantum pick Tribeca, Docker, Nandos` (true-random decision helper)
 - `help` or `menu` (full command list)
-- `what do you know about me` — person profile (not just logs)
+- `my memory` / `what do you know about me` — structured Mauri Memory profile (active focus, strategy track, facts)
 - `remember that …` / `forget that …` — update stored facts about you
 - `my focus` (this week's one habit)
 - `my streaks` (habit consistency, no guilt)

@@ -15,8 +15,9 @@ Daily
 - lesson — today's 2-minute insight
 
 Discover yourself
-- what do you know about me — your person profile (not just logs)
-- help focus — pick advice lane (money, career, discipline, relationships…)
+- my memory — structured profile (active focus, strategy track, what you told me)
+- what do you know about me — same as my memory
+- help focus — change advice lane (money, career, discipline, relationships…)
 - remember that … — save something about you
 - forget that … — remove a stored fact
 - my focus — this week's one habit

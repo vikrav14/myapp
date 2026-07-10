@@ -96,8 +96,8 @@ describe("help focus inference", () => {
     });
 
     expect(explanation).toContain("Personal Finance + Parenting");
-    expect(explanation).toContain("Shame-free money habits");
-    expect(explanation).toContain("Connection before correction");
+    expect(explanation).toContain("🛡️ Strategy track");
+    expect(explanation).toContain("How I help:");
     expect(explanation).not.toContain("Classic frameworks woven in");
     expect(explanation).not.toContain("Psychology of Money");
 
