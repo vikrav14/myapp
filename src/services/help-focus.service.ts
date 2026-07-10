@@ -111,7 +111,7 @@ export async function handleHelpFocusMessage(input: {
       return {
         handled: true,
         user: input.user,
-        reply: `Didn't recognise "${sourcesRequest.invalidLane}". Try help focus sources personal finance — or reply help focus to see lanes.`
+        reply: `Didn't recognise "${sourcesRequest.invalidLane}". Try my playbook personal finance — or reply help focus to see lanes.`
       };
     }
 

@@ -229,7 +229,8 @@ export function formatStrategyTrackBlock(track: MauriMemoryStrategyTrack): strin
   return [
     formatMemorySectionHeader("🛡️", "Strategy track"),
     track.laneLabels,
-    `How I help: ${track.howIHelp}`
+    `How I help: ${track.howIHelp}`,
+    "Reply my playbook to see what's behind this lane."
   ];
 }
 
@@ -313,5 +314,5 @@ export function formatStrategyTrackReplyForUser(user: MauriUser): string {
 
   const block = formatStrategyTrackBlock(track);
 
-  return [`${name} — ${block[0]}`, block[1], block[2], "", "Reply help focus to change lane."].join("\n");
+  return [`${name} — ${block[0]}`, block[1], block[2], block[3] ?? "", "", "Reply help focus to change lane."].join("\n");
 }

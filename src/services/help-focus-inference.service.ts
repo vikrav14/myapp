@@ -2,7 +2,7 @@ import type { UserMindFact } from "../types.js";
 import { formatStrategyTrackBlock } from "./mauri-memory-view.service.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY, HELP_FOCUS_CATALOG, HELP_FOCUS_KEYS } from "./help-focus.constants.js";
-import { HELP_FOCUS_FRAMEWORKS } from "./help-focus-frameworks.js";
+import { HELP_FOCUS_PLAYBOOK, formatPlaybookLaneSection } from "./help-focus-playbook.js";
 import { combinedFactBlob, hasBoundaryGoal, hasFamilyMoneyPressure } from "./profile-inference.service.js";
 
 export interface InferredHelpFocus {
@@ -143,7 +143,7 @@ export function buildHelpFocusActivationExplanation(input: {
     ...trackBlock,
     "",
     "Next message — tap Looks good or Pick lane. Reply help focus anytime to change later.",
-    "Curious what's behind a lane? Reply help focus sources."
+    "Want to see the playbook behind this lane? Reply my playbook."
   ].join("\n");
 }
 
@@ -279,24 +279,35 @@ export function buildHelpFocusSourcesReply(input: {
   }
 
   if (lanes.length === 0) {
-    return `${name} — no advice lane set yet. Reply help focus to pick one, then help focus sources to see what's behind it.`;
+    return `${name} — no advice lane set yet. Reply help focus to pick one, then my playbook to see what I'll apply for you.`;
   }
+
+  const laneLabels =
+    lanes.length > 1 && !input.lane
+      ? `${formatHelpFocusLabel(lanes[0])} + ${formatHelpFocusLabel(lanes[1]!)}`
+      : formatHelpFocusLabel(lanes[0]!);
 
   const sections = lanes.map((key, index) => {
     const label = formatHelpFocusLabel(key);
-    const role =
+    const roleSuffix =
       !input.lane && lanes.length > 1 ? (index === 0 ? " (primary)" : " (secondary)") : "";
-    const books = HELP_FOCUS_FRAMEWORKS[key];
 
-    return `*${label}${role}*\n${books.map((book) => `• ${book}`).join("\n")}`;
+    return formatPlaybookLaneSection({
+      label,
+      roleSuffix,
+      playbook: HELP_FOCUS_PLAYBOOK[key]
+    });
   });
 
   return [
-    `${name} — thinking behind your advice lane${lanes.length > 1 ? "s" : ""}:`,
+    `${name} — your playbook for ${laneLabels}:`,
+    "",
+    "What I'm applying for you:",
     "",
     sections.join("\n\n"),
     "",
-    "I turn these into one practical step for your life — not homework. Reply help focus sources <lane> for another domain (e.g. help focus sources psychology), or help focus to switch."
+    "Not homework — proven thinking compressed into WhatsApp-sized steps for your life.",
+    "Reply my playbook <lane> for another domain (e.g. my playbook psychology), or help focus to switch."
   ].join("\n");
 }
 
@@ -304,6 +315,21 @@ export function parseHelpFocusSourcesRequest(
   message: string
 ): { lane: HelpFocusKey | null; invalidLane?: string | undefined } | null {
   const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
+
+  const playbookLaneMatch = normalized.match(/^my playbook(?: (.+))?$/);
+  if (playbookLaneMatch) {
+    const tail = playbookLaneMatch[1]?.trim();
+    if (!tail) {
+      return { lane: null };
+    }
+
+    const key = normalizeHelpFocusKey(tail);
+    if (key) {
+      return { lane: key };
+    }
+
+    return { lane: null, invalidLane: tail };
+  }
 
   const laneFromPrefix = normalized.match(/^help focus sources (.+)$/);
   if (laneFromPrefix?.[1]) {
@@ -316,6 +342,11 @@ export function parseHelpFocusSourcesRequest(
   }
 
   if (
+    normalized === "my playbook" ||
+    normalized === "whats my playbook" ||
+    normalized === "what's my playbook" ||
+    normalized === "show my playbook" ||
+    normalized === "show me my playbook" ||
     normalized === "help focus sources" ||
     normalized === "advice sources" ||
     normalized === "framework sources" ||
@@ -336,7 +367,7 @@ export function parseHelpFocusSourcesRequest(
   }
 
   if (
-    (/\b(which|what)\b/.test(normalized) && /\b(book|framework|source)\b/.test(normalized)) ||
+    (/\b(which|what)\b/.test(normalized) && /\b(book|framework|source|playbook)\b/.test(normalized)) ||
     (/\bwhere\b/.test(normalized) && /\b(from|come from)\b/.test(normalized) && /\b(that|this|advice)\b/.test(normalized))
   ) {
     return { lane: null };
