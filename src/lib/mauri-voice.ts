@@ -10,7 +10,7 @@ export const MAURI_SIGNATURE_EMOJI = "🦤";
  */
 /** Plain-language flagship — use in know-you / express preview, not insider jargon at activation. */
 export const MAURI_SMART_ADVICE_VALUE_LINE =
-  "Stuck on money, habits, or a hard call? I turn proven thinking into one practical next step for your life — no book lists, no homework.";
+  "15 playbooks behind your lane — Atomic Habits, Psychology of Money, and more compressed into one next step. Reply my playbook when you're curious.";
 
 export function mauriSignatureLine(text: string): string {
   const trimmed = text.trim();
