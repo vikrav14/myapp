@@ -298,13 +298,17 @@ describe("user mind helpers", () => {
     });
 
     expect(prompt).toContain("Before I track anything");
-    expect(prompt).toContain("week to week");
-    expect(prompt).toContain("Sunday report");
-    expect(prompt).toContain("roast me or hype me");
-    expect(prompt).toContain("one practical next step");
-    expect(prompt).toContain("no book lists");
-    expect(prompt).toContain("spot patterns over time");
-    expect(prompt).toContain("reply help anytime");
+    expect(prompt).toContain("your whole week in WhatsApp");
+    expect(prompt).toContain("7am");
+    expect(prompt).toContain("my memory");
+    expect(prompt).toContain("my playbook");
+    expect(prompt).toContain("Atomic Habits");
+    expect(prompt).toContain("Psychology of Money");
+    expect(prompt).toContain("Sunday");
+    expect(prompt).toContain("squad showdown");
+    expect(prompt).toContain("Mauritian juggle");
+    expect(prompt).toContain("silent strategist");
+    expect(prompt).toContain("not homework");
     expect(prompt).toContain("👋");
     expect(prompt).toContain("your age");
     expect(prompt).toContain("what to avoid");

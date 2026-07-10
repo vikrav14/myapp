@@ -1,7 +1,6 @@
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
 import { env } from "../lib/env.js";
-import { MAURI_SMART_ADVICE_VALUE_LINE, mauriSignatureLine } from "../lib/mauri-voice.js";
 import type { ProfileDelta } from "../schemas/message-router.js";
 import { messageRouterExtractionSchema } from "../schemas/message-router.js";
 import type { UserMindExtraction } from "../schemas/user-mind.js";
@@ -253,22 +252,18 @@ export function formatUserMindForPrompt(facts: UserMindFact[]): string {
 export function buildKnowYouPrompt(user: MauriUser): string {
   const name = user.first_name?.trim() || "there";
 
-  return `Hey ${name} 👋 I'm Mauri — here to help you make sense of your week, right from WhatsApp.
+  return `Hey ${name} 👋 I'm Mauri — your whole week in WhatsApp.
 
-Before I track anything, I want to know you like a friend who's around all week — not ChatGPT that resets tomorrow. I stay here, remember what matters, and help you spot patterns over time.
+Before I track anything, I want to know you like a friend who's here all week — not ChatGPT that resets tomorrow.
 
-What that looks like week to week:
-🌅 7am brief — traffic, weather, stories matched to you (personal stuff never in that)
-📊 Sunday report — roast me or hype me on how the week actually landed
-${mauriSignatureLine(MAURI_SMART_ADVICE_VALUE_LINE)}
-🔔 Gentle follow-ups when something's live · reminders when you ask
-💸 Receipt snaps · payday runway · brain dumps in plain chat
+🌅 7am — weather, traffic & stories AI picks for YOUR tags (personal stuff stays out of that)
+💬 All day — brain dumps, receipt snaps, reminders when you ask
+🧠 Memory + 15 playbooks — my memory shows what I've learned; my playbook draws on Atomic Habits, Psychology of Money & more (one step, not homework)
+📊 Sunday — roast or hype, your week in numbers, squad showdown if you're in a pact
 
-Squads, calendar sync, local alerts — reply help anytime for the full menu.
+Built for the Mauritian juggle. High corporate stakes, heavy family loads, and the chaos of the commute. Meet your silent strategist.
 
-Most Mauritians use me for rent pressure, family load, commute chaos — the messy middle. I'll tune to yours once I know you.
-
-30-second voice note is perfect. Rough is fine. Tell me whatever comes to mind:
+30-second voice note — rough is fine. Tell me whatever comes to mind:
 
 • your age (or rough — "mid-20s" is fine)
 • what life looks like right now — work, study, hustle, family
