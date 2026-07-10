@@ -63,9 +63,36 @@ describe("registerInboundEvent", () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it("reclaims duplicates still marked processing", async () => {
+  it("ignores fresh duplicates still marked processing", async () => {
     mockMaybeSingle.mockResolvedValue({
-      data: { id: "row-1", duplicate_count: 0, status: "processing" },
+      data: {
+        id: "row-1",
+        duplicate_count: 0,
+        status: "processing",
+        updated_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString()
+      },
+      error: null
+    });
+
+    const result = await registerInboundEvent({
+      provider: "whatsapp",
+      eventId: "wamid-1"
+    });
+
+    expect(result).toEqual({ duplicate: true, reclaim: false });
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("reclaims stale duplicates still marked processing", async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: {
+        id: "row-1",
+        duplicate_count: 0,
+        status: "processing",
+        updated_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        last_seen_at: new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      },
       error: null
     });
 

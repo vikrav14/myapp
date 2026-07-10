@@ -6,6 +6,26 @@ export interface InboundEventRegistration {
   reclaim: boolean;
 }
 
+/** Only reclaim stuck processing rows — fresh duplicates are concurrent webhook retries. */
+export const PROCESSING_RECLAIM_STALE_MS = 3 * 60 * 1000;
+
+function isStaleProcessingEvent(record: {
+  updated_at?: string | null;
+  last_seen_at?: string | null;
+}): boolean {
+  const timestamp = record.updated_at ?? record.last_seen_at;
+  if (!timestamp) {
+    return true;
+  }
+
+  const updatedAt = new Date(timestamp).getTime();
+  if (Number.isNaN(updatedAt)) {
+    return true;
+  }
+
+  return Date.now() - updatedAt >= PROCESSING_RECLAIM_STALE_MS;
+}
+
 export async function registerInboundEvent(input: {
   provider: string;
   eventId: string;
@@ -20,7 +40,7 @@ export async function registerInboundEvent(input: {
 
   const { data: existing, error: existingError } = await supabase
     .from("processed_inbound_events")
-    .select("id, duplicate_count, status")
+    .select("id, duplicate_count, status, updated_at, last_seen_at")
     .eq("provider", input.provider)
     .eq("event_id", trimmedEventId)
     .maybeSingle();
@@ -43,7 +63,7 @@ export async function registerInboundEvent(input: {
       throw new Error(`Failed to update duplicate inbound event: ${updateError.message}`);
     }
 
-    if (existing.status === "processed") {
+    if (existing.status === "processed" || !isStaleProcessingEvent(existing)) {
       await recordAuditEventBestEffort({
         requestId: input.requestId,
         eventType: "inbound_event_duplicate_ignored",
@@ -51,10 +71,14 @@ export async function registerInboundEvent(input: {
         actorType: input.provider,
         entityType: "inbound_event",
         entityId: trimmedEventId,
-        message: "Duplicate inbound event was ignored.",
+        message:
+          existing.status === "processed"
+            ? "Duplicate inbound event was ignored."
+            : "Concurrent duplicate inbound event was ignored while processing.",
         metadata: {
           provider: input.provider,
-          eventKind: input.eventKind
+          eventKind: input.eventKind,
+          priorStatus: existing.status
         }
       });
 

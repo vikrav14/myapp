@@ -313,6 +313,25 @@ export function buildHelpFocusSourcesReply(input: {
   ].join("\n");
 }
 
+export function isHelpFocusInteractiveEchoMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
+  if (normalized.length < 40) {
+    return false;
+  }
+
+  const markers = [
+    "happy with that advice lane",
+    "tap my playbook for frameworks",
+    "for advice i'm leaning into",
+    "pick a different lane if you want",
+    "not listed? reply help domain",
+    "tap looks good below to lock it in"
+  ];
+
+  const hits = markers.filter((marker) => normalized.includes(marker)).length;
+  return hits >= 2 || (hits >= 1 && normalized.length > 140);
+}
+
 export function parseHelpFocusSourcesRequest(
   message: string
 ): { lane: HelpFocusKey | null; invalidLane?: string | undefined } | null {

@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import * as userService from "../src/services/user.service.js";
 
 import {
   buildHelpFocusActivationExplanation,
@@ -251,5 +253,112 @@ describe("help focus activation playbook UX", () => {
       "Pick lane",
       "My playbook"
     ]);
+  });
+
+  it("returns activation buttons after lane pick during fresh activation, not another list", async () => {
+    const user = {
+      id: "u1",
+      phone_number: "23050000000",
+      first_name: "Vik",
+      archetype: "Corporate / Career",
+      brief_focus: null,
+      active_modules: [],
+      onboarding_state: "active" as const,
+      subscription_status: "Trial_Active" as const,
+      onboarding_completed_at: new Date().toISOString(),
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: null,
+      locked_at: null,
+      subscription_started_at: null,
+      subscription_ends_at: null,
+      last_payment_at: null,
+      topic_preferences: [],
+      morning_digest_enabled: true,
+      calendar_sync_enabled: true,
+      memory_resurfacing_enabled: true,
+      local_alerts_enabled: true,
+      school_alerts_enabled: true,
+      payday_day_of_month: null,
+      monthly_income_rs: null,
+      weekly_focus_habit: null,
+      weekly_focus_set_at: null,
+      open_loop_followups_enabled: true,
+      proactive_checkins_paused_until: null,
+      quiet_hours_enabled: true,
+      quiet_hours_start_hour: 22,
+      quiet_hours_end_hour: 7,
+      help_focus_primary: "parenting",
+      help_focus_secondary: "relationship",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z"
+    };
+
+    const updateSpy = vi.spyOn(userService, "updateUserState").mockResolvedValue({
+      ...user,
+      help_focus_primary: "human_behavior"
+    });
+
+    const result = await handleHelpFocusMessage({
+      user,
+      message: "help domain human_behavior"
+    });
+
+    updateSpy.mockRestore();
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Human Behavior");
+    expect(result.interactive?.buttons?.map((button) => button.title)).toEqual([
+      "Looks good",
+      "Pick lane",
+      "My playbook"
+    ]);
+    expect(result.interactive?.listButtonLabel).toBeUndefined();
+  });
+
+  it("suppresses pasted help-focus card echoes", async () => {
+    const result = await handleHelpFocusMessage({
+      user: {
+        id: "u1",
+        phone_number: "23050000000",
+        first_name: "Vik",
+        archetype: "Corporate / Career",
+        brief_focus: null,
+        active_modules: [],
+        onboarding_state: "active",
+        subscription_status: "Trial_Active",
+        onboarding_completed_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: null,
+        locked_at: null,
+        subscription_started_at: null,
+        subscription_ends_at: null,
+        last_payment_at: null,
+        topic_preferences: [],
+        morning_digest_enabled: true,
+        calendar_sync_enabled: true,
+        memory_resurfacing_enabled: true,
+        local_alerts_enabled: true,
+        school_alerts_enabled: true,
+        payday_day_of_month: null,
+        monthly_income_rs: null,
+        weekly_focus_habit: null,
+        weekly_focus_set_at: null,
+        open_loop_followups_enabled: true,
+        proactive_checkins_paused_until: null,
+        quiet_hours_enabled: true,
+        quiet_hours_start_hour: 22,
+        quiet_hours_end_hour: 7,
+        help_focus_primary: "parenting",
+        help_focus_secondary: "relationship",
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z"
+      },
+      message:
+        "Advice focus Vik — for advice I'm leaning into Parenting + Relationship. Pick a different lane if you want. Not listed? Reply help domain <lane> — e.g. help domain phil"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toBeUndefined();
+    expect(result.interactive).toBeUndefined();
   });
 });

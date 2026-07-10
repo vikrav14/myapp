@@ -6,6 +6,7 @@ import {
   buildHelpFocusSourcesReply,
   formatHelpFocusLabel,
   inferHelpFocusFromFacts,
+  isHelpFocusInteractiveEchoMessage,
   normalizeHelpFocusKey,
   parseHelpFocusSourcesRequest
 } from "./help-focus-inference.service.js";
@@ -147,6 +148,10 @@ export async function handleHelpFocusMessage(input: {
     return { handled: false };
   }
 
+  if (isHelpFocusInteractiveEchoMessage(input.message)) {
+    return { handled: true, user: input.user };
+  }
+
   const sourcesRequest = parseHelpFocusSourcesRequest(input.message);
   if (sourcesRequest) {
     if (sourcesRequest.invalidLane) {
@@ -201,16 +206,17 @@ export async function handleHelpFocusMessage(input: {
   if (command.type === "set") {
     const updatedUser = await setHelpFocusPrimary(input.user, command.key);
     const label = HELP_FOCUS_CATALOG.find((entry) => entry.key === command.key)?.label ?? command.key;
+    const resumeActivation = shouldResumeHelpFocusActivation(updatedUser);
 
     return {
       handled: true,
       user: updatedUser,
-      reply: `Got it — I'll lean into ${label} when I advise you. Personal stuff still stays out of your 7am brief. Reply help focus anytime to switch.`,
-      interactive: buildHelpFocusPickerInteractive({
-        firstName: updatedUser.first_name,
-        suggestedPrimary: updatedUser.help_focus_primary,
-        suggestedSecondary: updatedUser.help_focus_secondary
-      })
+      reply: resumeActivation
+        ? `Got it — I'll lean into ${label} when I advise you. Personal stuff still stays out of your 7am brief. Tap Looks good below to lock it in, or Pick lane to browse again.`
+        : `Got it — I'll lean into ${label} when I advise you. Personal stuff still stays out of your 7am brief. Reply help focus anytime to switch.`,
+      interactive: resumeActivation
+        ? buildHelpFocusActivationInteractive({ firstName: updatedUser.first_name })
+        : undefined
     };
   }
 
