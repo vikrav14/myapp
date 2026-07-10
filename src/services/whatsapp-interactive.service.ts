@@ -371,7 +371,7 @@ export function buildHelpFocusActivationInteractive(input: {
   return {
     header: "Advice focus",
     body: `${name} — happy with that advice lane, or want to switch?`,
-    footer: "Tap My playbook to see what's behind it — then confirm or switch",
+    footer: "Tap My playbook for frameworks — then confirm or switch",
     buttons: [
       { id: "help_focus_confirm", title: "Looks good" },
       { id: "help_advice_focus", title: "Pick lane" },
