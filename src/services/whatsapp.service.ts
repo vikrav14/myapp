@@ -55,15 +55,35 @@ export function isInteractiveLogBody(body: string): boolean {
   );
 }
 
+const WHATSAPP_INTERACTIVE_HEADER_MAX = 60;
+const WHATSAPP_INTERACTIVE_FOOTER_MAX = 60;
+const WHATSAPP_INTERACTIVE_BODY_MAX = 1024;
+
+function trimInteractiveHeader(header?: string): string | undefined {
+  return header?.trim() ? header.trim().slice(0, WHATSAPP_INTERACTIVE_HEADER_MAX) : undefined;
+}
+
+function trimInteractiveFooter(footer?: string): string | undefined {
+  return footer?.trim() ? footer.trim().slice(0, WHATSAPP_INTERACTIVE_FOOTER_MAX) : undefined;
+}
+
+function trimInteractiveBody(body: string): string {
+  return body.trim().slice(0, WHATSAPP_INTERACTIVE_BODY_MAX);
+}
+
 function buildInteractivePayload(interactive: WhatsAppInteractiveOutbound): Record<string, unknown> {
+  const header = trimInteractiveHeader(interactive.header);
+  const body = trimInteractiveBody(interactive.body);
+  const footer = trimInteractiveFooter(interactive.footer);
+
   if (interactive.ctaUrl) {
     return {
       type: "interactive",
       interactive: {
         type: "cta_url",
-        header: interactive.header ? { type: "text", text: interactive.header } : undefined,
-        body: { text: interactive.body },
-        footer: interactive.footer ? { text: interactive.footer } : undefined,
+        header: header ? { type: "text", text: header } : undefined,
+        body: { text: body },
+        footer: footer ? { text: footer } : undefined,
         action: {
           name: "cta_url",
           parameters: {
@@ -80,9 +100,9 @@ function buildInteractivePayload(interactive: WhatsAppInteractiveOutbound): Reco
       type: "interactive",
       interactive: {
         type: "button",
-        header: interactive.header ? { type: "text", text: interactive.header } : undefined,
-        body: { text: interactive.body },
-        footer: interactive.footer ? { text: interactive.footer } : undefined,
+        header: header ? { type: "text", text: header } : undefined,
+        body: { text: body },
+        footer: footer ? { text: footer } : undefined,
         action: {
           buttons: interactive.buttons.slice(0, 3).map((button) => ({
             type: "reply",
@@ -104,9 +124,9 @@ function buildInteractivePayload(interactive: WhatsAppInteractiveOutbound): Reco
     type: "interactive",
     interactive: {
       type: "list",
-      header: interactive.header ? { type: "text", text: interactive.header } : undefined,
-      body: { text: interactive.body },
-      footer: interactive.footer ? { text: interactive.footer } : undefined,
+      header: header ? { type: "text", text: header } : undefined,
+      body: { text: body },
+      footer: footer ? { text: footer } : undefined,
       action: {
         button: (interactive.listButtonLabel ?? "Choose").slice(0, 20),
         sections: interactive.sections.map((section) => ({
@@ -598,6 +618,10 @@ export function buildInteractiveDeliveryFallback(input: {
   }
 
   if (input.textAlreadySent) {
+    if (input.flow === "express_activation") {
+      return "Buttons didn't load — reply help focus confirm, my playbook, or help focus to switch.";
+    }
+
     return "Buttons didn't load — reply help focus, help domain <lane>, or tell me in your own words.";
   }
 

@@ -35,4 +35,19 @@ describe("interactive delivery fallback", () => {
     expect(fallback).toContain("help domain");
     expect(fallback).not.toContain("Already sent");
   });
+
+  it("uses activation-specific nudge when express text was already sent", () => {
+    const fallback = buildInteractiveDeliveryFallback({
+      flow: "express_activation",
+      textAlreadySent: true,
+      payload: {
+        text: "Already sent",
+        interactive: buildHelpFocusPickerInteractive({ firstName: "Vik" })
+      }
+    });
+
+    expect(fallback).toContain("help focus confirm");
+    expect(fallback).toContain("my playbook");
+    expect(fallback).not.toContain("Already sent");
+  });
 });

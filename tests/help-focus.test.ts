@@ -174,6 +174,7 @@ describe("help focus inference", () => {
     expect(activationButtons.buttons?.[0]?.title).toBe("Looks good");
     expect(activationButtons.buttons?.[1]?.title).toBe("Pick lane");
     expect(activationButtons.buttons?.[2]?.title).toBe("My playbook");
+    expect((activationButtons.footer ?? "").length).toBeLessThanOrEqual(60);
 
     const picker = buildHelpFocusPickerInteractive({
       firstName: "Vik",
