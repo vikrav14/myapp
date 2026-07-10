@@ -21,6 +21,7 @@ import {
   type UserMindSnapshotPayload
 } from "../schemas/user-mind.js";
 import { buildHelpFocusPromptForUser } from "./help-focus.service.js";
+import { getDensityPromptBlock, getProactiveMaxWords } from "./notification-pace.service.js";
 import { CHAOS_ORGANIZER_AI_RULES, isChaosProfile } from "./chaos-organizer.service.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
 import {
@@ -524,10 +525,10 @@ You are sending a proactive check-in (mode: ${input.mode}).
 ${modeGuidance}
 
 Rules:
-- 2 short paragraphs max.
 - Warm, specific, never survey-like.
 - One question max.
 - Mention they can reply "not now" to pause proactive pings.
+${getDensityPromptBlock(input.user)}
 ${CHAOS_ORGANIZER_AI_RULES}
 ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Sound like a real mate, not a bot.
@@ -545,7 +546,7 @@ Reply in plain text only.`;
     responseMimeType: "text/plain"
   });
 
-  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_PROACTIVE });
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: getProactiveMaxWords(input.user) });
 }
 
 export async function generateOpenLoopFollowUpMessage(input: {
@@ -556,10 +557,10 @@ export async function generateOpenLoopFollowUpMessage(input: {
 You are gently following up on something the user mentioned earlier.
 
 Rules:
-- 2 short paragraphs max.
 - Warm, grounded, zero guilt.
 - Reference the open loop naturally without quoting it word-for-word.
 - Make clear they do not have to debrief if they do not want to.
+${getDensityPromptBlock(input.user)}
 ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Sound like a real mate checking in.
 
@@ -575,7 +576,7 @@ Reply in plain text only.`;
     responseMimeType: "text/plain"
   });
 
-  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: MAURI_REPLY_MAX_WORDS_PROACTIVE });
+  return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: getProactiveMaxWords(input.user) });
 }
 
 export async function generateConversationalReply(input: {

@@ -36,6 +36,7 @@ const baseUser: MauriUser = {
   quiet_hours_enabled: true,
   quiet_hours_start_hour: 22,
   quiet_hours_end_hour: 7,
+  notification_config: null,
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z"
 };

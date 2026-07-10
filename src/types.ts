@@ -65,6 +65,19 @@ export type HelpFocusKey =
   | "psychology"
   | "art";
 
+export type ProactivePacePreset = "silent" | "bookends" | "steady" | "engaged" | "coaching";
+
+export type DensityProfile = "micro" | "pulse" | "depth";
+
+export interface NotificationConfig {
+  proactive_preset: ProactivePacePreset;
+  density_profile: DensityProfile;
+  proactive_max_per_day: number;
+  proactive_min_interval_minutes: number;
+  proactive_max_per_week: number;
+  configured_at?: string | undefined;
+}
+
 export interface MauriUser {
   id: string;
   phone_number: string;
@@ -98,6 +111,7 @@ export interface MauriUser {
   quiet_hours_enabled: boolean;
   quiet_hours_start_hour: number;
   quiet_hours_end_hour: number;
+  notification_config: NotificationConfig | null;
   created_at: string;
   updated_at: string;
 }

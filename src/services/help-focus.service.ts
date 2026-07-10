@@ -18,6 +18,7 @@ import {
   buildHelpFocusActivationInteractive,
   buildHelpFocusPickerInteractive
 } from "./whatsapp-interactive.service.js";
+import { buildPostActivationPaceOffer, isPaceConfigured } from "./notification-pace.service.js";
 
 export interface HelpFocusCommandResult {
   handled: boolean;
@@ -200,10 +201,22 @@ export async function handleHelpFocusMessage(input: {
           ? formatHelpFocusLabel(input.user.help_focus_primary)
           : "your setup";
 
+    const lockReply = `Locked in — I'll lean into ${labels} for advice. Reply help focus anytime to switch.`;
+    const paceOffer = await buildPostActivationPaceOffer(input.user);
+
+    if (paceOffer) {
+      return {
+        handled: true,
+        user: input.user,
+        reply: `${lockReply}\n\n${paceOffer.reply}`,
+        interactive: paceOffer.interactive
+      };
+    }
+
     return {
       handled: true,
       user: input.user,
-      reply: `Locked in — I'll lean into ${labels} for advice. Reply help focus anytime to switch.`
+      reply: lockReply
     };
   }
 

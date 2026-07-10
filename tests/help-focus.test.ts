@@ -237,6 +237,7 @@ describe("help focus activation playbook UX", () => {
         quiet_hours_enabled: true,
         quiet_hours_start_hour: 22,
         quiet_hours_end_hour: 7,
+        notification_config: null,
         help_focus_primary: "personal_finance",
         help_focus_secondary: "relationship",
         created_at: "2026-01-01T00:00:00.000Z",
@@ -287,6 +288,7 @@ describe("help focus activation playbook UX", () => {
       quiet_hours_enabled: true,
       quiet_hours_start_hour: 22,
       quiet_hours_end_hour: 7,
+      notification_config: null,
       help_focus_primary: "parenting",
       help_focus_secondary: "relationship",
       created_at: "2026-01-01T00:00:00.000Z",
@@ -313,6 +315,54 @@ describe("help focus activation playbook UX", () => {
       "My playbook"
     ]);
     expect(result.interactive?.listButtonLabel).toBeUndefined();
+  });
+
+  it("offers pace picker after help focus confirm when pace is not configured", async () => {
+    const result = await handleHelpFocusMessage({
+      user: {
+        id: "u1",
+        phone_number: "23050000000",
+        first_name: "Vik",
+        archetype: "Corporate / Career",
+        brief_focus: null,
+        active_modules: [],
+        onboarding_state: "active",
+        subscription_status: "Trial_Active",
+        onboarding_completed_at: new Date().toISOString(),
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: null,
+        locked_at: null,
+        subscription_started_at: null,
+        subscription_ends_at: null,
+        last_payment_at: null,
+        topic_preferences: [],
+        morning_digest_enabled: true,
+        calendar_sync_enabled: true,
+        memory_resurfacing_enabled: true,
+        local_alerts_enabled: true,
+        school_alerts_enabled: true,
+        payday_day_of_month: null,
+        monthly_income_rs: null,
+        weekly_focus_habit: null,
+        weekly_focus_set_at: null,
+        open_loop_followups_enabled: true,
+        proactive_checkins_paused_until: null,
+        quiet_hours_enabled: true,
+        quiet_hours_start_hour: 22,
+        quiet_hours_end_hour: 7,
+        notification_config: null,
+        help_focus_primary: "personal_finance",
+        help_focus_secondary: "relationship",
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z"
+      },
+      message: "help focus confirm"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Locked in");
+    expect(result.reply).toContain("how often should I check in unprompted");
+    expect(result.interactive?.listButtonLabel).toBe("Pick pace");
   });
 
   it("suppresses pasted help-focus card echoes", async () => {
@@ -348,6 +398,7 @@ describe("help focus activation playbook UX", () => {
         quiet_hours_enabled: true,
         quiet_hours_start_hour: 22,
         quiet_hours_end_hour: 7,
+        notification_config: null,
         help_focus_primary: "parenting",
         help_focus_secondary: "relationship",
         created_at: "2026-01-01T00:00:00.000Z",
