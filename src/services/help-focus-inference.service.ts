@@ -1,4 +1,5 @@
 import type { UserMindFact } from "../types.js";
+import { formatStrategyTrackBlock } from "./mauri-memory-view.service.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY, HELP_FOCUS_CATALOG, HELP_FOCUS_KEYS } from "./help-focus.constants.js";
 import { combinedFactBlob, hasBoundaryGoal, hasFamilyMoneyPressure } from "./profile-inference.service.js";
@@ -127,10 +128,15 @@ export function buildHelpFocusActivationExplanation(input: {
 
   const whyLine = factHook ? `I ${factHook}.` : "I read that from what you shared.";
 
+  const trackBlock = formatStrategyTrackBlock({
+    laneLabels: labels,
+    howIHelp: lenses || "One practical next step at a time."
+  });
+
   return [
     `For advice I'll lean into ${labels} — ${whyLine}`,
     "",
-    `How I'll help: ${lenses}.`,
+    ...trackBlock,
     "",
     "Next message — tap Looks good or Pick lane. Reply help focus anytime to change later."
   ].join("\n");
@@ -247,29 +253,4 @@ export function buildHelpFocusEnginePrompt(input: {
   );
 
   return lines.join("\n");
-}
-
-export function buildHelpFocusStatusReply(input: {
-  firstName?: string | null;
-  primary: HelpFocusKey | null;
-  secondary: HelpFocusKey | null;
-}): string {
-  const name = input.firstName?.trim() || "there";
-
-  if (!input.primary) {
-    return `${name} — pick what you want me to help with most. Tap the list below or reply help focus anytime.`;
-  }
-
-  const labels =
-    input.secondary && input.secondary !== input.primary
-      ? `${formatHelpFocusLabel(input.primary)} + ${formatHelpFocusLabel(input.secondary)}`
-      : formatHelpFocusLabel(input.primary);
-
-  const lenses = [formatHelpFocusUserLens(input.primary), input.secondary ? formatHelpFocusUserLens(input.secondary) : null]
-    .filter(Boolean)
-    .join(" · ");
-
-  return `${name} — advice focus: ${labels}.
-
-How I help: ${lenses}. Reply help focus to change.`;
 }

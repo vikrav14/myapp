@@ -9,6 +9,11 @@ import type { MauriUser, UserMindFact, UserMindSource } from "../types.js";
 import { buildArchetypeLaneList } from "./archetype-catalog.js";
 import { extractUserMindProfile, generateKnowYouAcknowledgement, routeInboundMessage } from "./ai.service.js";
 import { cancelPendingOpenLoopFollowUps } from "./open-loop-follow-up.service.js";
+import {
+  buildMauriMemoryViewFromData,
+  formatMauriMemoryViewForWhatsApp,
+  loadMauriMemoryView
+} from "./mauri-memory-view.service.js";
 
 function slugifyKey(value: string): string {
   return value
@@ -428,14 +433,14 @@ ${buildArchetypeLaneList()}`;
 
 ${summary}
 
-I'll hold that as *you*, not just your logs. Wrong or missing something? Just correct me in chat.`;
+I'll hold that as *you*, not just your logs. Reply my memory anytime to see it structured. Wrong or missing something? Just correct me in chat.`;
   }
 
   return `${name} — thanks for sharing that with me.
 
 ${summary}
 
-I'll hold that as *you*, not just your logs. Wrong or missing something? Just correct me in chat.
+I'll hold that as *you*, not just your logs. Reply my memory anytime to see it structured. Wrong or missing something? Just correct me in chat.
 
 Now pick a starting lane for your 7 AM pulse — closest fit is fine, or build your own.
 
@@ -602,7 +607,7 @@ export async function deleteUserMindFactsMatching(input: {
   if (matches.length === 0) {
     return {
       deleted: 0,
-      reply: `I don't have anything stored that matches "${input.query.trim()}". Reply what do you know about me to see your profile.`
+      reply: `I don't have anything stored that matches "${input.query.trim()}". Reply my memory to see your structured profile.`
     };
   }
 
@@ -620,51 +625,8 @@ export async function deleteUserMindFactsMatching(input: {
 }
 
 export function buildUserMindProfileReply(user: MauriUser, facts: UserMindFact[]): string {
-  const name = user.first_name?.trim() || "You";
-
-  if (facts.length === 0) {
-    return `${name}, I don't have much on you yet beyond WhatsApp basics.
-
-Tell me in onboarding style — or reply remember that I live in Quatre Bornes / I hate guilt trips / I'm into football.`;
-  }
-
-  const lines = [`${name}, here's what I hold about *you* (not just this week's logs):`, ""];
-
-  const grouped = new Map<string, UserMindFact[]>();
-  for (const fact of facts) {
-    const bucket = grouped.get(fact.category) ?? [];
-    bucket.push(fact);
-    grouped.set(fact.category, bucket);
-  }
-
-  const labels: Record<string, string> = {
-    identity: "Identity",
-    location: "Where you're based",
-    life_context: "Life & work",
-    interests: "Interests",
-    goals: "Goals",
-    stressors: "What's heavy",
-    preferences: "How to show up",
-    boundaries: "Boundaries",
-    relationships: "People",
-    user_stated: "You told me"
-  };
-
-  for (const [category, categoryFacts] of grouped.entries()) {
-    lines.push(`${labels[category] ?? category}:`);
-    for (const fact of categoryFacts) {
-      if (category === "identity" && fact.fact_key === "preferred_name") {
-        lines.push(`- Call you: ${fact.fact_value}`);
-      } else {
-        lines.push(`- ${fact.fact_value}`);
-      }
-    }
-    lines.push("");
-  }
-
-  lines.push(`Wrong or outdated? Reply forget that … or remember that …`);
-
-  return lines.join("\n").trim();
+  const view = buildMauriMemoryViewFromData({ user, facts });
+  return formatMauriMemoryViewForWhatsApp(user, view);
 }
 
 export function parseUserMindCommand(
@@ -677,7 +639,11 @@ export function parseUserMindCommand(
     normalized === "what do you know about me?" ||
     normalized === "my profile" ||
     normalized === "about me" ||
-    normalized === "who am i to you"
+    normalized === "who am i to you" ||
+    normalized === "my memory" ||
+    normalized === "mauri memory" ||
+    normalized === "how do you see me" ||
+    normalized === "how do you see me?"
   ) {
     return { type: "profile" };
   }
@@ -705,10 +671,10 @@ export async function handleUserMindCommandMessage(input: {
   }
 
   if (command.type === "profile") {
-    const facts = await loadUserMindFacts(input.user.id);
+    const view = await loadMauriMemoryView(input.user);
     return {
       handled: true,
-      reply: buildUserMindProfileReply(input.user, facts)
+      reply: formatMauriMemoryViewForWhatsApp(input.user, view)
     };
   }
 
