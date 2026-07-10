@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildHelpFocusActivationExplanation,
   buildHelpFocusEnginePrompt,
+  buildHelpFocusSourcesReply,
   inferHelpFocusFromFacts,
-  normalizeHelpFocusKey
+  normalizeHelpFocusKey,
+  parseHelpFocusSourcesRequest
 } from "../src/services/help-focus-inference.service.js";
 import { parseHelpFocusCommand } from "../src/services/help-focus.service.js";
 import { buildHelpFocusActivationInteractive, buildHelpFocusPickerInteractive, buildHelpFocusPickerRows, WHATSAPP_LIST_MAX_ROWS } from "../src/services/whatsapp-interactive.service.js";
@@ -85,7 +87,30 @@ describe("help focus inference", () => {
 
     expect(prompt).toContain("Primary help focus: Personal Finance");
     expect(prompt).toContain("Secondary help focus: Discipline");
-    expect(prompt).toContain("Never name-drop books");
+    expect(prompt).toContain("Never name-drop books unless the user asked for sources");
+  });
+
+  it("reveals framework sources when the user asks", () => {
+    const reply = buildHelpFocusSourcesReply({
+      firstName: "Vik",
+      primary: "personal_finance",
+      secondary: "psychology"
+    });
+
+    expect(reply).toContain("Psychology of Money");
+    expect(reply).toContain("Feeling Good");
+    expect(reply).toContain("(primary)");
+    expect(reply).toContain("(secondary)");
+    expect(reply).toContain("not homework");
+
+    expect(parseHelpFocusSourcesRequest("help focus sources")).toEqual({ lane: null });
+    expect(parseHelpFocusSourcesRequest("help focus sources psychology")).toEqual({ lane: "psychology" });
+    expect(parseHelpFocusSourcesRequest("which book is that from")).toEqual({ lane: null });
+    expect(parseHelpFocusSourcesRequest("help focus sources widgets")).toEqual({
+      lane: null,
+      invalidLane: "widgets"
+    });
+    expect(parseHelpFocusSourcesRequest("help focus personal finance")).toBeNull();
   });
 
   it("prioritises finance and communication for family money pressure profiles", () => {

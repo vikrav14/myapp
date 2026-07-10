@@ -18,6 +18,7 @@ Discover yourself
 - my memory — structured profile (active focus, strategy track, what you told me)
 - what do you know about me — same as my memory
 - help focus — change advice lane (money, career, discipline, relationships…)
+- help focus sources — see book/framework thinking behind your lane (on request)
 - remember that … — save something about you
 - forget that … — remove a stored fact
 - my focus — this week's one habit

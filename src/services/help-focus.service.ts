@@ -3,9 +3,11 @@ import { updateUserState } from "./user.service.js";
 import {
   buildHelpFocusActivationExplanation,
   buildHelpFocusEnginePrompt,
+  buildHelpFocusSourcesReply,
   formatHelpFocusLabel,
   inferHelpFocusFromFacts,
-  normalizeHelpFocusKey
+  normalizeHelpFocusKey,
+  parseHelpFocusSourcesRequest
 } from "./help-focus-inference.service.js";
 import { formatStrategyTrackReplyForUser } from "./mauri-memory-view.service.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
@@ -59,6 +61,10 @@ export function parseHelpFocusCommand(
 
   const setMatch = normalized.match(/^help focus (.+)$/);
   if (setMatch?.[1]) {
+    if (setMatch[1] === "sources") {
+      return null;
+    }
+
     const key = normalizeHelpFocusKey(setMatch[1]);
     if (key) {
       return { type: "set", key };
@@ -97,6 +103,40 @@ export async function handleHelpFocusMessage(input: {
 }): Promise<HelpFocusCommandResult> {
   if (input.user.onboarding_state !== "active") {
     return { handled: false };
+  }
+
+  const sourcesRequest = parseHelpFocusSourcesRequest(input.message);
+  if (sourcesRequest) {
+    if (sourcesRequest.invalidLane) {
+      return {
+        handled: true,
+        user: input.user,
+        reply: `Didn't recognise "${sourcesRequest.invalidLane}". Try help focus sources personal finance — or reply help focus to see lanes.`
+      };
+    }
+
+    if (sourcesRequest.lane) {
+      return {
+        handled: true,
+        user: input.user,
+        reply: buildHelpFocusSourcesReply({
+          firstName: input.user.first_name,
+          primary: input.user.help_focus_primary,
+          secondary: input.user.help_focus_secondary,
+          lane: sourcesRequest.lane
+        })
+      };
+    }
+
+    return {
+      handled: true,
+      user: input.user,
+      reply: buildHelpFocusSourcesReply({
+        firstName: input.user.first_name,
+        primary: input.user.help_focus_primary,
+        secondary: input.user.help_focus_secondary
+      })
+    };
   }
 
   const command = parseHelpFocusCommand(input.message);
@@ -152,4 +192,4 @@ export async function handleHelpFocusMessage(input: {
   return { handled: false };
 }
 
-export { inferHelpFocusFromFacts, buildHelpFocusActivationExplanation };
+export { inferHelpFocusFromFacts, buildHelpFocusActivationExplanation, buildHelpFocusSourcesReply, parseHelpFocusSourcesRequest };
