@@ -134,6 +134,26 @@ export interface PaymentCheckoutSessionRecord {
   updated_at: string;
 }
 
+export interface WeeklyDailySeries {
+  labels: string[];
+  spend_rs: Array<number | null>;
+  habit_wins: Array<number | null>;
+  mood_avg: Array<number | null>;
+}
+
+export interface WeeklyReportMemorySnapshot {
+  active_focus: string | null;
+  open_loops: string[];
+  strategy_track: string | null;
+}
+
+export interface WeeklyWeekOverWeek {
+  prior_week_start: string | null;
+  spend_delta_pct: number | null;
+  habit_wins_delta: number | null;
+  momentum_delta: number | null;
+}
+
 export interface WeeklyDiagnosticSummary {
   window: {
     week_start: string;
@@ -163,6 +183,9 @@ export interface WeeklyDiagnosticSummary {
   };
   momentum_score: number;
   trial_cliffhanger: boolean;
+  daily?: WeeklyDailySeries;
+  week_over_week?: WeeklyWeekOverWeek;
+  memory?: WeeklyReportMemorySnapshot;
 }
 
 export type WeeklyFeedbackReason =

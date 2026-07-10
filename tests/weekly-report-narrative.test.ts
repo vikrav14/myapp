@@ -32,6 +32,8 @@ function quietSummary(): WeeklyDiagnosticSummary {
 function baseNarrative(overrides: Partial<WeeklyReportNarrativeContext> = {}): WeeklyReportNarrativeContext {
   return {
     userMindSnapshotPrompt: null,
+    activeFocus: null,
+    strategyTrack: null,
     openLoops: [],
     weeklyFocusHabit: null,
     momentumDelta: null,
@@ -52,22 +54,37 @@ describe("weekly report narrative helpers", () => {
     ).toBe(false);
   });
 
-  it("builds narrative prompt with snapshot, loops, and momentum delta", () => {
+  it("builds narrative prompt with Mauri Memory, loops, and momentum delta", () => {
     const prompt = buildWeeklyReportNarrativePrompt(
       baseNarrative({
+        activeFocus: "Balancing shop overheads vs newborn schedule",
+        strategyTrack: "Personal Finance + Parenting",
         userMindSnapshotPrompt: "Life summary: Wedding loan pressure still heavy",
         openLoops: ["Dad lost factory job", "Parents expect loan payment"],
         weeklyFocusHabit: "Log one family-money moment before you react",
         priorMomentumScore: 30,
-        momentumDelta: -8
+        momentumDelta: -8,
+        isQuietWeek: true
       })
     );
 
-    expect(prompt).toContain("Reflection snapshot:");
+    expect(prompt).toContain("Mauri Memory — active focus:");
+    expect(prompt).toContain("Balancing shop overheads");
+    expect(prompt).toContain("Mauri Memory — strategy track:");
     expect(prompt).toContain("Dad lost factory job");
     expect(prompt).toContain("Weekly focus habit:");
     expect(prompt).toContain("Momentum vs last week:");
     expect(prompt).toContain("Do not sound empty or robotic");
+  });
+
+  it("prefers active focus in quiet-week fallback copy", () => {
+    const signal = buildQuietWeekFallbackSignal(
+      baseNarrative({
+        activeFocus: "Brain fried by 8pm before side hustle gets a minute"
+      })
+    );
+
+    expect(signal).toContain("brain fried by 8pm");
   });
 
   it("prefers open loops in quiet-week fallback copy", () => {
