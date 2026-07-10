@@ -11,12 +11,17 @@ vi.mock("../src/services/engagement-delivery.service.js", () => ({
   recordEngagementDelivery: mockRecordEngagementDelivery
 }));
 
-vi.mock("../src/services/outbound-message.service.js", () => ({
-  findOutboundByProviderMessageId: mockFindOutboundByProviderMessageId,
-  findRecentActivationOutboundForUser: mockFindRecentActivationOutboundForUser,
-  isActivationOutboundMessage: (record: { body: string; metadata?: { flow?: string } | null }) =>
-    record.metadata?.flow === "express_activation" || record.body.startsWith("You're in,")
-}));
+vi.mock("../src/services/outbound-message.service.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/services/outbound-message.service.js")>(
+    "../src/services/outbound-message.service.js"
+  );
+
+  return {
+    ...actual,
+    findOutboundByProviderMessageId: mockFindOutboundByProviderMessageId,
+    findRecentActivationOutboundForUser: mockFindRecentActivationOutboundForUser
+  };
+});
 
 vi.mock("../src/services/whatsapp.service.js", () => ({
   sendWhatsAppMessage: mockSendWhatsAppMessage
@@ -24,7 +29,9 @@ vi.mock("../src/services/whatsapp.service.js", () => ({
 
 const {
   ACTIVATION_REACTION_ACK_KEY,
+  HELP_FOCUS_REACTION_ACK_KEY,
   buildActivationReactionAck,
+  buildHelpFocusReactionAck,
   handleActivationReactionMessage,
   isPositiveActivationReaction
 } = await import("../src/services/activation-reaction.service.js");
@@ -49,6 +56,8 @@ const activeUser = {
   morning_digest_enabled: true,
   weekly_focus_habit: "Morning check-in: mood plus one small win.",
   open_loop_followups_enabled: true,
+  help_focus_primary: "productivity",
+  help_focus_secondary: "relationship",
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z"
 };
@@ -72,7 +81,12 @@ describe("activation reaction ack", () => {
     expect(buildActivationReactionAck("Vik")).toContain("tomorrow at 7");
   });
 
-  it("sends ack once when reaction targets activation message", async () => {
+  it("builds a help-focus reaction ack with lane labels", () => {
+    expect(buildHelpFocusReactionAck(activeUser)).toContain("Productivity + Relationship");
+    expect(buildHelpFocusReactionAck(activeUser)).toContain("Locked in, Vik");
+  });
+
+  it("sends ack once when reaction targets activation text message", async () => {
     mockFindOutboundByProviderMessageId.mockResolvedValue({
       body: "You're in, Vik ✌️",
       metadata: { flow: "express_activation", provider_message_id: "wamid-activation" }
@@ -97,7 +111,33 @@ describe("activation reaction ack", () => {
     });
 
     expect(second.handled).toBe(true);
-    expect(second.reply).toBeUndefined();
+    expect(second.reply).toContain("All set, Vik");
+  });
+
+  it("locks advice lane when reaction targets advice focus interactive", async () => {
+    mockFindOutboundByProviderMessageId.mockResolvedValue({
+      body: "[interactive:list] Vik — for advice I'm leaning into Productivity + Relationship.",
+      metadata: {
+        flow: "help_focus",
+        interactive: true,
+        interactive_payload: {
+          header: "Advice focus",
+          body: "Vik — for advice I'm leaning into Productivity + Relationship."
+        },
+        provider_message_id: "wamid-help-focus"
+      }
+    });
+
+    const result = await handleActivationReactionMessage({
+      user: activeUser,
+      emoji: "👍",
+      targetMessageId: "wamid-help-focus"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Locked in, Vik");
+    expect(result.reply).toContain("Productivity + Relationship");
+    expect(mockRecordEngagementDelivery).toHaveBeenCalledWith(activeUser.id, HELP_FOCUS_REACTION_ACK_KEY);
   });
 
   it("falls back to recent activation within the onboarding window", async () => {

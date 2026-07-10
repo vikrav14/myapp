@@ -493,7 +493,10 @@ export async function sendWhatsAppTypingIndicator(messageId: string): Promise<vo
   }
 }
 
-export async function acknowledgeInboundWhatsAppMessageBestEffort(messageId: string | undefined): Promise<void> {
+export async function acknowledgeInboundWhatsAppMessageBestEffort(
+  messageId: string | undefined,
+  options?: { skipTyping?: boolean | undefined }
+): Promise<void> {
   if (!messageId?.trim()) {
     return;
   }
@@ -503,6 +506,13 @@ export async function acknowledgeInboundWhatsAppMessageBestEffort(messageId: str
   }
 
   try {
+    if (options?.skipTyping) {
+      if (env.WHATSAPP_MARK_READ_ENABLED) {
+        await markWhatsAppMessageRead(messageId);
+      }
+      return;
+    }
+
     if (env.WHATSAPP_TYPING_INDICATOR_ENABLED) {
       await sendWhatsAppTypingIndicator(messageId);
       return;
@@ -533,8 +543,8 @@ export async function deliverWhatsAppReaction(input: {
   });
 }
 
-export async function deliverWhatsAppInteractive(to: string, interactive: WhatsAppInteractiveOutbound): Promise<void> {
-  await postWhatsAppMessage({
+export async function deliverWhatsAppInteractive(to: string, interactive: WhatsAppInteractiveOutbound): Promise<string | undefined> {
+  return postWhatsAppMessage({
     to,
     payload: buildInteractivePayload(interactive)
   });
@@ -584,9 +594,14 @@ export async function sendWhatsAppInteractive(
 
     try {
       await markOutboundMessageSending(outbound.id);
-      await deliverWhatsAppInteractive(to, interactive);
+      const providerMessageId = await deliverWhatsAppInteractive(to, interactive);
       delivered = true;
       await markOutboundMessageSent(outbound.id);
+      if (providerMessageId) {
+        await appendOutboundMessageMetadata(outbound.id, {
+          provider_message_id: providerMessageId
+        });
+      }
       return { outboundId: outbound.id, delivered: true };
     } catch (error) {
       lastError = error;

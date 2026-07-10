@@ -158,7 +158,9 @@ async function processInboundWhatsAppMessage(input: {
         requestId
       });
 
-    await acknowledgeInboundWhatsAppMessageBestEffort(inboundMessage.messageId);
+    await acknowledgeInboundWhatsAppMessageBestEffort(inboundMessage.messageId, {
+      skipTyping: inboundMessage.kind === "reaction"
+    });
 
     const respondOk = async (body: Record<string, unknown>) => {
       await finishInbound();

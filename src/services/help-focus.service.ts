@@ -79,6 +79,10 @@ export function parseHelpFocusCommand(
 }
 
 function shouldResumeHelpFocusActivation(user: MauriUser): boolean {
+  return isWithinHelpFocusActivationWindow(user);
+}
+
+export function isWithinHelpFocusActivationWindow(user: MauriUser): boolean {
   if (!user.onboarding_completed_at) {
     return false;
   }
