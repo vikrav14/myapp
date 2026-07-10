@@ -39,6 +39,7 @@ import { assignHelpFocusFromFacts } from "./help-focus.service.js";
 import { buildHelpFocusActivationExplanation } from "./help-focus-inference.service.js";
 import { buildHelpFocusActivationInteractive } from "./whatsapp-interactive.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
+import { buildChaosOrganizerMap, isChaosProfile } from "./chaos-organizer.service.js";
 import { buildWelcomeImagePayload } from "./rich-media.service.js";
 import { updateUserState } from "./user.service.js";
 
@@ -346,6 +347,21 @@ export async function handleOnboardingMessage(input: {
       });
       const setup = inferExpressSetup(facts);
       const summary = buildExpressStartSummary({ firstName: updatedUser.first_name, setup });
+
+      if (heavyShare && isChaosProfile(facts, message)) {
+        const chaosMap = buildChaosOrganizerMap({
+          firstName: updatedUser.first_name,
+          facts
+        });
+        const bridge = buildHeavyShareTrustBridge(updatedUser.first_name);
+        return {
+          handled: true,
+          user: updatedUser,
+          reply: `${chaosMap}\n\n${bridge}`,
+          interactive: buildExpressStartInteractive(),
+          sendTextBeforeInteractive: true
+        };
+      }
 
       if (heavyShare) {
         const bridge = buildHeavyShareTrustBridge(updatedUser.first_name);

@@ -185,6 +185,33 @@ describe("handleOnboardingMessage express flow", () => {
       first_name: "Vik",
       onboarding_state: "awaiting_express_start"
     });
+    mockIngestUserMindMessage.mockResolvedValue([
+      ...financeFacts,
+      {
+        id: "fact-3",
+        user_id: baseUser.id,
+        category: "stressors",
+        fact_key: "health",
+        fact_value: "waiting on biopsy results",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      },
+      {
+        id: "fact-4",
+        user_id: baseUser.id,
+        category: "relationships",
+        fact_key: "mum",
+        fact_value: "mum's not great",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      }
+    ]);
 
     const result = await handleOnboardingMessage({
       user: { ...baseUser, onboarding_state: "awaiting_know_you" },
@@ -194,7 +221,8 @@ describe("handleOnboardingMessage express flow", () => {
     });
 
     expect(result.reply).toContain("check in gently");
-    expect(result.reply).toContain("Morning pulse");
+    expect(result.reply).toContain("here's your map");
+    expect(result.reply).not.toContain("Morning pulse");
     expect(result.interactive?.buttons?.[0]?.id).toBe("express_start");
   });
 

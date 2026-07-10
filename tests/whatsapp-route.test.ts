@@ -41,6 +41,19 @@ vi.mock("../src/services/memory.service.js", () => ({
   storeConversationMemory: mockStoreConversationMemory
 }));
 
+const mockListRecentAssistantOutboundBodies = vi.fn();
+
+vi.mock("../src/services/outbound-message.service.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/services/outbound-message.service.js")>(
+    "../src/services/outbound-message.service.js"
+  );
+
+  return {
+    ...actual,
+    listRecentAssistantOutboundBodies: mockListRecentAssistantOutboundBodies
+  };
+});
+
 vi.mock("../src/services/onboarding.service.js", () => ({
   enforceAccessPolicy: mockEnforceAccessPolicy,
   handleOnboardingMessage: mockHandleOnboardingMessage
@@ -101,6 +114,7 @@ describe("WhatsApp webhook route", () => {
     mockHandleSquadMessage.mockResolvedValue({ handled: false });
     mockSendMauriReply.mockResolvedValue(undefined);
     mockSendWhatsAppMessage.mockResolvedValue(undefined);
+    mockListRecentAssistantOutboundBodies.mockResolvedValue([]);
   });
 
   it("returns the onboarding reply for a new user awaiting archetype", async () => {

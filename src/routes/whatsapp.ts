@@ -18,6 +18,8 @@ import {
 } from "../services/message-router.service.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
+import { stripInboundBotEcho } from "../services/context-grounding.service.js";
+import { listRecentAssistantOutboundBodies } from "../services/outbound-message.service.js";
 import { completeInboundEvent, registerInboundEvent } from "../services/inbound-event.service.js";
 import { flushInboundProcessingForTests, scheduleInboundProcessing } from "../services/inbound-processing-queue.service.js";
 import { persistExtraction } from "../services/logging.service.js";
@@ -990,13 +992,27 @@ async function processInboundWhatsAppMessage(input: {
       return;
     }
 
-    const context = await loadUserContext(user.id, normalizedMessageText);
+    let messageForReply = normalizedMessageText;
+    try {
+      const recentBodies = await listRecentAssistantOutboundBodies(user.id);
+      const stripped = stripInboundBotEcho({
+        message: normalizedMessageText,
+        recentAssistantBodies: recentBodies
+      });
+      if (stripped.trim()) {
+        messageForReply = stripped;
+      }
+    } catch (error) {
+      logger.warn({ error, userId: user.id }, "Failed to strip inbound bot echo.");
+    }
+
+    const context = await loadUserContext(user.id, messageForReply);
 
     try {
       await storeConversationMemory({
         userId: user.id,
         memoryType: "user_message",
-        contentText: normalizedMessageText,
+        contentText: messageForReply,
         sourceMessageId: inboundMessage.messageId,
         metadata: {
           sourceType: inboundMessage.kind,
@@ -1014,7 +1030,7 @@ async function processInboundWhatsAppMessage(input: {
     if (commitRouterEnabled) {
       try {
         const routerRaw = await routeInboundMessage({
-          message: normalizedMessageText,
+          message: messageForReply,
           existingFactsSummary: context.userMindPrompt
         });
         const committed = await commitRouterExtraction({
@@ -1025,15 +1041,15 @@ async function processInboundWhatsAppMessage(input: {
         profileDeltaAck = committed.profileDeltaAck;
       } catch (error) {
         logger.warn({ error, userId: user.id }, "Message router commit failed; falling back to legacy extractor.");
-        extraction = await extractStructuredContext(normalizedMessageText);
+        extraction = await extractStructuredContext(messageForReply);
         await persistExtraction(user.id, extraction);
       }
     } else {
       const [legacyExtraction, routerRaw] = await Promise.all([
-        extractStructuredContext(normalizedMessageText),
+        extractStructuredContext(messageForReply),
         shadowRouterEnabled
           ? routeInboundMessage({
-              message: normalizedMessageText,
+              message: messageForReply,
               existingFactsSummary: context.userMindPrompt
             }).catch((error) => {
               logger.warn({ error, userId: user.id }, "Message router shadow call failed.");
@@ -1047,7 +1063,7 @@ async function processInboundWhatsAppMessage(input: {
       if (shadowRouterEnabled && routerRaw) {
         logShadowRouterComparison({
           userId: user.id,
-          messagePreview: normalizedMessageText,
+          messagePreview: messageForReply,
           legacy: legacyExtraction,
           router: normalizeRouterExtraction(routerRaw)
         });
@@ -1065,7 +1081,7 @@ async function processInboundWhatsAppMessage(input: {
     const reply = appendProfileDeltaAck(
       await generateConversationalReply({
         user,
-        message: normalizedMessageText,
+        message: messageForReply,
         extraction,
         context
       }),
