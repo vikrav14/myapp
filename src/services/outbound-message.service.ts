@@ -345,7 +345,28 @@ export async function discardOutboundMessage(messageId: string): Promise<Outboun
   return mapOutboundMessage(data as Record<string, unknown>);
 }
 
+export function isHelpFocusOutboundMessage(record: OutboundMessageRecord): boolean {
+  if (record.metadata?.interactive !== true) {
+    return false;
+  }
+
+  if (record.metadata?.flow === "help_focus") {
+    return true;
+  }
+
+  const payload = record.metadata?.interactive_payload;
+  if (payload && typeof payload === "object" && "header" in payload) {
+    return (payload as { header?: string }).header === "Advice focus";
+  }
+
+  return record.body.startsWith("[interactive:");
+}
+
 export function isActivationOutboundMessage(record: OutboundMessageRecord): boolean {
+  if (record.metadata?.interactive === true) {
+    return false;
+  }
+
   const flow = record.metadata?.flow;
   if (flow === "express_activation") {
     return true;

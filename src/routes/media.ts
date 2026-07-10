@@ -5,6 +5,7 @@ import { logger } from "../lib/logger.js";
 import {
   buildSundayCardSvg,
   buildWelcomeCardSvg,
+  renderLockedInStickerWebp,
   renderSvgToPng,
   verifySundayCardToken
 } from "../services/rich-media.service.js";
@@ -16,6 +17,12 @@ async function sendPng(response: Response, png: Buffer): Promise<void> {
   response.status(200).send(png);
 }
 
+async function sendWebp(response: Response, webp: Buffer): Promise<void> {
+  response.setHeader("content-type", "image/webp");
+  response.setHeader("cache-control", "public, max-age=300");
+  response.status(200).send(webp);
+}
+
 export async function handleWelcomeImageRequest(_request: Request, response: Response): Promise<void> {
   const png = await renderSvgToPng(buildWelcomeCardSvg());
   if (!png) {
@@ -24,6 +31,16 @@ export async function handleWelcomeImageRequest(_request: Request, response: Res
   }
 
   await sendPng(response, png);
+}
+
+export async function handleLockedInStickerRequest(_request: Request, response: Response): Promise<void> {
+  const webp = await renderLockedInStickerWebp();
+  if (!webp) {
+    response.status(503).send("Sticker rendering unavailable.");
+    return;
+  }
+
+  await sendWebp(response, webp);
 }
 
 export async function handleSundayCardImageRequest(request: Request, response: Response): Promise<void> {

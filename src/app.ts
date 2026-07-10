@@ -15,7 +15,7 @@ import { adminRouter } from "./routes/admin.js";
 import { paymentsRouter, paymentWebhooksRouter } from "./routes/payments.js";
 import { reportsRouter } from "./routes/reports.js";
 import { handleReportWebRequest } from "./routes/report.js";
-import { handleSundayCardImageRequest, handleWelcomeImageRequest } from "./routes/media.js";
+import { handleSundayCardImageRequest, handleLockedInStickerRequest, handleWelcomeImageRequest } from "./routes/media.js";
 import { whatsappRouter } from "./routes/whatsapp.js";
 
 export function createApp(): express.Express {
@@ -71,6 +71,7 @@ export function createApp(): express.Express {
   );
 
   app.get("/media/welcome.png", handleWelcomeImageRequest);
+  app.get("/media/locked-in-sticker.webp", handleLockedInStickerRequest);
   app.get("/media/sunday/:token.png", handleSundayCardImageRequest);
   app.get("/report/:token", handleReportWebRequest);
 

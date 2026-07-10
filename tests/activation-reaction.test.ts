@@ -5,26 +5,44 @@ const mockRecordEngagementDelivery = vi.fn();
 const mockFindOutboundByProviderMessageId = vi.fn();
 const mockFindRecentActivationOutboundForUser = vi.fn();
 const mockSendWhatsAppMessage = vi.fn();
+const mockSendWhatsAppSticker = vi.fn();
+const mockDeliverWhatsAppReaction = vi.fn();
+const mockResolveLockedInStickerUrl = vi.fn();
 
 vi.mock("../src/services/engagement-delivery.service.js", () => ({
   hasEngagementDelivery: mockHasEngagementDelivery,
   recordEngagementDelivery: mockRecordEngagementDelivery
 }));
 
-vi.mock("../src/services/outbound-message.service.js", () => ({
-  findOutboundByProviderMessageId: mockFindOutboundByProviderMessageId,
-  findRecentActivationOutboundForUser: mockFindRecentActivationOutboundForUser,
-  isActivationOutboundMessage: (record: { body: string; metadata?: { flow?: string } | null }) =>
-    record.metadata?.flow === "express_activation" || record.body.startsWith("You're in,")
+vi.mock("../src/services/outbound-message.service.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/services/outbound-message.service.js")>(
+    "../src/services/outbound-message.service.js"
+  );
+
+  return {
+    ...actual,
+    findOutboundByProviderMessageId: mockFindOutboundByProviderMessageId,
+    findRecentActivationOutboundForUser: mockFindRecentActivationOutboundForUser
+  };
+});
+
+vi.mock("../src/services/rich-media.service.js", () => ({
+  resolveLockedInStickerUrl: mockResolveLockedInStickerUrl
 }));
 
 vi.mock("../src/services/whatsapp.service.js", () => ({
-  sendWhatsAppMessage: mockSendWhatsAppMessage
+  sendWhatsAppMessage: mockSendWhatsAppMessage,
+  sendWhatsAppSticker: mockSendWhatsAppSticker,
+  deliverWhatsAppReaction: mockDeliverWhatsAppReaction
 }));
 
 const {
   ACTIVATION_REACTION_ACK_KEY,
+  HELP_FOCUS_REACTION_ACK_KEY,
+  MAURI_POSITIVE_REACTION_EMOJI,
   buildActivationReactionAck,
+  buildHelpFocusReactionAck,
+  deliverInboundReactionAck,
   handleActivationReactionMessage,
   isPositiveActivationReaction
 } = await import("../src/services/activation-reaction.service.js");
@@ -49,6 +67,8 @@ const activeUser = {
   morning_digest_enabled: true,
   weekly_focus_habit: "Morning check-in: mood plus one small win.",
   open_loop_followups_enabled: true,
+  help_focus_primary: "productivity",
+  help_focus_secondary: "relationship",
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z"
 };
@@ -60,6 +80,9 @@ describe("activation reaction ack", () => {
     mockRecordEngagementDelivery.mockResolvedValue(undefined);
     mockFindOutboundByProviderMessageId.mockResolvedValue(null);
     mockFindRecentActivationOutboundForUser.mockResolvedValue(null);
+    mockSendWhatsAppSticker.mockResolvedValue(true);
+    mockResolveLockedInStickerUrl.mockReturnValue("https://mauri.example/media/locked-in-sticker.webp");
+    mockDeliverWhatsAppReaction.mockResolvedValue(undefined);
   });
 
   it("detects positive activation reactions", () => {
@@ -67,12 +90,12 @@ describe("activation reaction ack", () => {
     expect(isPositiveActivationReaction("👎")).toBe(false);
   });
 
-  it("builds a warm one-line ack", () => {
+  it("builds fallback text for sticker delivery", () => {
     expect(buildActivationReactionAck("Vik")).toContain("Perfect, Vik");
-    expect(buildActivationReactionAck("Vik")).toContain("tomorrow at 7");
+    expect(buildHelpFocusReactionAck(activeUser)).toContain("Productivity + Relationship");
   });
 
-  it("sends ack once when reaction targets activation message", async () => {
+  it("uses sticker mode on first activation reaction", async () => {
     mockFindOutboundByProviderMessageId.mockResolvedValue({
       body: "You're in, Vik ✌️",
       metadata: { flow: "express_activation", provider_message_id: "wamid-activation" }
@@ -85,35 +108,115 @@ describe("activation reaction ack", () => {
     });
 
     expect(first.handled).toBe(true);
-    expect(first.reply).toContain("Perfect, Vik");
+    expect(first.mode).toBe("sticker");
     expect(mockRecordEngagementDelivery).toHaveBeenCalledWith(activeUser.id, ACTIVATION_REACTION_ACK_KEY);
 
-    mockHasEngagementDelivery.mockResolvedValue(true);
-
-    const second = await handleActivationReactionMessage({
+    await deliverInboundReactionAck({
       user: activeUser,
-      emoji: "👍",
-      targetMessageId: "wamid-activation"
+      phoneNumber: activeUser.phone_number,
+      targetMessageId: "wamid-activation",
+      result: first
     });
 
-    expect(second.handled).toBe(true);
-    expect(second.reply).toBeUndefined();
+    expect(mockDeliverWhatsAppReaction).toHaveBeenCalledWith({
+      to: activeUser.phone_number,
+      messageId: "wamid-activation",
+      emoji: MAURI_POSITIVE_REACTION_EMOJI
+    });
+    expect(mockSendWhatsAppSticker).toHaveBeenCalled();
+    expect(mockSendWhatsAppMessage).not.toHaveBeenCalled();
   });
 
-  it("falls back to recent activation within the onboarding window", async () => {
-    mockFindRecentActivationOutboundForUser.mockResolvedValue({
-      body: "You're in, Vik ✌️",
-      metadata: { flow: "express_activation" }
+  it("reacts only on repeat advice-focus reactions", async () => {
+    mockHasEngagementDelivery.mockResolvedValue(true);
+    mockFindOutboundByProviderMessageId.mockResolvedValue({
+      body: "[interactive:list] Vik — for advice I'm leaning into Productivity + Relationship.",
+      metadata: {
+        flow: "help_focus",
+        interactive: true,
+        interactive_payload: { header: "Advice focus", body: "Pick lane" },
+        provider_message_id: "wamid-help-focus"
+      }
     });
 
     const result = await handleActivationReactionMessage({
       user: activeUser,
       emoji: "👍",
-      targetMessageId: "wamid-unknown"
+      targetMessageId: "wamid-help-focus"
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toBeDefined();
+    expect(result.mode).toBe("repeat");
+    expect(result.reply).toBeUndefined();
+
+    await deliverInboundReactionAck({
+      user: activeUser,
+      phoneNumber: activeUser.phone_number,
+      targetMessageId: "wamid-help-focus",
+      result
+    });
+
+    expect(mockDeliverWhatsAppReaction).toHaveBeenCalled();
+    expect(mockSendWhatsAppSticker).not.toHaveBeenCalled();
+    expect(mockSendWhatsAppMessage).not.toHaveBeenCalled();
+  });
+
+  it("locks advice lane with sticker on first help-focus reaction", async () => {
+    mockFindOutboundByProviderMessageId.mockResolvedValue({
+      body: "[interactive:list] Vik — for advice I'm leaning into Productivity + Relationship.",
+      metadata: {
+        flow: "help_focus",
+        interactive: true,
+        interactive_payload: {
+          header: "Advice focus",
+          body: "Vik — for advice I'm leaning into Productivity + Relationship."
+        },
+        provider_message_id: "wamid-help-focus"
+      }
+    });
+
+    const result = await handleActivationReactionMessage({
+      user: activeUser,
+      emoji: "👍",
+      targetMessageId: "wamid-help-focus"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.mode).toBe("sticker");
+    expect(mockRecordEngagementDelivery).toHaveBeenCalledWith(activeUser.id, HELP_FOCUS_REACTION_ACK_KEY);
+  });
+
+  it("falls back to text when sticker delivery fails", async () => {
+    mockSendWhatsAppSticker.mockResolvedValue(false);
+    mockFindOutboundByProviderMessageId.mockResolvedValue({
+      body: "[interactive:buttons] Vik — happy with that advice lane, or want to switch?",
+      metadata: {
+        flow: "express_activation",
+        interactive: true,
+        interactive_payload: { header: "Advice focus", body: "Pick lane" },
+        provider_message_id: "wamid-help-focus"
+      }
+    });
+
+    const result = await handleActivationReactionMessage({
+      user: activeUser,
+      emoji: "👍",
+      targetMessageId: "wamid-help-focus"
+    });
+
+    await deliverInboundReactionAck({
+      user: activeUser,
+      phoneNumber: activeUser.phone_number,
+      targetMessageId: "wamid-help-focus",
+      result
+    });
+
+    expect(mockSendWhatsAppSticker).toHaveBeenCalled();
+    expect(mockSendWhatsAppMessage).toHaveBeenCalledWith(
+      activeUser.phone_number,
+      expect.stringContaining("Locked in, Vik"),
+      expect.any(Object)
+    );
   });
 
   it("ignores reactions for non-active users", async () => {

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildLockedInStickerFrameSvg,
   buildSundayCardSvg,
   buildWelcomeCardSvg,
+  renderLockedInStickerWebp,
   shouldSendSundayReportImage,
   signSundayCardToken,
   verifySundayCardToken
@@ -65,6 +67,17 @@ describe("rich media service", () => {
         messageCountThisWeek: 0
       })
     ).toBe(false);
+  });
+
+  it("builds animated locked-in sticker frames and webp", async () => {
+    const frame = buildLockedInStickerFrameSvg(0, 12);
+    expect(frame).toContain("Locked in");
+    expect(frame).toContain("🦤");
+
+    const webp = await renderLockedInStickerWebp();
+    expect(webp).toBeTruthy();
+    expect(webp!.length).toBeGreaterThan(500);
+    expect(webp!.length).toBeLessThan(500 * 1024);
   });
 });
 

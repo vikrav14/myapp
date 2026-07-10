@@ -493,7 +493,10 @@ export async function sendWhatsAppTypingIndicator(messageId: string): Promise<vo
   }
 }
 
-export async function acknowledgeInboundWhatsAppMessageBestEffort(messageId: string | undefined): Promise<void> {
+export async function acknowledgeInboundWhatsAppMessageBestEffort(
+  messageId: string | undefined,
+  options?: { skipTyping?: boolean | undefined }
+): Promise<void> {
   if (!messageId?.trim()) {
     return;
   }
@@ -503,6 +506,13 @@ export async function acknowledgeInboundWhatsAppMessageBestEffort(messageId: str
   }
 
   try {
+    if (options?.skipTyping) {
+      if (env.WHATSAPP_MARK_READ_ENABLED) {
+        await markWhatsAppMessageRead(messageId);
+      }
+      return;
+    }
+
     if (env.WHATSAPP_TYPING_INDICATOR_ENABLED) {
       await sendWhatsAppTypingIndicator(messageId);
       return;
@@ -533,8 +543,8 @@ export async function deliverWhatsAppReaction(input: {
   });
 }
 
-export async function deliverWhatsAppInteractive(to: string, interactive: WhatsAppInteractiveOutbound): Promise<void> {
-  await postWhatsAppMessage({
+export async function deliverWhatsAppInteractive(to: string, interactive: WhatsAppInteractiveOutbound): Promise<string | undefined> {
+  return postWhatsAppMessage({
     to,
     payload: buildInteractivePayload(interactive)
   });
@@ -584,9 +594,14 @@ export async function sendWhatsAppInteractive(
 
     try {
       await markOutboundMessageSending(outbound.id);
-      await deliverWhatsAppInteractive(to, interactive);
+      const providerMessageId = await deliverWhatsAppInteractive(to, interactive);
       delivered = true;
       await markOutboundMessageSent(outbound.id);
+      if (providerMessageId) {
+        await appendOutboundMessageMetadata(outbound.id, {
+          provider_message_id: providerMessageId
+        });
+      }
       return { outboundId: outbound.id, delivered: true };
     } catch (error) {
       lastError = error;
@@ -722,6 +737,76 @@ export async function sendWhatsAppImage(
       errorMessage
     });
     throw error;
+  }
+}
+
+export async function deliverWhatsAppSticker(to: string, stickerUrl: string): Promise<void> {
+  await postWhatsAppMessage({
+    to,
+    payload: {
+      type: "sticker",
+      sticker: {
+        link: stickerUrl
+      }
+    }
+  });
+}
+
+export async function sendWhatsAppSticker(
+  to: string,
+  stickerUrl: string,
+  options?: {
+    userId?: string | null | undefined;
+    requestId?: string | undefined;
+    metadata?: Record<string, unknown> | undefined;
+  }
+): Promise<boolean> {
+  const outbound = await createOutboundMessage({
+    phoneNumber: to,
+    body: `[sticker] ${stickerUrl}`,
+    userId: options?.userId ?? null,
+    requestId: options?.requestId,
+    metadata: {
+      ...options?.metadata,
+      rich_media: true,
+      sticker_url: stickerUrl
+    }
+  });
+
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    logger.info({ to, stickerUrl }, "WhatsApp credentials missing. Sticker logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return false;
+  }
+
+  if (!isRichMediaEnabled() || !env.WHATSAPP_STICKERS_ENABLED) {
+    logger.info({ to, stickerUrl }, "WhatsApp stickers disabled. Sticker logged instead of sent.");
+    await markOutboundMessageLoggedOnly(outbound.id);
+    return false;
+  }
+
+  let delivered = false;
+  try {
+    await markOutboundMessageSending(outbound.id);
+    await deliverWhatsAppSticker(to, stickerUrl);
+    delivered = true;
+    await markOutboundMessageSent(outbound.id);
+    return true;
+  } catch (error) {
+    if (delivered) {
+      logger.error(
+        { error, outboundMessageId: outbound.id },
+        "WhatsApp sticker delivery succeeded but outbound finalization failed."
+      );
+      throw error;
+    }
+
+    const errorMessage = error instanceof Error ? error.message : "Unknown sticker send error";
+    await markOutboundMessageFailed({
+      messageId: outbound.id,
+      errorMessage
+    });
+    return false;
   }
 }
 

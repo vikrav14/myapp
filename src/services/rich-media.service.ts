@@ -227,6 +227,81 @@ export async function renderSvgToPng(svg: string): Promise<Buffer | null> {
   }
 }
 
+const LOCKED_IN_STICKER_FRAMES = 12;
+const LOCKED_IN_STICKER_DELAY_MS = 90;
+
+export function buildLockedInStickerFrameSvg(frameIndex: number, totalFrames: number): string {
+  const phase = (frameIndex / totalFrames) * Math.PI * 2;
+  const pulse = 1 + 0.06 * Math.sin(phase);
+  const glow = 0.35 + 0.25 * Math.sin(phase);
+  const shieldScale = pulse.toFixed(3);
+  const glowOpacity = glow.toFixed(2);
+  const wingTilt = (4 * Math.sin(phase)).toFixed(1);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#7dffb8" stop-opacity="${glowOpacity}"/>
+      <stop offset="100%" stop-color="#0f3d2e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f3d2e"/>
+      <stop offset="100%" stop-color="#1f6b4d"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)" rx="96"/>
+  <circle cx="256" cy="220" r="150" fill="url(#glow)"/>
+  <g transform="translate(256 210) scale(${shieldScale}) translate(-256 -210)">
+    <text x="256" y="250" text-anchor="middle" font-size="148" font-family="Arial, sans-serif">🛡️</text>
+  </g>
+  <text x="256" y="360" text-anchor="middle" font-size="72" font-family="Arial, sans-serif" transform="rotate(${wingTilt} 256 360)">🦤</text>
+  <text x="256" y="430" text-anchor="middle" fill="#ffffff" font-size="34" font-weight="700" font-family="Arial, sans-serif">Locked in</text>
+  <text x="256" y="468" text-anchor="middle" fill="#c9ead8" font-size="22" font-family="Arial, sans-serif">Lane set ✌️</text>
+</svg>`;
+}
+
+export async function renderLockedInStickerWebp(): Promise<Buffer | null> {
+  try {
+    const sharp = (await import("sharp")).default;
+    const frames: Buffer[] = [];
+
+    for (let frame = 0; frame < LOCKED_IN_STICKER_FRAMES; frame += 1) {
+      const svg = buildLockedInStickerFrameSvg(frame, LOCKED_IN_STICKER_FRAMES);
+      const png = await sharp(Buffer.from(svg, "utf8")).resize(512, 512).png().toBuffer();
+      frames.push(png);
+    }
+
+    return await sharp(frames, {
+      animated: true,
+      delay: Array.from({ length: LOCKED_IN_STICKER_FRAMES }, () => LOCKED_IN_STICKER_DELAY_MS)
+    })
+      .webp({ quality: 82, effort: 4 })
+      .toBuffer();
+  } catch (error) {
+    logger.warn({ error }, "Failed to render locked-in sticker WebP.");
+    return null;
+  }
+}
+
+export function resolveLockedInStickerUrl(): string | null {
+  if (!isRichMediaEnabled() || !env.WHATSAPP_STICKERS_ENABLED) {
+    return null;
+  }
+
+  const override = env.MAURI_LOCKED_IN_STICKER_URL?.trim();
+  if (override) {
+    return override;
+  }
+
+  const base = resolvePublicBaseUrl();
+  if (!base) {
+    return null;
+  }
+
+  return `${base}/media/locked-in-sticker.webp`;
+}
+
 export function buildWelcomeImagePayload(user: MauriUser): { url: string; caption: string } | null {
   const url = resolveWelcomeImageUrl();
   if (!url) {
