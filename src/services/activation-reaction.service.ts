@@ -10,21 +10,19 @@ import {
   isHelpFocusOutboundMessage,
   findOutboundByProviderMessageId
 } from "./outbound-message.service.js";
-import { resolveLockedInStickerUrl } from "./rich-media.service.js";
-import {
-  deliverWhatsAppReaction,
-  sendWhatsAppMessage,
-  sendWhatsAppSticker
-} from "./whatsapp.service.js";
+import { deliverWhatsAppReaction, sendWhatsAppMessage } from "./whatsapp.service.js";
 
 export const ACTIVATION_REACTION_ACK_KEY = "express_activation_reaction_ack";
 export const HELP_FOCUS_REACTION_ACK_KEY = "help_focus_reaction_ack";
 const ACTIVATION_REACTION_WINDOW_HOURS = 72;
-export const MAURI_POSITIVE_REACTION_EMOJI = "✌️";
+export const MAURI_REACTION_ACK_EMOJI = "🦤";
 
-const POSITIVE_REACTION_EMOJIS = new Set(["👍", "✅", "❤️", "🙏", "✌️", "😊", "🎉", "💯", "❤"]);
+/** @deprecated Use MAURI_REACTION_ACK_EMOJI */
+export const MAURI_POSITIVE_REACTION_EMOJI = MAURI_REACTION_ACK_EMOJI;
 
-export type InboundReactionAckMode = "repeat" | "sticker" | "text";
+const POSITIVE_REACTION_EMOJIS = new Set(["👍", "✅", "❤️", "🙏", "✌️", "🦤", "😊", "🎉", "💯", "❤"]);
+
+export type InboundReactionAckMode = "repeat" | "reaction" | "text";
 
 export interface InboundReactionResult {
   handled: boolean;
@@ -39,7 +37,7 @@ export function isPositiveActivationReaction(emoji: string): boolean {
 export function buildActivationReactionAck(firstName?: string | null): string {
   const name = firstName?.trim() || "there";
 
-  return `Perfect, ${name} — you're all set ✌️
+  return `Perfect, ${name} — you're all set 🦤
 
 First pulse lands tomorrow at 7. Brain dump or remind me anytime before then.`;
 }
@@ -53,7 +51,7 @@ export function buildHelpFocusReactionAck(user: MauriUser): string {
         ? formatHelpFocusLabel(user.help_focus_primary)
         : "your lane";
 
-  return `Locked in, ${name} ✌️ — ${labels} for advice. First pulse tomorrow at 7.`;
+  return `Locked in, ${name} 🦤 — ${labels} for advice. First pulse tomorrow at 7.`;
 }
 
 function hoursSince(date: Date): number {
@@ -89,7 +87,7 @@ async function handleHelpFocusReaction(input: {
   if (isWithinHelpFocusActivationWindow(input.user)) {
     return {
       handled: true,
-      mode: "sticker",
+      mode: "reaction",
       reply: buildHelpFocusReactionAck(input.user)
     };
   }
@@ -97,7 +95,7 @@ async function handleHelpFocusReaction(input: {
   return {
     handled: true,
     mode: "text",
-    reply: `Got your 👍, ${input.user.first_name?.trim() || "there"} ✌️ — reply help focus anytime to switch lanes.`
+    reply: `Got your 👍, ${input.user.first_name?.trim() || "there"} 🦤 — reply help focus anytime to switch lanes.`
   };
 }
 
@@ -112,7 +110,7 @@ async function handleActivationReaction(input: {
 
   return {
     handled: true,
-    mode: "sticker",
+    mode: "reaction",
     reply: buildActivationReactionAck(input.user.first_name)
   };
 }
@@ -159,13 +157,15 @@ export async function deliverInboundReactionAck(input: {
     return;
   }
 
+  let reacted = false;
   if (env.WHATSAPP_REACTIONS_ENABLED && input.targetMessageId.trim()) {
     try {
       await deliverWhatsAppReaction({
         to: input.phoneNumber,
         messageId: input.targetMessageId,
-        emoji: MAURI_POSITIVE_REACTION_EMOJI
+        emoji: MAURI_REACTION_ACK_EMOJI
       });
+      reacted = true;
     } catch (error) {
       logger.warn(
         { error, userId: input.user.id, targetMessageId: input.targetMessageId },
@@ -174,25 +174,8 @@ export async function deliverInboundReactionAck(input: {
     }
   }
 
-  if (input.result.mode === "repeat") {
+  if (reacted && input.result.mode !== "text") {
     return;
-  }
-
-  if (input.result.mode === "sticker") {
-    const stickerUrl = resolveLockedInStickerUrl();
-    if (stickerUrl) {
-      const delivered = await sendWhatsAppSticker(input.phoneNumber, stickerUrl, {
-        userId: input.user.id,
-        requestId: input.requestId,
-        metadata: {
-          flow: "activation_reaction_sticker"
-        }
-      });
-
-      if (delivered) {
-        return;
-      }
-    }
   }
 
   if (input.result.reply?.trim()) {
