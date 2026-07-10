@@ -1,8 +1,11 @@
-import type { MauriModuleKey, MauriUser, WhatsAppImageOutbound, WhatsAppInteractiveOutbound } from "../types.js";
+import type { MauriModuleKey, MauriUser, UserMindFact, WhatsAppImageOutbound, WhatsAppInteractiveOutbound } from "../types.js";
 
 import { logger } from "../lib/logger.js";
 import { buildPaywallReplyForUser } from "./paywall.service.js";
-import { buildExpressStartInteractive } from "./whatsapp-interactive.service.js";
+import {
+  buildChaosPinPickerInteractive,
+  buildExpressStartInteractive
+} from "./whatsapp-interactive.service.js";
 import {
   buildExpressActivationReply,
   buildExpressStartSummary,
@@ -39,7 +42,14 @@ import { assignHelpFocusFromFacts } from "./help-focus.service.js";
 import { buildHelpFocusActivationExplanation } from "./help-focus-inference.service.js";
 import { buildHelpFocusActivationInteractive } from "./whatsapp-interactive.service.js";
 import { assignWeeklyFocusForUser } from "./weekly-focus.service.js";
-import { buildChaosOrganizerMap, isChaosProfile } from "./chaos-organizer.service.js";
+import {
+  buildChaosMapLines,
+  buildChaosOrganizerMap,
+  buildChaosPinSelectionReply,
+  inferWeeklyFocusFromChaosLine,
+  isChaosProfile,
+  parseChaosPinCommand
+} from "./chaos-organizer.service.js";
 import { buildWelcomeImagePayload } from "./rich-media.service.js";
 import { updateUserState } from "./user.service.js";
 
@@ -138,8 +148,84 @@ async function beginExpressStartStep(user: MauriUser, prefixReply?: string): Pro
   };
 }
 
+async function buildChaosPinGateResult(user: MauriUser, facts: UserMindFact[]): Promise<OnboardingResult | null> {
+  if (!isChaosProfile(facts) || user.weekly_focus_habit?.trim()) {
+    return null;
+  }
+
+  const lines = buildChaosMapLines(facts);
+  if (lines.length === 0) {
+    return null;
+  }
+
+  return {
+    handled: true,
+    user,
+    reply: "Pick one line from your map first — then we'll start your trial.",
+    interactive: buildChaosPinPickerInteractive({
+      firstName: user.first_name,
+      lines
+    })
+  };
+}
+
+async function handleChaosPinSelection(
+  user: MauriUser,
+  message: string,
+  facts: UserMindFact[]
+): Promise<OnboardingResult | null> {
+  const command = parseChaosPinCommand(message);
+  if (!command) {
+    return null;
+  }
+
+  const lines = buildChaosMapLines(facts);
+  const line = lines.find((entry) => entry.key === command.key);
+  if (!line) {
+    return {
+      handled: true,
+      user,
+      reply: "That line isn't on your map anymore — pick one from the list.",
+      interactive: buildChaosPinPickerInteractive({
+        firstName: user.first_name,
+        lines
+      })
+    };
+  }
+
+  const weeklyFocus = inferWeeklyFocusFromChaosLine(line);
+  const updatedUser = await updateUserState(user.id, {
+    weekly_focus_habit: weeklyFocus,
+    weekly_focus_set_at: new Date().toISOString()
+  });
+
+  return {
+    handled: true,
+    user: updatedUser,
+    reply: buildChaosPinSelectionReply({
+      firstName: updatedUser.first_name,
+      line,
+      weeklyFocus
+    }),
+    interactive: buildExpressStartInteractive(),
+    sendTextBeforeInteractive: true
+  };
+}
+
 async function handleExpressSetupMessage(user: MauriUser, message: string): Promise<OnboardingResult> {
+  const facts = await loadUserMindFacts(user.id);
+
+  const chaosPinResult = await handleChaosPinSelection(user, message, facts);
+  if (chaosPinResult) {
+    return chaosPinResult;
+  }
+
   if (isExpressStartConfirmation(message)) {
+    const gate = await buildChaosPinGateResult(user, facts);
+    if (gate) {
+      return gate;
+    }
+
     return completeExpressStart(user);
   }
 
@@ -150,7 +236,6 @@ async function handleExpressSetupMessage(user: MauriUser, message: string): Prom
     };
   }
 
-  const facts = await loadUserMindFacts(user.id);
   const setup = inferExpressSetup(facts);
 
   if (isExpressSetupQuestion(message)) {
@@ -162,6 +247,17 @@ async function handleExpressSetupMessage(user: MauriUser, message: string): Prom
       setup
     });
 
+    const gate = await buildChaosPinGateResult(user, facts);
+    if (gate && !user.weekly_focus_habit?.trim()) {
+      return {
+        handled: true,
+        user,
+        reply: `${explanation}\n\n${gate.reply}`,
+        interactive: gate.interactive,
+        sendTextBeforeInteractive: true
+      };
+    }
+
     return {
       handled: true,
       user,
@@ -172,6 +268,11 @@ async function handleExpressSetupMessage(user: MauriUser, message: string): Prom
   }
 
   if (user.onboarding_state === "awaiting_express_start") {
+    const gate = await buildChaosPinGateResult(user, facts);
+    if (gate) {
+      return gate;
+    }
+
     return {
       handled: true,
       user,
@@ -349,6 +450,7 @@ export async function handleOnboardingMessage(input: {
       const summary = buildExpressStartSummary({ firstName: updatedUser.first_name, setup });
 
       if (heavyShare && isChaosProfile(facts, message)) {
+        const lines = buildChaosMapLines(facts);
         const chaosMap = buildChaosOrganizerMap({
           firstName: updatedUser.first_name,
           facts
@@ -358,7 +460,10 @@ export async function handleOnboardingMessage(input: {
           handled: true,
           user: updatedUser,
           reply: `${chaosMap}\n\n${bridge}`,
-          interactive: buildExpressStartInteractive(),
+          interactive: buildChaosPinPickerInteractive({
+            firstName: updatedUser.first_name,
+            lines
+          }),
           sendTextBeforeInteractive: true
         };
       }

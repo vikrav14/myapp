@@ -4,6 +4,7 @@ import { HELP_FOCUS_CATALOG } from "./help-focus.constants.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY } from "./help-focus.constants.js";
 import { formatHelpFocusLabel } from "./help-focus-inference.service.js";
+import type { ChaosMapLine } from "./chaos-organizer.service.js";
 import { PACE_PRESET_CATALOG } from "./notification-pace.constants.js";
 import type { ProactivePacePreset } from "./notification-pace.constants.js";
 import { MODULE_CATALOG } from "./user-modules.constants.js";
@@ -15,6 +16,15 @@ const HELP_DOMAIN_REPLY_ENTRIES = Object.fromEntries(
 const PACE_REPLY_ENTRIES = Object.fromEntries(
   PACE_PRESET_CATALOG.map((entry) => [`pace_${entry.key}`, `pace ${entry.key}`])
 ) as Record<string, string>;
+
+const CHAOS_PIN_REPLY_ENTRIES = {
+  chaos_pin_money: "chaos pin money",
+  chaos_pin_home: "chaos pin home",
+  chaos_pin_family: "chaos pin family",
+  chaos_pin_work: "chaos pin work",
+  chaos_pin_goals: "chaos pin goals",
+  chaos_pin_live: "chaos pin live"
+} as const;
 
 export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   archetype_student: "Student Grind",
@@ -70,6 +80,7 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
 
 Object.assign(INTERACTIVE_REPLY_MAP, HELP_DOMAIN_REPLY_ENTRIES);
 Object.assign(INTERACTIVE_REPLY_MAP, PACE_REPLY_ENTRIES);
+Object.assign(INTERACTIVE_REPLY_MAP, CHAOS_PIN_REPLY_ENTRIES);
 
 export function resolveInteractiveReplyId(replyId: string): string | null {
   return INTERACTIVE_REPLY_MAP[replyId] ?? null;
@@ -515,6 +526,30 @@ export function buildPacePickerInteractive(input: {
           id: `pace_${entry.key}`,
           title: entry.label.slice(0, 24),
           description: entry.description.slice(0, 72)
+        }))
+      }
+    ]
+  };
+}
+
+export function buildChaosPinPickerInteractive(input: {
+  firstName?: string | null;
+  lines: ChaosMapLine[];
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+
+  return {
+    header: "Pick your pin",
+    body: `${name} — one line this week. Tap the thread you want Mauri to nudge on.`,
+    footer: "One pin beats fixing everything",
+    listButtonLabel: "Pick a line",
+    sections: [
+      {
+        title: "Your map",
+        rows: input.lines.map((line) => ({
+          id: `chaos_pin_${line.key}`,
+          title: `${line.emoji} ${line.label}`.slice(0, 24),
+          description: line.detail.slice(0, 72)
         }))
       }
     ]
