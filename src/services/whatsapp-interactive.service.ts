@@ -39,6 +39,7 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   help_focus: "my focus",
   help_focus_confirm: "help focus confirm",
   help_advice_focus: "help focus",
+  help_playbook: "my playbook",
   help_roast: "roast me",
   help_hype: "hype me",
   help_runway: "my runway",
@@ -370,10 +371,11 @@ export function buildHelpFocusActivationInteractive(input: {
   return {
     header: "Advice focus",
     body: `${name} — happy with that advice lane, or want to switch?`,
-    footer: "Shapes how I counsel — not your 7am brief",
+    footer: "Tap My playbook to see what's behind it — then confirm or switch",
     buttons: [
       { id: "help_focus_confirm", title: "Looks good" },
-      { id: "help_advice_focus", title: "Pick lane" }
+      { id: "help_advice_focus", title: "Pick lane" },
+      { id: "help_playbook", title: "My playbook" }
     ]
   };
 }

@@ -132,18 +132,20 @@ export function buildHelpFocusActivationExplanation(input: {
 
   const whyLine = factHook ? `I ${factHook}.` : "I read that from what you shared.";
 
-  const trackBlock = formatStrategyTrackBlock({
-    laneLabels: labels,
-    howIHelp: lenses || "One practical next step at a time."
-  });
+  const trackBlock = formatStrategyTrackBlock(
+    {
+      laneLabels: labels,
+      howIHelp: lenses || "One practical next step at a time."
+    },
+    { includePlaybookCue: false }
+  );
 
   return [
     `For advice I'll lean into ${labels} — ${whyLine}`,
     "",
     ...trackBlock,
     "",
-    "Next message — tap Looks good or Pick lane. Reply help focus anytime to change later.",
-    "Want to see the playbook behind this lane? Reply my playbook."
+    "Next message — tap Looks good, Pick lane, or My playbook. Reply help focus anytime to change later."
   ].join("\n");
 }
 

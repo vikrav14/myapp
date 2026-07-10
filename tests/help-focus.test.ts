@@ -8,8 +8,14 @@ import {
   normalizeHelpFocusKey,
   parseHelpFocusSourcesRequest
 } from "../src/services/help-focus-inference.service.js";
-import { parseHelpFocusCommand } from "../src/services/help-focus.service.js";
-import { buildHelpFocusActivationInteractive, buildHelpFocusPickerInteractive, buildHelpFocusPickerRows, WHATSAPP_LIST_MAX_ROWS } from "../src/services/whatsapp-interactive.service.js";
+import { parseHelpFocusCommand, handleHelpFocusMessage } from "../src/services/help-focus.service.js";
+import {
+  buildHelpFocusActivationInteractive,
+  buildHelpFocusPickerInteractive,
+  buildHelpFocusPickerRows,
+  resolveInteractiveReplyId,
+  WHATSAPP_LIST_MAX_ROWS
+} from "../src/services/whatsapp-interactive.service.js";
 import type { UserMindFact } from "../src/types.js";
 
 function fact(overrides: Partial<UserMindFact> & Pick<UserMindFact, "category" | "fact_value">): UserMindFact {
@@ -161,12 +167,13 @@ describe("help focus inference", () => {
     expect(explanation).not.toContain("Psychology of Money");
 
     expect(explanation).toContain("Next message");
-    expect(explanation).toContain("Looks good or Pick lane");
-    expect(explanation).toContain("my playbook");
+    expect(explanation).toContain("Looks good, Pick lane, or My playbook");
+    expect(explanation).toContain("My playbook");
 
     const activationButtons = buildHelpFocusActivationInteractive({ firstName: "Vik" });
     expect(activationButtons.buttons?.[0]?.title).toBe("Looks good");
     expect(activationButtons.buttons?.[1]?.title).toBe("Pick lane");
+    expect(activationButtons.buttons?.[2]?.title).toBe("My playbook");
 
     const picker = buildHelpFocusPickerInteractive({
       firstName: "Vik",
@@ -186,5 +193,62 @@ describe("help focus inference", () => {
     expect(rows.length).toBeLessThanOrEqual(WHATSAPP_LIST_MAX_ROWS);
     expect(rows.some((row) => row.id === "help_domain_personal_finance")).toBe(true);
     expect(rows.some((row) => row.id === "help_domain_parenting")).toBe(true);
+  });
+});
+
+describe("help focus activation playbook UX", () => {
+  it("maps My playbook button tap to my playbook command", () => {
+    expect(resolveInteractiveReplyId("help_playbook")).toBe("my playbook");
+  });
+
+  it("re-shows activation buttons after playbook during fresh activation", async () => {
+    const result = await handleHelpFocusMessage({
+      user: {
+        id: "u1",
+        phone_number: "23050000000",
+        first_name: "Vik",
+        archetype: "Corporate / Career",
+        brief_focus: null,
+        active_modules: [],
+        onboarding_state: "active",
+        subscription_status: "Trial_Active",
+        onboarding_completed_at: new Date().toISOString(),
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: null,
+        locked_at: null,
+        subscription_started_at: null,
+        subscription_ends_at: null,
+        last_payment_at: null,
+        topic_preferences: [],
+        morning_digest_enabled: true,
+        calendar_sync_enabled: true,
+        memory_resurfacing_enabled: true,
+        local_alerts_enabled: true,
+        school_alerts_enabled: true,
+        payday_day_of_month: null,
+        monthly_income_rs: null,
+        weekly_focus_habit: null,
+        weekly_focus_set_at: null,
+        open_loop_followups_enabled: true,
+        proactive_checkins_paused_until: null,
+        quiet_hours_enabled: true,
+        quiet_hours_start_hour: 22,
+        quiet_hours_end_hour: 7,
+        help_focus_primary: "personal_finance",
+        help_focus_secondary: "relationship",
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z"
+      },
+      message: "my playbook"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("your playbook");
+    expect(result.reply).toContain("Tap Looks good to lock this lane");
+    expect(result.interactive?.buttons?.map((button) => button.title)).toEqual([
+      "Looks good",
+      "Pick lane",
+      "My playbook"
+    ]);
   });
 });
