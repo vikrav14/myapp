@@ -54,6 +54,10 @@ export async function assignWeeklyFocusForUser(
   user: MauriUser,
   facts: UserMindFact[] = []
 ): Promise<MauriUser> {
+  if (user.weekly_focus_habit?.trim()) {
+    return user;
+  }
+
   const focus = facts.length > 0 ? inferWeeklyFocusFromFacts(facts, user.archetype) : defaultWeeklyFocusForArchetype(user.archetype);
   return updateUserState(user.id, {
     weekly_focus_habit: focus,

@@ -223,7 +223,90 @@ describe("handleOnboardingMessage express flow", () => {
     expect(result.reply).toContain("check in gently");
     expect(result.reply).toContain("here's your map");
     expect(result.reply).not.toContain("Morning pulse");
-    expect(result.interactive?.buttons?.[0]?.id).toBe("express_start");
+    expect(result.interactive?.listButtonLabel).toBe("Pick a line");
+  });
+
+  it("saves weekly focus when user picks a chaos map line", async () => {
+    const chaosFacts = [
+      ...financeFacts,
+      {
+        id: "fact-3",
+        user_id: baseUser.id,
+        category: "stressors",
+        fact_key: "loan",
+        fact_value: "Parents expect wedding loan repayment after dad's job loss",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      },
+      {
+        id: "fact-4",
+        user_id: baseUser.id,
+        category: "goals",
+        fact_key: "hustle",
+        fact_value: "Build digital marketing side hustle",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      }
+    ];
+    mockLoadUserMindFacts.mockResolvedValue(chaosFacts);
+    mockUpdateUserState.mockResolvedValue({
+      ...baseUser,
+      first_name: "Vik",
+      weekly_focus_habit: "One money move on Parents expect wedding loan repayment — log before you react",
+      weekly_focus_set_at: "2026-06-22T00:00:00.000Z"
+    });
+
+    const result = await handleOnboardingMessage({
+      user: { ...baseUser, onboarding_state: "awaiting_express_start", first_name: "Vik" },
+      isNewUser: false,
+      message: "chaos pin money"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Money it is");
+    expect(result.interactive?.buttons?.[0]?.title).toBe("Start my trial");
+    expect(mockUpdateUserState).toHaveBeenCalledWith(
+      baseUser.id,
+      expect.objectContaining({
+        weekly_focus_habit: expect.stringContaining("One money move")
+      })
+    );
+  });
+
+  it("requires a chaos pin before starting trial on chaos profiles", async () => {
+    const chaosFacts = [
+      ...financeFacts,
+      {
+        id: "fact-3",
+        user_id: baseUser.id,
+        category: "relationships",
+        fact_key: "parents",
+        fact_value: "Parents expect wedding loan repayment",
+        source: "onboarding",
+        confidence: 1,
+        user_visible: true,
+        created_at: "2026-06-22T00:00:00.000Z",
+        updated_at: "2026-06-22T00:00:00.000Z"
+      }
+    ];
+    mockLoadUserMindFacts.mockResolvedValue(chaosFacts);
+
+    const result = await handleOnboardingMessage({
+      user: { ...baseUser, onboarding_state: "awaiting_express_start", first_name: "Vik" },
+      isNewUser: false,
+      message: "start my trial"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("Pick one line from your map first");
+    expect(result.interactive?.listButtonLabel).toBe("Pick a line");
+    expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 
   it("activates on start confirmation with inferred setup", async () => {
