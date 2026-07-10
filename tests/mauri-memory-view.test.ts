@@ -142,5 +142,6 @@ describe("mauri memory view", () => {
     expect(reply).toContain("Personal Finance");
     expect(reply).toContain("How I help:");
     expect(reply).toContain("Reply help focus to change lane.");
+    expect(reply).toContain("my playbook");
   });
 });

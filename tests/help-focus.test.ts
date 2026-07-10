@@ -90,19 +90,24 @@ describe("help focus inference", () => {
     expect(prompt).toContain("Never name-drop books unless the user asked for sources");
   });
 
-  it("reveals framework sources when the user asks", () => {
+  it("reveals playbook copy when the user asks", () => {
     const reply = buildHelpFocusSourcesReply({
       firstName: "Vik",
       primary: "personal_finance",
       secondary: "psychology"
     });
 
+    expect(reply).toContain("your playbook");
+    expect(reply).toContain("What I'm applying for you");
+    expect(reply).toContain("Runway clarity without shame");
     expect(reply).toContain("Psychology of Money");
-    expect(reply).toContain("Feeling Good");
+    expect(reply).toContain("What to expect:");
     expect(reply).toContain("(primary)");
     expect(reply).toContain("(secondary)");
-    expect(reply).toContain("not homework");
+    expect(reply).toContain("Not homework");
 
+    expect(parseHelpFocusSourcesRequest("my playbook")).toEqual({ lane: null });
+    expect(parseHelpFocusSourcesRequest("my playbook psychology")).toEqual({ lane: "psychology" });
     expect(parseHelpFocusSourcesRequest("help focus sources")).toEqual({ lane: null });
     expect(parseHelpFocusSourcesRequest("help focus sources psychology")).toEqual({ lane: "psychology" });
     expect(parseHelpFocusSourcesRequest("which book is that from")).toEqual({ lane: null });
@@ -157,6 +162,7 @@ describe("help focus inference", () => {
 
     expect(explanation).toContain("Next message");
     expect(explanation).toContain("Looks good or Pick lane");
+    expect(explanation).toContain("my playbook");
 
     const activationButtons = buildHelpFocusActivationInteractive({ firstName: "Vik" });
     expect(activationButtons.buttons?.[0]?.title).toBe("Looks good");
