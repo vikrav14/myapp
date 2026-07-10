@@ -216,6 +216,18 @@ export async function resetProfileForKnowYouOnboarding(userId: string): Promise<
     throw new Error(`Failed to reset user mind snapshot for onboarding: ${snapshotError.message}`);
   }
 
+  const { error: memoriesError } = await supabase.from("conversation_memories").delete().eq("user_id", userId);
+
+  if (memoriesError) {
+    throw new Error(`Failed to reset conversation memories for onboarding: ${memoriesError.message}`);
+  }
+
+  const { error: insightsError } = await supabase.from("insights_vault").delete().eq("user_id", userId);
+
+  if (insightsError) {
+    throw new Error(`Failed to reset insights for onboarding: ${insightsError.message}`);
+  }
+
   await cancelPendingOpenLoopFollowUps(userId).catch((error) => {
     logger.warn({ error, userId }, "Failed to cancel pending follow-ups during know-you reset.");
   });

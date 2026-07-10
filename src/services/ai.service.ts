@@ -21,6 +21,7 @@ import {
   type UserMindSnapshotPayload
 } from "../schemas/user-mind.js";
 import { buildHelpFocusPromptForUser } from "./help-focus.service.js";
+import { CHAOS_ORGANIZER_AI_RULES, isChaosProfile } from "./chaos-organizer.service.js";
 import { mauriBrainDumpJsonSchema, mauriBrainDumpSchema, parseStructuredJson } from "../schemas/extraction.js";
 import {
   messageRouterExtractionJsonSchema,
@@ -527,6 +528,7 @@ Rules:
 - Warm, specific, never survey-like.
 - One question max.
 - Mention they can reply "not now" to pause proactive pings.
+${CHAOS_ORGANIZER_AI_RULES}
 ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - Sound like a real mate, not a bot.
 
@@ -583,6 +585,7 @@ export async function generateConversationalReply(input: {
   context: UserContextSnapshot;
 }): Promise<string> {
   const { user, message, extraction, context } = input;
+  const chaosMode = isChaosProfile(context.userMindFacts, message);
 
   const replyPrompt = `
 You are Mauri.
@@ -591,6 +594,7 @@ You sound grounded, sharp, warm, direct.
 
 Hard guardrails:
 ${MAURI_TEXT_REPLY_GUARDRAILS}
+${chaosMode ? `\n${CHAOS_ORGANIZER_AI_RULES}\n` : ""}
 
 User profile:
 First name: ${user.first_name ?? "Unknown"}
@@ -619,7 +623,7 @@ ${JSON.stringify(context.recentHabits)}
 Recent emotional logs:
 ${JSON.stringify(context.recentEmotions)}
 
-Semantically relevant older memories:
+Semantically relevant older memories (grounded — may be empty):
 ${JSON.stringify(context.semanticMemories)}
 
 Structured extraction from the latest message:
@@ -629,10 +633,12 @@ Latest user message:
 ${message}
 
 Reply in plain text only.
-If the user shared stress, respond with empathy first.
-If they implicitly logged progress, acknowledge it naturally.
-If they seem scattered, help them narrow to the next move without sounding robotic.
-Never reference details that are not in their profile facts, snapshot, or recent logs. Do not invent work hours, family members, or struggles they did not mention.
+${
+  chaosMode
+    ? "User is in chaos mode. Organize their threads into a short map, then ONE next pin. No therapy monologue."
+    : "If the user shared stress, acknowledge briefly then move to one next step. If they seem scattered, help them narrow without sounding robotic."
+}
+Never reference details that are not in their profile facts, snapshot, recent logs, or latest message. Do not invent loan sharks, crypto, threats, electricity bills, relatives in danger, or storylines from old test data.
 `;
 
   const rawReply = await callGemini({

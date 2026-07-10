@@ -4,6 +4,7 @@ import { searchRelevantMemories } from "./memory.service.js";
 import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
 import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
 import { formatUserMindSnapshotForPrompt } from "./user-mind-prompt.js";
+import { filterGroundedSemanticMemories } from "./context-grounding.service.js";
 
 export async function loadUserContext(userId: string, queryText?: string): Promise<UserContextSnapshot> {
   const [todosResult, financeResult, habitsResult, emotionsResult, semanticMemories, userMindFacts, mindRecord] =
@@ -73,7 +74,7 @@ export async function loadUserContext(userId: string, queryText?: string): Promi
       raw_unfiltered_vent: String(row.raw_unfiltered_vent),
       logged_at: String(row.logged_at)
     })),
-    semanticMemories,
+    semanticMemories: filterGroundedSemanticMemories(semanticMemories, userMindFacts),
     userMindFacts,
     userMindPrompt: formatUserMindForPrompt(userMindFacts),
     userMindSnapshot,

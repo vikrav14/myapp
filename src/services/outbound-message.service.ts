@@ -417,3 +417,21 @@ export async function findRecentActivationOutboundForUser(userId: string): Promi
 
   return data ? mapOutboundMessage(data as Record<string, unknown>) : null;
 }
+
+export async function listRecentAssistantOutboundBodies(userId: string, limit = 6): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("outbound_messages")
+    .select("body")
+    .eq("user_id", userId)
+    .eq("status", "sent")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to list recent outbound bodies: ${error.message}`);
+  }
+
+  return (data ?? [])
+    .map((row) => String((row as Record<string, unknown>).body ?? "").trim())
+    .filter((body) => body.length >= 20);
+}
