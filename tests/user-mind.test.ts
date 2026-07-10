@@ -312,5 +312,7 @@ describe("user mind helpers", () => {
     expect(prompt).toContain("👋");
     expect(prompt).toContain("your age");
     expect(prompt).toContain("what to avoid");
+    expect(prompt).toContain("Grand Baie");
+    expect(prompt).toContain("wedding last year");
   });
 });
