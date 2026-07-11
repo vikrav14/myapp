@@ -83,6 +83,27 @@ describe("handleFinanceCommandMessage", () => {
     });
   });
 
+  it("sets monthly income with dodo ack", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...activeUser,
+      monthly_income_rs: 25000
+    });
+    mockSupabaseFrom.mockImplementation(() =>
+      buildSelectChain({
+        data: []
+      })
+    );
+
+    const result = await handleFinanceCommandMessage({
+      user: activeUser,
+      message: "salary 25000"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toContain("🦤");
+    expect(result.reply).toContain("monthly income saved");
+  });
+
   it("shows runway using pay-cycle spend", async () => {
     mockSupabaseFrom.mockImplementation(() =>
       buildSelectChain({

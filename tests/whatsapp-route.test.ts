@@ -225,13 +225,16 @@ describe("WhatsApp webhook route", () => {
     expect(mockStoreConversationMemory).toHaveBeenCalledTimes(2);
     expect(mockSendWhatsAppMessage).toHaveBeenCalledWith(
       activeUser.phone_number,
-      "Good. You logged both progress and spending clearly.",
+      expect.stringContaining("🦤 Got it — Rs 150 on Food logged."),
       expect.objectContaining({
         userId: activeUser.id,
         metadata: expect.objectContaining({
           flow: "conversational_reply"
         })
       })
+    );
+    expect(mockSendWhatsAppMessage.mock.calls[0]?.[1]).toContain(
+      "Good. You logged both progress and spending clearly."
     );
     expect(mockRecordAuditEventBestEffort).toHaveBeenCalledWith(
       expect.objectContaining({

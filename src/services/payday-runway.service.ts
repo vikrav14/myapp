@@ -1,3 +1,4 @@
+import { MAURI_SIGNATURE_EMOJI } from "../lib/mauri-voice.js";
 import { env } from "../lib/env.js";
 import { supabase } from "../lib/supabase.js";
 import type { MauriUser } from "../types.js";
@@ -303,7 +304,7 @@ Then: my runway`
     return {
       handled: true,
       user: updatedUser,
-      reply: `Monthly income set to Rs ${roundRs(command.amount)}.\n\n${runway}`
+      reply: `${MAURI_SIGNATURE_EMOJI} Got it — Rs ${roundRs(command.amount)} monthly income saved.\n\n${runway}`
     };
   }
 

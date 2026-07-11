@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyCaptureAckToReply,
   buildMeasurableLogAckLine,
   buildPlaybookCatalogPrompt,
+  buildRememberFactAck,
   buildStrategicTransparencyPromptBlock,
+  buildUnifiedCaptureAck,
+  classifyFinanceCapture,
   ensureMauriDodoOnAdviceReply,
   extractionHasReportableData,
   isAdviceSeekingMessage,
@@ -109,6 +113,18 @@ describe("strategic transparency", () => {
 
     expect(
       buildMeasurableLogAckLine({
+        finance: { amount: 25000, category: "salary", raw_source_text: "salary 25000" }
+      })
+    ).toBe("🦤 Got it — Rs 25000 income logged.");
+
+    expect(
+      buildMeasurableLogAckLine({
+        finance: { amount: 8000, category: "rent", raw_source_text: "rent is 8000" }
+      })
+    ).toBe("🦤 Got it — Rs 8000 fixed cost (rent) logged.");
+
+    expect(
+      buildMeasurableLogAckLine({
         habits: { activity_type: "gym", is_success: true }
       })
     ).toBe("🦤 Nice — gym logged.");
@@ -116,6 +132,33 @@ describe("strategic transparency", () => {
     expect(extractionHasReportableData({ finance: { amount: 1, category: "x", raw_source_text: "x" } })).toBe(
       true
     );
+
+    expect(classifyFinanceCapture({ amount: 25000, category: "salary", raw_source_text: "earn 25000" })).toBe(
+      "income"
+    );
+  });
+
+  it("merges measurable and profile capture into one dodo line", () => {
+    expect(
+      buildUnifiedCaptureAck({
+        extraction: {
+          finance: { amount: 4000, category: "car declaration", raw_source_text: "log expense 4000 declaration of car" }
+        },
+        profileDeltas: [
+          {
+            category: "life_context",
+            fact_key: "work",
+            fact_value: "commute to Grand Baie"
+          }
+        ]
+      })
+    ).toBe(
+      "🦤 Got it — Rs 4000 on car declaration logged, and updated what you're working toward."
+    );
+  });
+
+  it("builds remember-that ack with dodo", () => {
+    expect(buildRememberFactAck("I live in Quatre Bornes")).toContain("🦤 Got it — saved for your profile:");
   });
 
   it("prepends measurable ack when model omits it", () => {
