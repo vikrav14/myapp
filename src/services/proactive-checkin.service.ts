@@ -9,18 +9,17 @@ import { generateProactiveCheckInMessage } from "./ai.service.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import {
   canSendProactiveOutbound,
+  countProactivePingsToday,
   recordProactivePing
 } from "./outbound-pace.service.js";
-import { hasEngagementDelivery, recordEngagementDelivery } from "./engagement-delivery.service.js";
+import { hasEngagementDelivery } from "./engagement-delivery.service.js";
 import { buildPaydayRunwaySnippet, loadPayCycleSpend } from "./payday-runway.service.js";
 import { isReminderEligible } from "./reminder-schedule.service.js";
 import {
   PROACTIVE_CHECKIN_CARE_SILENCE_MAX_HOURS,
   PROACTIVE_CHECKIN_CURIOUS_COOLDOWN_DAYS,
-  PROACTIVE_CHECKIN_MAX_PER_WEEK,
   PROACTIVE_CHECKIN_MIN_SILENCE_HOURS,
   PROACTIVE_CHECKIN_PAUSE_DAYS,
-  PROACTIVE_CHECKIN_RECENT_ACTIVITY_HOURS,
   PROACTIVE_MODE_PRIORITY
 } from "./proactive-checkin.constants.js";
 import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
@@ -29,7 +28,7 @@ import { hasModule } from "./user-modules.service.js";
 import { TRIAL_PROACTIVE_MIN_SILENCE_HOURS } from "./relationship-engagement.constants.js";
 import { isWithinTrialRelationshipWindow } from "./relationship-engagement.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
-import { resolveNotificationConfig } from "./notification-pace.service.js";
+import { resolveNotificationConfig, formatPacePresetLabel } from "./notification-pace.service.js";
 
 function effectiveMinSilenceHours(user: MauriUser): number {
   const paceMinutes = resolveNotificationConfig(user).proactive_min_interval_minutes;
@@ -41,12 +40,7 @@ function effectiveMinSilenceHours(user: MauriUser): number {
 }
 
 function effectiveWeeklyCap(user: MauriUser): number {
-  const paceCap = resolveNotificationConfig(user).proactive_max_per_week;
-  if (paceCap > 0) {
-    return paceCap;
-  }
-
-  return 0;
+  return resolveNotificationConfig(user).proactive_max_per_week;
 }
 
 export type ProactiveCheckInMode = "care" | "useful" | "curious";
@@ -61,19 +55,6 @@ export interface ProactiveCheckInCommandResult {
   handled: boolean;
   reply?: string | undefined;
   user?: MauriUser | undefined;
-}
-
-function proactiveDateKey(date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: env.MORNING_BRIEF_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
-}
-
-function buildDailyDeliveryKey(dateKey = proactiveDateKey()): string {
-  return `proactive_checkin_day_${dateKey}`;
 }
 
 function buildHookDeliveryKey(userId: string, mode: ProactiveCheckInMode, hookSummary: string): string {
@@ -207,52 +188,6 @@ async function getLastProactiveCheckinByMode(
   }
 
   return new Date(String(data.sent_at));
-}
-
-async function hasBlockingEngagementToday(userId: string, dateKey = proactiveDateKey()): Promise<boolean> {
-  const dailyKeys = [
-    buildDailyDeliveryKey(dateKey),
-    `memory_resurface_day_${dateKey}`
-  ];
-
-  for (const deliveryKey of dailyKeys) {
-    if (await hasEngagementDelivery(userId, deliveryKey)) {
-      return true;
-    }
-  }
-
-  const dayStart = `${dateKey}T00:00:00.000Z`;
-  const dayEnd = `${dateKey}T23:59:59.999Z`;
-
-  const [{ data: briefRows, error: briefError }, { data: followUpRows, error: followUpError }] =
-    await Promise.all([
-      supabase
-        .from("daily_brief_deliveries")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("delivery_status", "sent")
-        .gte("sent_at", dayStart)
-        .lte("sent_at", dayEnd)
-        .limit(1),
-      supabase
-        .from("open_loop_follow_ups")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("status", "sent")
-        .gte("sent_at", dayStart)
-        .lte("sent_at", dayEnd)
-        .limit(1)
-    ]);
-
-  if (briefError) {
-    throw new Error(`Failed to check morning brief deliveries: ${briefError.message}`);
-  }
-
-  if (followUpError) {
-    throw new Error(`Failed to check open-loop follow-ups: ${followUpError.message}`);
-  }
-
-  return (briefRows ?? []).length > 0 || (followUpRows ?? []).length > 0;
 }
 
 async function hasPendingOpenLoopFollowUp(userId: string): Promise<boolean> {
@@ -443,6 +378,33 @@ export async function buildCuriousCandidate(input: {
   };
 }
 
+export async function buildPaceFocusCandidate(input: {
+  user: MauriUser;
+  silenceHours: number | null;
+}): Promise<ProactiveCheckInCandidate | null> {
+  const focus = input.user.weekly_focus_habit?.trim();
+  if (!focus || input.silenceHours === null) {
+    return null;
+  }
+
+  const pace = resolveNotificationConfig(input.user);
+  if (pace.proactive_max_per_day <= 0) {
+    return null;
+  }
+
+  const minSilence = effectiveMinSilenceHours(input.user);
+  if (input.silenceHours < minSilence) {
+    return null;
+  }
+
+  const hookSummary = `Quick pin — ${focus}. One move counts.`;
+  return {
+    mode: "useful",
+    hookSummary,
+    deliveryKey: buildHookDeliveryKey(input.user.id, "useful", `pace_focus:${focus}`)
+  };
+}
+
 export async function buildProactiveCheckInCandidates(input: {
   user: MauriUser;
   mind: UserMindSnapshotPayload | null;
@@ -451,6 +413,7 @@ export async function buildProactiveCheckInCandidates(input: {
   const candidates = await Promise.all([
     buildCareCandidate(input),
     buildUsefulCandidate(input),
+    buildPaceFocusCandidate(input),
     buildCuriousCandidate(input)
   ]);
 
@@ -464,6 +427,11 @@ export async function canSendProactiveCheckIn(input: {
 }): Promise<{ ok: boolean; reason?: string }> {
   if (!env.PROACTIVE_CHECKINS_ENABLED) {
     return { ok: false, reason: "disabled" };
+  }
+
+  const pace = resolveNotificationConfig(input.user);
+  if (pace.proactive_max_per_day <= 0) {
+    return { ok: false, reason: "pace_silent" };
   }
 
   if (!input.user.open_loop_followups_enabled) {
@@ -487,20 +455,14 @@ export async function canSendProactiveCheckIn(input: {
     return { ok: false, reason: "too_soon" };
   }
 
-  if (input.silenceHours < PROACTIVE_CHECKIN_RECENT_ACTIVITY_HOURS) {
-    return { ok: false, reason: "recent_activity" };
-  }
-
-  if (input.weeklyCount >= effectiveWeeklyCap(input.user)) {
+  const weeklyCap = effectiveWeeklyCap(input.user);
+  if (weeklyCap > 0 && input.weeklyCount >= weeklyCap) {
     return { ok: false, reason: "weekly_cap" };
   }
 
-  if (await hasBlockingEngagementToday(input.user.id)) {
-    return { ok: false, reason: "other_engagement_today" };
-  }
-
-  if (await hasEngagementDelivery(input.user.id, buildDailyDeliveryKey())) {
-    return { ok: false, reason: "already_sent_today" };
+  const outboundGate = await canSendProactiveOutbound(input.user, "proactive_checkin");
+  if (!outboundGate.allowed) {
+    return { ok: false, reason: outboundGate.reason ?? "pace_gate" };
   }
 
   return { ok: true };
@@ -564,7 +526,6 @@ export async function deliverProactiveCheckIn(input: {
     throw new Error(`Failed to record proactive check-in: ${error.message}`);
   }
 
-  await recordEngagementDelivery(input.user.id, buildDailyDeliveryKey());
   await recordProactivePing(input.user.id, "proactive_checkin");
   await recordAuditEventBestEffort({
     requestId: input.requestId,
@@ -686,10 +647,12 @@ export async function handleProactiveCheckInMessage(input: {
     }
 
     const weeklyCount = await countProactiveCheckinsThisWeek(input.user.id);
+    const sentToday = await countProactivePingsToday(input.user.id);
+    const pace = resolveNotificationConfig(input.user);
     const paused = isUserPaused(input.user);
     const statusLine = input.user.open_loop_followups_enabled
-      ? "Proactive check-ins are on (shared with followups on/off)."
-      : "Proactive check-ins are off. Say followups on to re-enable.";
+      ? `Mate check-ins: ${formatPacePresetLabel(pace.proactive_preset)} (${pace.proactive_max_per_day}/day max).`
+      : "Mate check-ins are off. Say followups on to re-enable.";
 
     const pauseLine = paused
       ? `Paused until ${input.user.proactive_checkins_paused_until?.slice(0, 16).replace("T", " ")}.`
@@ -698,7 +661,12 @@ export async function handleProactiveCheckInMessage(input: {
     return {
       handled: true,
       user: input.user,
-      reply: `${statusLine}\n${pauseLine}\nThis week: ${weeklyCount}/${PROACTIVE_CHECKIN_MAX_PER_WEEK} proactive pings sent.`
+      reply: [
+        statusLine,
+        pauseLine,
+        `Today: ${sentToday}/${pace.proactive_max_per_day} mate pings · This week: ${weeklyCount}/${pace.proactive_max_per_week}`,
+        "7am brief is separate and does not count toward your pace."
+      ].join("\n")
     };
   }
 

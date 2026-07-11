@@ -119,16 +119,21 @@ export function parsePaceCommand(message: string): { type: "show" } | { type: "s
 export function buildPaceStatusReply(user: MauriUser, sentToday: number): string {
   const config = resolveNotificationConfig(user);
   const preset = getPacePresetDefinition(config.proactive_preset);
+  const intervalLabel =
+    config.proactive_min_interval_minutes >= 60
+      ? `${Math.round(config.proactive_min_interval_minutes / 60)}h apart`
+      : `${config.proactive_min_interval_minutes}min apart`;
   const lines = [
     "Your Mauri pace",
     "",
-    `Unprompted check-ins: ${preset?.label ?? config.proactive_preset}`,
+    `Mate check-ins: ${preset?.label ?? config.proactive_preset}`,
     preset?.description ?? "",
     `Density: ${config.density_profile}`,
-    `Today: ${sentToday}/${config.proactive_max_per_day} unprompted pings used`,
+    `Today: ${sentToday}/${config.proactive_max_per_day} mate pings used`,
+    `Gap between mate pings: ${intervalLabel}`,
     `Quiet hours: ${user.quiet_hours_enabled ? "on" : "off"}${user.quiet_hours_enabled ? ` (${formatQuietHoursWindow(user)})` : ""}`,
     "",
-    "7am brief and replies when you message are separate.",
+    "7am brief, reminders, and replies when you message are separate.",
     "Reply my pace anytime to change, or not now to pause 7 days."
   ];
 

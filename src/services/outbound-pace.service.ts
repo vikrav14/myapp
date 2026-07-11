@@ -152,11 +152,12 @@ export function buildProactiveBudgetStatusReply(user: MauriUser, sentToday: numb
   return [
     "Proactive ping settings",
     "",
-    `Pace: ${pace.proactive_preset} (${pace.proactive_max_per_day}/day max)`,
+    `Pace: ${pace.proactive_preset} — ${pace.proactive_max_per_day} mate pings/day max`,
     `Quiet hours: ${quiet ? "on" : "off"}${quiet ? ` (${formatQuietHoursWindow(user)})` : ""}`,
     `Paused: ${paused ? `yes until ${user.proactive_checkins_paused_until?.slice(0, 16).replace("T", " ")}` : "no"}`,
-    `Today's unprompted pings: ${sentToday}/${pace.proactive_max_per_day}`,
+    `Today's mate pings: ${sentToday}/${pace.proactive_max_per_day}`,
     "",
+    "7am brief does not count toward pace.",
     "Commands: my pace · quiet hours on/off · not now (pause 7 days)"
   ].join("\n");
 }
