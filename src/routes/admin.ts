@@ -284,6 +284,8 @@ function renderAdminPanelHtml(): string {
         font-weight: 600;
       }
       button.secondary { background: #26314f; border: 1px solid var(--line); }
+      button.secondary:hover { background: #334066; border-color: #4b5f8f; }
+      button.secondary:active { transform: translateY(1px); }
       button.success { background: linear-gradient(135deg, var(--success) 0%, #16a34a 100%); }
       button.warning { background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%); }
       button.danger { background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%); }
@@ -299,7 +301,7 @@ function renderAdminPanelHtml(): string {
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
       .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
       .kv { padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
-      .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; position: relative; z-index: 2; }
       .ops-box { margin-top: 14px; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
       .ops-result { margin-top: 10px; white-space: pre-wrap; color: var(--muted); font-size: 13px; }
       .checkbox-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
@@ -605,9 +607,10 @@ function renderAdminPanelHtml(): string {
               <table><thead><tr><th>Provider</th><th>Status</th><th>User</th><th>Amount</th><th>Created</th></tr></thead><tbody id="sessionsTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody></table>
             </div>
             <h3 style="margin:18px 0 8px;">Morning brief runs</h3>
+            <div class="panel-note" style="margin-bottom:8px;">Reload refreshes the table. Run executes scrape → curate → deliver for today.</div>
             <div class="actions" style="margin-bottom:8px;">
-              <button id="runMorningBriefButton" class="warning small">Run morning brief now</button>
-              <button id="reloadMorningBriefButton" class="secondary small">Reload morning brief</button>
+              <button type="button" id="runMorningBriefButton" class="warning small">Run morning brief now</button>
+              <button type="button" id="reloadMorningBriefButton" class="secondary small">Reload morning brief</button>
             </div>
             <div class="table-wrap" style="max-height:180px;">
               <table><thead><tr><th>Date</th><th>Status</th><th>Scraped</th><th>Curated</th><th>Delivered</th></tr></thead><tbody id="morningBriefTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody></table>
@@ -1282,11 +1285,32 @@ function renderAdminPanelHtml(): string {
         document.getElementById('reloadSecurityButton').addEventListener('click', loadSecurityPosture);
         document.getElementById('reloadDeployPreflightButton').addEventListener('click', loadDeployPreflight);
         document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadAlerts(), loadSessions(), loadReports(), loadMorningBriefRuns(), loadAuditEvents()]));
-        document.getElementById('reloadMorningBriefButton').addEventListener('click', loadMorningBriefRuns);
+        document.getElementById('reloadMorningBriefButton').addEventListener('click', async () => {
+          try {
+            if (!state.adminKey) {
+              setStatus('Paste and save the admin key first.', 'error');
+              return;
+            }
+            setStatus('Reloading morning brief runs...');
+            await loadMorningBriefRuns();
+            setStatus('Morning brief runs refreshed.', 'success');
+          } catch (error) {
+            setStatus(error.message || 'Failed to reload morning brief runs.', 'error');
+          }
+        });
         document.getElementById('runMorningBriefButton').addEventListener('click', async () => {
-          await api('/internal/admin/morning-brief/run', { method: 'POST', body: JSON.stringify({ step: 'all' }) });
-          await Promise.all([loadMorningBriefRuns(), loadAuditEvents()]);
-          setStatus('Morning brief pipeline executed.', 'success');
+          try {
+            if (!state.adminKey) {
+              setStatus('Paste and save the admin key first.', 'error');
+              return;
+            }
+            setStatus('Running morning brief pipeline (scrape → curate → deliver)...');
+            await api('/internal/admin/morning-brief/run', { method: 'POST', body: JSON.stringify({ step: 'all' }) });
+            await Promise.all([loadMorningBriefRuns(), loadAuditEvents()]);
+            setStatus('Morning brief pipeline executed.', 'success');
+          } catch (error) {
+            setStatus(error.message || 'Morning brief run failed.', 'error');
+          }
         });
         document.getElementById('applyAuditFiltersButton').addEventListener('click', loadAuditEvents);
         document.getElementById('evaluateAlertsButton').addEventListener('click', async () => {

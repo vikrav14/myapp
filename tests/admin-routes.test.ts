@@ -75,6 +75,8 @@ describe("Admin routes", () => {
     expect(response.text).toContain("/internal/reports/weekly");
     expect(response.text).toContain('id="opsPaymentProvider"');
     expect(response.text).toContain('id="opsReportSendMessage"');
+    expect(response.text).toContain('id="reloadMorningBriefButton"');
+    expect(response.text).toContain("Reload refreshes the table");
   });
 
   it("rejects protected admin endpoints without the admin key", async () => {
