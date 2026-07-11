@@ -12,6 +12,12 @@ export const MAURI_SIGNATURE_EMOJI = "🦤";
 export const MAURI_SMART_ADVICE_VALUE_LINE =
   "15 playbooks behind your lane — Atomic Habits, Psychology of Money, and more compressed into one next step. Reply my playbook when you're curious.";
 
+export const MAURI_BRAND_HEADER = "Mauri — Your Silent Strategist";
+
+export const MAURI_PRIVACY_NOTE = "What you shared stays private.";
+
+export const MAURI_NO_HOMEWORK_LINE = "No homework. Just direct leverage.";
+
 export function mauriSignatureLine(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) {

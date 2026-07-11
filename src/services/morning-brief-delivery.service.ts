@@ -9,7 +9,6 @@ import {
   parseMauritiusWeatherSummary
 } from "./mauritius-weather.service.js";
 import { loadUserMindFacts } from "./user-mind.service.js";
-import { appendMicroLessonToBriefMessage } from "./trial-engagement.service.js";
 import { hasModule } from "./user-modules.service.js";
 import { loadPayCycleSpend, buildPaydayRunwaySnippet } from "./payday-runway.service.js";
 import { deliverMorningMoodCheck } from "./relationship-engagement.service.js";
@@ -102,7 +101,7 @@ export async function deliverMorningBriefRun(input: {
       }
     }
 
-    const message = await appendMicroLessonToBriefMessage(user, baseMessage);
+    const message = baseMessage;
 
     try {
       await sendWhatsAppMessage(user.phone_number, message, {

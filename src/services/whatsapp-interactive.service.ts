@@ -5,6 +5,7 @@ import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY } from "./help-focus.constants.js";
 import { formatHelpFocusLabel } from "./help-focus-inference.service.js";
 import type { ChaosMapLine } from "./chaos-organizer.service.js";
+import { MAURI_BRAND_HEADER } from "../lib/mauri-voice.js";
 import { PACE_PRESET_CATALOG } from "./notification-pace.constants.js";
 import type { ProactivePacePreset } from "./notification-pace.constants.js";
 import { MODULE_CATALOG } from "./user-modules.constants.js";
@@ -56,6 +57,7 @@ export const INTERACTIVE_REPLY_MAP: Record<string, string> = {
   help_focus_confirm: "help focus confirm",
   help_advice_focus: "help focus",
   help_playbook: "my playbook",
+  help_playbook_confirm: "help playbook confirm",
   help_roast: "roast me",
   help_hype: "hype me",
   help_runway: "my runway",
@@ -388,13 +390,26 @@ export function buildHelpFocusActivationInteractive(input: {
 
   return {
     header: "Advice focus",
-    body: `${name} — happy with that advice lane, or want to switch?`,
-    footer: "Tap My playbook for frameworks — then confirm or switch",
+    body: `${name} — happy with that advice lane, or want to switch? Tap My playbook to see what I'll apply.`,
+    footer: "Then confirm or switch",
     buttons: [
       { id: "help_focus_confirm", title: "Looks good" },
       { id: "help_advice_focus", title: "Pick lane" },
       { id: "help_playbook", title: "My playbook" }
     ]
+  };
+}
+
+export function buildPlaybookConfirmInteractive(input: {
+  firstName?: string | null;
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+
+  return {
+    header: "Your playbook",
+    body: `${name} — this is what I'll apply when you ask for advice. No homework — just direct leverage.`,
+    footer: "One tap to continue",
+    buttons: [{ id: "help_playbook_confirm", title: "Looks good" }]
   };
 }
 
@@ -516,13 +531,13 @@ export function buildPacePickerInteractive(input: {
 
   return {
     header: "Your Mauri pace",
-    body: `${name} — how often should I check in unprompted? Replies when you message are always on.`,
+    body: `${name} — how often should I check in unprompted? Replies when you message are always on. 7am pulse is separate.`,
     footer: "Change anytime · reply my pace",
     listButtonLabel: "Pick pace",
     sections: [
       {
         title: "Unprompted check-ins",
-        rows: PACE_PRESET_CATALOG.map((entry) => ({
+        rows: PACE_PRESET_CATALOG.filter((entry) => entry.key !== "coaching").map((entry) => ({
           id: `pace_${entry.key}`,
           title: entry.label.slice(0, 24),
           description: entry.description.slice(0, 72)
@@ -532,6 +547,27 @@ export function buildPacePickerInteractive(input: {
   };
 }
 
+export function buildChaosPinInteractive(input: {
+  firstName?: string | null;
+  lines: ChaosMapLine[];
+}): WhatsAppInteractiveOutbound {
+  const name = input.firstName?.trim() || "there";
+
+  if (input.lines.length > 0 && input.lines.length <= 3) {
+    return {
+      header: MAURI_BRAND_HEADER,
+      body: `${name} — which line should we tackle first?`,
+      footer: "One pin beats fixing everything",
+      buttons: input.lines.map((line) => ({
+        id: `chaos_pin_${line.key}`,
+        title: `${line.emoji} ${line.label}`.slice(0, 20)
+      }))
+    };
+  }
+
+  return buildChaosPinPickerInteractive(input);
+}
+
 export function buildChaosPinPickerInteractive(input: {
   firstName?: string | null;
   lines: ChaosMapLine[];
@@ -539,7 +575,7 @@ export function buildChaosPinPickerInteractive(input: {
   const name = input.firstName?.trim() || "there";
 
   return {
-    header: "Pick your pin",
+    header: MAURI_BRAND_HEADER,
     body: `${name} — one line this week. Tap the thread you want Mauri to nudge on.`,
     footer: "One pin beats fixing everything",
     listButtonLabel: "Pick a line",

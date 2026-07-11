@@ -3,7 +3,7 @@ import type { MauriModuleKey, MauriUser, UserMindFact, WhatsAppImageOutbound, Wh
 import { logger } from "../lib/logger.js";
 import { buildPaywallReplyForUser } from "./paywall.service.js";
 import {
-  buildChaosPinPickerInteractive,
+  buildChaosPinInteractive,
   buildExpressStartInteractive
 } from "./whatsapp-interactive.service.js";
 import {
@@ -162,7 +162,7 @@ async function buildChaosPinGateResult(user: MauriUser, facts: UserMindFact[]): 
     handled: true,
     user,
     reply: "Pick one line from your map first — then we'll start your trial.",
-    interactive: buildChaosPinPickerInteractive({
+    interactive: buildChaosPinInteractive({
       firstName: user.first_name,
       lines
     })
@@ -186,7 +186,7 @@ async function handleChaosPinSelection(
       handled: true,
       user,
       reply: "That line isn't on your map anymore — pick one from the list.",
-      interactive: buildChaosPinPickerInteractive({
+      interactive: buildChaosPinInteractive({
         firstName: user.first_name,
         lines
       })
@@ -460,7 +460,7 @@ export async function handleOnboardingMessage(input: {
           handled: true,
           user: updatedUser,
           reply: `${chaosMap}\n\n${bridge}`,
-          interactive: buildChaosPinPickerInteractive({
+          interactive: buildChaosPinInteractive({
             firstName: updatedUser.first_name,
             lines
           }),

@@ -4,6 +4,7 @@ import {
   buildHelpFocusActivationExplanation,
   buildHelpFocusEnginePrompt,
   buildHelpFocusSourcesReply,
+  buildActivationPlaybookReply,
   formatHelpFocusLabel,
   inferHelpFocusFromFacts,
   isHelpFocusInteractiveEchoMessage,
@@ -16,7 +17,8 @@ import { HELP_FOCUS_CATALOG } from "./help-focus.constants.js";
 import { loadUserMindFacts } from "./user-mind.service.js";
 import {
   buildHelpFocusActivationInteractive,
-  buildHelpFocusPickerInteractive
+  buildHelpFocusPickerInteractive,
+  buildPlaybookConfirmInteractive
 } from "./whatsapp-interactive.service.js";
 import { buildPostActivationPaceOffer, isPaceConfigured } from "./notification-pace.service.js";
 
@@ -25,6 +27,7 @@ export interface HelpFocusCommandResult {
   reply?: string | undefined;
   interactive?: WhatsAppInteractiveOutbound | undefined;
   user?: MauriUser | undefined;
+  sendTextBeforeInteractive?: boolean | undefined;
 }
 
 function normalize(message: string): string {
@@ -33,11 +36,15 @@ function normalize(message: string): string {
 
 export function parseHelpFocusCommand(
   message: string
-): { type: "show" } | { type: "set"; key: HelpFocusKey } | { type: "confirm" } | null {
+): { type: "show" } | { type: "set"; key: HelpFocusKey } | { type: "confirm" } | { type: "playbook_confirm" } | null {
   const normalized = normalize(message);
 
   if (normalized === "help focus confirm") {
     return { type: "confirm" };
+  }
+
+  if (normalized === "help playbook confirm") {
+    return { type: "playbook_confirm" };
   }
 
   if (
@@ -101,6 +108,22 @@ function buildPlaybookHelpFocusResult(
   user: MauriUser,
   lane?: HelpFocusKey | null
 ): HelpFocusCommandResult {
+  const resumeActivation = shouldResumeHelpFocusActivation(user);
+
+  if (resumeActivation && !lane) {
+    return {
+      handled: true,
+      user,
+      reply: buildActivationPlaybookReply({
+        firstName: user.first_name,
+        primary: user.help_focus_primary,
+        secondary: user.help_focus_secondary
+      }),
+      interactive: buildPlaybookConfirmInteractive({ firstName: user.first_name }),
+      sendTextBeforeInteractive: true
+    };
+  }
+
   const reply = buildHelpFocusSourcesReply({
     firstName: user.first_name,
     primary: user.help_focus_primary,
@@ -108,17 +131,43 @@ function buildPlaybookHelpFocusResult(
     lane: lane ?? undefined
   });
 
-  const resumeActivation = shouldResumeHelpFocusActivation(user);
-
   return {
     handled: true,
     user,
     reply: resumeActivation
-      ? `${reply.trim()}\n\nTap Looks good to lock this lane, or Pick lane to switch.`
+      ? `${reply.trim()}\n\nTap Looks good when you're ready for pace.`
       : reply,
     interactive: resumeActivation
-      ? buildHelpFocusActivationInteractive({ firstName: user.first_name })
-      : undefined
+      ? buildPlaybookConfirmInteractive({ firstName: user.first_name })
+      : undefined,
+    sendTextBeforeInteractive: resumeActivation
+  };
+}
+
+async function offerPaceAfterPlaybook(user: MauriUser): Promise<HelpFocusCommandResult> {
+  const paceOffer = await buildPostActivationPaceOffer(user);
+
+  if (paceOffer?.reply || paceOffer?.interactive) {
+    return {
+      handled: true,
+      user: paceOffer.user ?? user,
+      reply: paceOffer.reply,
+      interactive: paceOffer.interactive,
+      sendTextBeforeInteractive: Boolean(paceOffer.reply?.trim() && paceOffer.interactive)
+    };
+  }
+
+  const labels =
+    user.help_focus_primary && user.help_focus_secondary
+      ? `${formatHelpFocusLabel(user.help_focus_primary)} + ${formatHelpFocusLabel(user.help_focus_secondary)}`
+      : user.help_focus_primary
+        ? formatHelpFocusLabel(user.help_focus_primary)
+        : "your setup";
+
+  return {
+    handled: true,
+    user,
+    reply: `All set, ${user.first_name?.trim() || "there"} — ${labels} locked in. Reply my pace anytime to change rhythm.`
   };
 }
 
@@ -201,23 +250,25 @@ export async function handleHelpFocusMessage(input: {
           ? formatHelpFocusLabel(input.user.help_focus_primary)
           : "your setup";
 
-    const lockReply = `Locked in — I'll lean into ${labels} for advice. Reply help focus anytime to switch.`;
-    const paceOffer = await buildPostActivationPaceOffer(input.user);
-
-    if (paceOffer) {
-      return {
-        handled: true,
-        user: input.user,
-        reply: `${lockReply}\n\n${paceOffer.reply}`,
-        interactive: paceOffer.interactive
-      };
-    }
-
     return {
       handled: true,
       user: input.user,
-      reply: lockReply
+      reply: [
+        `Locked in — I'll lean into ${labels} for advice.`,
+        "",
+        buildActivationPlaybookReply({
+          firstName: input.user.first_name,
+          primary: input.user.help_focus_primary,
+          secondary: input.user.help_focus_secondary
+        })
+      ].join("\n"),
+      interactive: buildPlaybookConfirmInteractive({ firstName: input.user.first_name }),
+      sendTextBeforeInteractive: true
     };
+  }
+
+  if (command.type === "playbook_confirm") {
+    return offerPaceAfterPlaybook(input.user);
   }
 
   if (command.type === "set") {
@@ -240,4 +291,4 @@ export async function handleHelpFocusMessage(input: {
   return { handled: false };
 }
 
-export { inferHelpFocusFromFacts, buildHelpFocusActivationExplanation, buildHelpFocusSourcesReply, parseHelpFocusSourcesRequest };
+export { inferHelpFocusFromFacts, buildHelpFocusActivationExplanation, buildHelpFocusSourcesReply, buildActivationPlaybookReply, parseHelpFocusSourcesRequest };
