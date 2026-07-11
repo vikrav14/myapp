@@ -67,7 +67,7 @@ describe("handleQuietHoursCommandMessage", () => {
 
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("Quiet hours: on");
-    expect(result.reply).toContain("Today's unprompted pings");
+    expect(result.reply).toContain("Today's mate pings");
   });
 
   it("disables quiet hours", async () => {
