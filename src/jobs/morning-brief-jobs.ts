@@ -9,10 +9,37 @@ import {
   ensureDailyBriefRun,
   getDailyBriefRunByDate,
   markDailyBriefFailed,
+  resetDailyBriefRunForForceRerun,
   todayBriefDate,
   updateDailyBriefRun
 } from "../services/morning-brief-run.service.js";
 import { scrapeMorningBriefSources } from "../services/morning-brief-scraper.service.js";
+
+export async function runMorningBriefPipeline(input?: {
+  step?: "scrape" | "curate" | "deliver" | "all";
+  force?: boolean;
+}): Promise<{ latestStatus: string | null; forced: boolean }> {
+  const step = input?.step ?? "all";
+  const force = input?.force === true;
+  const briefDate = todayBriefDate();
+
+  if (force) {
+    await resetDailyBriefRunForForceRerun(briefDate);
+  }
+
+  if (step === "scrape" || step === "all") {
+    await runMorningBriefScrape();
+  }
+  if (step === "curate" || step === "all") {
+    await runMorningBriefCuration();
+  }
+  if (step === "deliver" || step === "all") {
+    await runMorningBriefDelivery();
+  }
+
+  const latest = await getDailyBriefRunByDate(briefDate);
+  return { latestStatus: latest?.status ?? null, forced: force };
+}
 
 export async function runMorningBriefScrape(): Promise<void> {
   if (!env.MORNING_BRIEF_ENABLED) {

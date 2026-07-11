@@ -137,6 +137,15 @@ export function todayBriefDate(): string {
   return getBriefDateInTimezone(env.MORNING_BRIEF_TIMEZONE);
 }
 
+/** Admin-only: allow scrape/curate/deliver to run again for today's brief. */
+export async function resetDailyBriefRunForForceRerun(briefDate: string): Promise<DailyBriefRunRecord> {
+  const run = await ensureDailyBriefRun(briefDate);
+  return updateDailyBriefRun(run.id, {
+    status: "pending_scrape",
+    error_message: null
+  });
+}
+
 export function isRunnableStatus(status: DailyBriefRunStatus | string, allowed: DailyBriefRunStatus[]): boolean {
   return allowed.includes(status as DailyBriefRunStatus);
 }

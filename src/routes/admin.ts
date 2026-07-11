@@ -26,9 +26,7 @@ import {
 } from "../services/admin.service.js";
 import { listDailyBriefRuns } from "../services/morning-brief-run.service.js";
 import {
-  runMorningBriefCuration,
-  runMorningBriefDelivery,
-  runMorningBriefScrape
+  runMorningBriefPipeline
 } from "../jobs/morning-brief-jobs.js";
 import { runOpenLoopFollowUpDeliveries } from "../services/open-loop-follow-up.service.js";
 import { runProactiveCheckInDeliveries } from "../services/proactive-checkin.service.js";
@@ -293,6 +291,18 @@ function renderAdminPanelHtml(): string {
       .status { color: var(--muted); font-size: 13px; }
       .status.error { color: #fecaca; }
       .status.success { color: #bbf7d0; }
+      .status.warning { color: #fde68a; }
+      .status-bar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        padding: 10px 12px;
+        margin: -18px -18px 14px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(11, 16, 32, 0.96);
+        backdrop-filter: blur(8px);
+      }
+      button:disabled { opacity: 0.55; cursor: wait; }
       table { width: 100%; border-collapse: collapse; font-size: 13px; }
       th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
       th { color: var(--muted); font-weight: 600; }
@@ -325,7 +335,7 @@ function renderAdminPanelHtml(): string {
           <button id="saveKeyButton" class="secondary">Save key</button>
           <button id="refreshAllButton">Refresh all</button>
         </div>
-        <div id="globalStatus" class="status">Save the admin key, then refresh the panel.</div>
+        <div id="globalStatus" class="status status-bar">Save the admin key, then refresh the panel.</div>
       </div>
 
       <div id="overviewCards" class="cards">
@@ -607,11 +617,16 @@ function renderAdminPanelHtml(): string {
               <table><thead><tr><th>Provider</th><th>Status</th><th>User</th><th>Amount</th><th>Created</th></tr></thead><tbody id="sessionsTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody></table>
             </div>
             <h3 style="margin:18px 0 8px;">Morning brief runs</h3>
-            <div class="panel-note" style="margin-bottom:8px;">Reload refreshes the table. Run executes scrape → curate → deliver for today.</div>
+            <div class="panel-note" style="margin-bottom:8px;">Reload refreshes the table. Run re-scrapes, re-curates, and re-delivers today. Force is on by default if today was already delivered.</div>
             <div class="actions" style="margin-bottom:8px;">
               <button type="button" id="runMorningBriefButton" class="warning small">Run morning brief now</button>
               <button type="button" id="reloadMorningBriefButton" class="secondary small">Reload morning brief</button>
             </div>
+            <label class="checkbox-row" style="margin-bottom:8px;">
+              <input id="forceMorningBriefRun" type="checkbox" checked />
+              Force re-run today (even if already delivered)
+            </label>
+            <div id="morningBriefActionStatus" class="status" style="margin-bottom:8px;">Ready.</div>
             <div class="table-wrap" style="max-height:180px;">
               <table><thead><tr><th>Date</th><th>Status</th><th>Scraped</th><th>Curated</th><th>Delivered</th></tr></thead><tbody id="morningBriefTableBody"><tr><td colspan="5">No data loaded yet.</td></tr></tbody></table>
             </div>
@@ -715,7 +730,11 @@ function renderAdminPanelHtml(): string {
           opsPaymentDurationDays: document.getElementById('opsPaymentDurationDays'),
           opsReportSendMessage: document.getElementById('opsReportSendMessage'),
           opsReportForceRegenerate: document.getElementById('opsReportForceRegenerate'),
-          userOpsResult: document.getElementById('userOpsResult')
+          userOpsResult: document.getElementById('userOpsResult'),
+          morningBriefActionStatus: document.getElementById('morningBriefActionStatus'),
+          forceMorningBriefRun: document.getElementById('forceMorningBriefRun'),
+          runMorningBriefButton: document.getElementById('runMorningBriefButton'),
+          reloadMorningBriefButton: document.getElementById('reloadMorningBriefButton')
         };
 
         el.adminKey.value = state.adminKey;
@@ -731,11 +750,31 @@ function renderAdminPanelHtml(): string {
 
         function setStatus(message, kind = '') {
           el.globalStatus.textContent = message;
-          el.globalStatus.className = 'status' + (kind ? ' ' + kind : '');
+          el.globalStatus.className = 'status status-bar' + (kind ? ' ' + kind : '');
+        }
+
+        function setMorningBriefStatus(message, kind = '') {
+          el.morningBriefActionStatus.textContent = message;
+          el.morningBriefActionStatus.className = 'status' + (kind ? ' ' + kind : '');
+        }
+
+        function resolveAdminKey() {
+          const fromInput = el.adminKey.value.trim();
+          if (fromInput) {
+            state.adminKey = fromInput;
+            localStorage.setItem('mauri-admin-key', fromInput);
+          }
+          return state.adminKey;
         }
 
         function headers() {
-          return state.adminKey ? { 'x-mauri-admin-key': state.adminKey } : {};
+          const key = resolveAdminKey();
+          return key ? { 'x-mauri-admin-key': key } : {};
+        }
+
+        function setMorningBriefButtonsBusy(busy) {
+          el.runMorningBriefButton.disabled = busy;
+          el.reloadMorningBriefButton.disabled = busy;
         }
 
         async function api(path, options = {}) {
@@ -1242,8 +1281,9 @@ function renderAdminPanelHtml(): string {
         }
 
         async function refreshAll() {
-          if (!state.adminKey) {
-            setStatus('Paste and save the admin key first.', 'error');
+          if (!resolveAdminKey()) {
+            setStatus('Paste your admin key above, then click Save key or Refresh all.', 'error');
+            setMorningBriefStatus('Admin key required before morning brief actions work.', 'error');
             return;
           }
           setStatus('Refreshing panel data...');
@@ -1287,29 +1327,58 @@ function renderAdminPanelHtml(): string {
         document.getElementById('reloadOpsButton').addEventListener('click', () => Promise.all([loadAlerts(), loadSessions(), loadReports(), loadMorningBriefRuns(), loadAuditEvents()]));
         document.getElementById('reloadMorningBriefButton').addEventListener('click', async () => {
           try {
-            if (!state.adminKey) {
-              setStatus('Paste and save the admin key first.', 'error');
+            if (!resolveAdminKey()) {
+              const message = 'Paste your INTERNAL_ADMIN_API_KEY in the box at the top first.';
+              setStatus(message, 'error');
+              setMorningBriefStatus(message, 'error');
               return;
             }
+            setMorningBriefButtonsBusy(true);
+            setMorningBriefStatus('Reloading morning brief runs...');
             setStatus('Reloading morning brief runs...');
             await loadMorningBriefRuns();
+            setMorningBriefStatus('Morning brief table refreshed.', 'success');
             setStatus('Morning brief runs refreshed.', 'success');
           } catch (error) {
-            setStatus(error.message || 'Failed to reload morning brief runs.', 'error');
+            const message = error.message || 'Failed to reload morning brief runs.';
+            setMorningBriefStatus(message, 'error');
+            setStatus(message, 'error');
+          } finally {
+            setMorningBriefButtonsBusy(false);
           }
         });
         document.getElementById('runMorningBriefButton').addEventListener('click', async () => {
           try {
-            if (!state.adminKey) {
-              setStatus('Paste and save the admin key first.', 'error');
+            if (!resolveAdminKey()) {
+              const message = 'Paste your INTERNAL_ADMIN_API_KEY in the box at the top first.';
+              setStatus(message, 'error');
+              setMorningBriefStatus(message, 'error');
               return;
             }
-            setStatus('Running morning brief pipeline (scrape → curate → deliver)...');
-            await api('/internal/admin/morning-brief/run', { method: 'POST', body: JSON.stringify({ step: 'all' }) });
+            const force = el.forceMorningBriefRun.checked;
+            setMorningBriefButtonsBusy(true);
+            setMorningBriefStatus(force
+              ? 'Running full pipeline (force re-scrape, curate, deliver)...'
+              : 'Running morning brief pipeline...');
+            setStatus('Running morning brief pipeline...');
+            const result = await api('/internal/admin/morning-brief/run', {
+              method: 'POST',
+              body: JSON.stringify({ step: 'all', force })
+            });
             await Promise.all([loadMorningBriefRuns(), loadAuditEvents()]);
+            const status = result.latestStatus || 'unknown';
+            const detail = result.forced
+              ? 'Force re-run finished. Latest status: ' + status + '. Check WhatsApp if deliver ran.'
+              : 'Pipeline finished. Latest status: ' + status + (status === 'delivered' ? ' (already delivered earlier today).' : '.');
+            setMorningBriefStatus(detail, status === 'failed' ? 'error' : 'success');
             setStatus('Morning brief pipeline executed.', 'success');
           } catch (error) {
-            setStatus(error.message || 'Morning brief run failed.', 'error');
+            const message = error.message || 'Morning brief run failed.';
+            setMorningBriefStatus(message, 'error');
+            setStatus(message, 'error');
+          } finally {
+            setMorningBriefButtonsBusy(false);
+            el.runMorningBriefButton.textContent = 'Run morning brief now';
           }
         });
         document.getElementById('applyAuditFiltersButton').addEventListener('click', loadAuditEvents);
@@ -1599,20 +1668,23 @@ adminRouter.get("/morning-brief/runs", async (request, response, next) => {
 
 adminRouter.post("/morning-brief/run", async (request, response, next) => {
   try {
-    const step = z.enum(["scrape", "curate", "deliver", "all"]).parse(request.body?.step ?? "all");
-    if (step === "scrape" || step === "all") {
-      await runMorningBriefScrape();
-    }
-    if (step === "curate" || step === "all") {
-      await runMorningBriefCuration();
-    }
-    if (step === "deliver" || step === "all") {
-      await runMorningBriefDelivery();
-    }
+    const body = z
+      .object({
+        step: z.enum(["scrape", "curate", "deliver", "all"]).default("all"),
+        force: z.boolean().optional()
+      })
+      .parse(request.body ?? {});
+
+    const result = await runMorningBriefPipeline({
+      step: body.step,
+      force: body.force === true
+    });
 
     const runs = await listDailyBriefRuns(1);
     response.status(200).json({
       ok: true,
+      forced: result.forced,
+      latestStatus: result.latestStatus,
       latestRun: runs[0] ?? null
     });
   } catch (error) {
