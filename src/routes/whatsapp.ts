@@ -1,5 +1,6 @@
 import { Router } from "express";
 
+import { applyCaptureAckToReply } from "../lib/strategic-transparency.js";
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { getRequestId } from "../lib/request-tracing.js";
@@ -9,13 +10,13 @@ import {
   routeInboundMessage
 } from "../services/ai.service.js";
 import {
-  appendProfileDeltaAck,
   commitRouterExtraction,
   logShadowRouterComparison,
   normalizeRouterExtraction,
   shouldCommitMessageRouterWrites,
   shouldRunMessageRouterShadow
 } from "../services/message-router.service.js";
+import type { ProfileDelta } from "../schemas/message-router.js";
 import { recordAuditEventBestEffort } from "../services/audit.service.js";
 import { loadUserContext } from "../services/context.service.js";
 import { stripInboundBotEcho } from "../services/context-grounding.service.js";
@@ -1087,7 +1088,7 @@ async function processInboundWhatsAppMessage(input: {
       logger.warn({ error, userId: user.id }, "Failed to store inbound conversation memory.");
     }
     let extraction: Awaited<ReturnType<typeof extractStructuredContext>>;
-    let profileDeltaAck: string | null = null;
+    let profileDeltas: ProfileDelta[] = [];
     const commitRouterEnabled = shouldCommitMessageRouterWrites();
     const shadowRouterEnabled = shouldRunMessageRouterShadow();
 
@@ -1102,7 +1103,7 @@ async function processInboundWhatsAppMessage(input: {
           router: routerRaw
         });
         extraction = committed.extraction;
-        profileDeltaAck = committed.profileDeltaAck;
+        profileDeltas = committed.profileDeltas;
       } catch (error) {
         logger.warn({ error, userId: user.id }, "Message router commit failed; falling back to legacy extractor.");
         extraction = await extractStructuredContext(messageForReply);
@@ -1142,14 +1143,14 @@ async function processInboundWhatsAppMessage(input: {
       requestId
     });
 
-    const reply = appendProfileDeltaAck(
+    const reply = applyCaptureAckToReply(
       await generateConversationalReply({
         user,
         message: messageForReply,
         extraction,
         context
       }),
-      profileDeltaAck
+      { extraction, profileDeltas }
     );
 
     try {

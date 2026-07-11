@@ -16,8 +16,7 @@ import {
   buildStrategicTransparencyPromptBlock,
   ensureMauriDodoOnAdviceReply,
   extractionHasReportableData,
-  MAURI_MEASURABLE_ACK_DODO_RULE,
-  prependMeasurableAckIfMissing
+  MAURI_MEASURABLE_ACK_DODO_RULE
 } from "../lib/strategic-transparency.js";
 import {
   parseUserMindSnapshot,
@@ -670,10 +669,6 @@ Never reference details that are not in their profile facts, snapshot, recent lo
   });
 
   let reply = finalizeMauriTextReply({ message, reply: rawReply });
-
-  if (hasMeasurable) {
-    reply = prependMeasurableAckIfMissing(reply, extraction);
-  }
 
   reply = ensureMauriDodoOnAdviceReply(reply, strategicMode !== "none");
 

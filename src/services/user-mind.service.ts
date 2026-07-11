@@ -1,6 +1,7 @@
-import { supabase } from "../lib/supabase.js";
+import { buildRememberFactAck } from "../lib/strategic-transparency.js";
 import { logger } from "../lib/logger.js";
 import { env } from "../lib/env.js";
+import { supabase } from "../lib/supabase.js";
 import type { ProfileDelta } from "../schemas/message-router.js";
 import { messageRouterExtractionSchema } from "../schemas/message-router.js";
 import type { UserMindExtraction } from "../schemas/user-mind.js";
@@ -694,7 +695,7 @@ export async function handleUserMindCommandMessage(input: {
     });
     return {
       handled: true,
-      reply: `Noted. I'll read you with that in mind going forward.`
+      reply: buildRememberFactAck(command.text)
     };
   }
 

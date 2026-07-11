@@ -1,6 +1,6 @@
 import { env } from "../lib/env.js";
-import { MAURI_SIGNATURE_EMOJI } from "../lib/mauri-voice.js";
 import { logger } from "../lib/logger.js";
+import { buildUnifiedCaptureAck } from "../lib/strategic-transparency.js";
 import {
   messageRouterExtractionSchema,
   type MessageRouterExtraction,
@@ -29,7 +29,9 @@ const MATERIAL_PROFILE_CATEGORIES = new Set<ProfileDelta["category"]>([
   "stressors",
   "relationships",
   "life_context",
-  "location"
+  "location",
+  "interests",
+  "boundaries"
 ]);
 
 export function hasMaterialProfileDeltas(deltas: ProfileDelta[] | undefined): boolean {
@@ -41,25 +43,16 @@ export function hasMaterialProfileDeltas(deltas: ProfileDelta[] | undefined): bo
 }
 
 export function buildProfileDeltaAck(deltas: ProfileDelta[] | undefined): string | null {
-  if (!hasMaterialProfileDeltas(deltas)) {
-    return null;
+  return buildUnifiedCaptureAck({ profileDeltas: deltas });
+}
+
+export function appendProfileDeltaAck(reply: string, ack: string | null | undefined): string {
+  const trimmedAck = ack?.trim();
+  if (!trimmedAck) {
+    return reply.trim();
   }
 
-  const categories = new Set(deltas?.map((delta) => delta.category));
-
-  if (categories.has("stressors") || categories.has("relationships")) {
-    return `${MAURI_SIGNATURE_EMOJI} Got it — updated how I read your money pressure.`;
-  }
-
-  if (categories.has("goals") || categories.has("life_context")) {
-    return `${MAURI_SIGNATURE_EMOJI} Got it — updated what you're working toward.`;
-  }
-
-  if (categories.has("location")) {
-    return `${MAURI_SIGNATURE_EMOJI} Got it — updated where you're based.`;
-  }
-
-  return `${MAURI_SIGNATURE_EMOJI} Got it — I've updated what I know about you.`;
+  return `${reply.trim()}\n\n${trimmedAck}`;
 }
 
 export function normalizeRouterExtraction(
@@ -82,21 +75,12 @@ export function routerToStructuredExtraction(router: MessageRouterExtraction): M
   return normalized.structured ?? {};
 }
 
-export function appendProfileDeltaAck(reply: string, ack: string | null | undefined): string {
-  const trimmedAck = ack?.trim();
-  if (!trimmedAck) {
-    return reply;
-  }
-
-  return `${reply.trim()}\n\n${trimmedAck}`;
-}
-
 export async function commitRouterExtraction(input: {
   userId: string;
   router: MessageRouterExtraction;
 }): Promise<{
   extraction: MauriBrainDumpExtraction;
-  profileDeltaAck: string | null;
+  profileDeltas: ProfileDelta[];
   completedTodoCount: number;
 }> {
   const normalized = normalizeRouterExtraction(input.router);
@@ -121,7 +105,7 @@ export async function commitRouterExtraction(input: {
 
   return {
     extraction,
-    profileDeltaAck: buildProfileDeltaAck(normalized.profile_deltas),
+    profileDeltas: normalized.profile_deltas ?? [],
     completedTodoCount
   };
 }
