@@ -4,8 +4,7 @@ import { parseRssItems } from "../src/services/morning-brief-scraper.service.js"
 import {
   buildPersonalizedMorningBriefMessage,
   formatMorningBriefSourceLabel,
-  formatMorningBriefStoryLine,
-  truncateMorningBriefHeadline
+  formatMorningBriefStoryLines
 } from "../src/services/morning-brief-curation.service.js";
 import {
   buildSuggestedTopicsPrompt,
@@ -93,33 +92,27 @@ describe("morning brief personalization", () => {
     expect(message).toContain("Morning Ava");
     expect(message).toContain("☁️");
     expect(message).toContain("🚗");
-    expect(message).toContain("#Traffic · Port Louis bottleneck · L'Express");
+    expect(message).toContain("#Traffic · L'Express");
+    expect(message).toContain("Port Louis bottleneck");
     expect(message).not.toContain("coworking space");
     expect(message).not.toContain("Your brief:");
   });
 
-  it("truncates long headlines on word boundaries and shows source labels", () => {
+  it("shows full headlines on their own line with source tag above", () => {
     const longHeadline =
-      "Indian Ocean Commission: Dr. Ibrahim Norbert Richard Appointed Secretary-General of the bloc";
+      "Indian Ocean Commission appoints Dr. Ibrahim Norbert Richard as Secretary-General.";
 
-    expect(truncateMorningBriefHeadline(longHeadline, 62)).toBe(
-      "Indian Ocean Commission: Dr. Ibrahim Norbert Richard…"
-    );
     expect(formatMorningBriefSourceLabel("lemauricien.com")).toBe("Le Mauricien");
     expect(
-      formatMorningBriefStoryLine({
+      formatMorningBriefStoryLines({
         topic: "LocalBuzz",
         headline: longHeadline,
         source: "lemauricien.com"
       })
-    ).toMatch(/^#LocalBuzz · .+ · Le Mauricien$/);
-    expect(
-      formatMorningBriefStoryLine({
-        topic: "LocalBuzz",
-        headline: longHeadline,
-        source: "lemauricien.com"
-      })
-    ).not.toMatch(/Secret…/);
+    ).toEqual([
+      "#LocalBuzz · Le Mauricien",
+      "Indian Ocean Commission appoints Dr. Ibrahim Norbert Richard as Secretary-General."
+    ]);
 
     const curated: CuratedMorningBrief = {
       brief_date: "2026-07-11",
@@ -141,8 +134,9 @@ describe("morning brief personalization", () => {
       curated
     });
 
-    expect(message).toContain("· Le Mauricien");
-    expect(message).not.toMatch(/\bSecret…/);
+    expect(message).toContain("#LocalBuzz · Le Mauricien");
+    expect(message).toContain("appoints Dr. Ibrahim Norbert Richard as Secretary-General.");
+    expect(message).not.toContain("…");
   });
 
   it("uses a personalized weather line override when provided", () => {

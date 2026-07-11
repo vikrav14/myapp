@@ -11,9 +11,6 @@ import {
 } from "./mauritius-weather.service.js";
 import { MORNING_BRIEF_TOPIC_KEYS } from "./morning-brief.constants.js";
 
-const MORNING_BRIEF_STORY_LINE_MAX = 118;
-const MORNING_BRIEF_HEADLINE_MIN_CHARS = 24;
-
 const MORNING_BRIEF_SOURCE_LABELS: Record<string, string> = {
   "defimedia.info": "Defi Media",
   "lexpress.mu": "L'Express",
@@ -29,36 +26,20 @@ export function formatMorningBriefSourceLabel(source: string): string {
   return MORNING_BRIEF_SOURCE_LABELS[normalized] ?? normalized;
 }
 
-export function truncateMorningBriefHeadline(text: string, maxLength: number): string {
-  const trimmed = text.trim().replace(/\s+/g, " ");
-  if (trimmed.length <= maxLength) {
-    return trimmed;
-  }
-
-  let candidate = trimmed.slice(0, maxLength);
-  const lastSpace = candidate.lastIndexOf(" ");
-  if (lastSpace >= Math.floor(maxLength * 0.55)) {
-    candidate = candidate.slice(0, lastSpace);
-  }
-
-  return `${candidate.trim()}…`;
+export function normalizeMorningBriefHeadline(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
 }
 
-export function formatMorningBriefStoryLine(input: {
+/** Tag + source on one line; full headline on the next — never truncated. */
+export function formatMorningBriefStoryLines(input: {
   topic: string;
   headline: string;
   source: string;
-}): string {
+}): string[] {
   const sourceLabel = formatMorningBriefSourceLabel(input.source);
-  const prefix = `#${input.topic} · `;
-  const suffix = ` · ${sourceLabel}`;
-  const headlineBudget = Math.max(
-    MORNING_BRIEF_HEADLINE_MIN_CHARS,
-    MORNING_BRIEF_STORY_LINE_MAX - prefix.length - suffix.length
-  );
-  const headline = truncateMorningBriefHeadline(input.headline, headlineBudget);
+  const headline = normalizeMorningBriefHeadline(input.headline);
 
-  return `${prefix}${headline}${suffix}`;
+  return [`#${input.topic} · ${sourceLabel}`, headline];
 }
 
 const curatedStorySchema = z.object({
@@ -170,7 +151,9 @@ ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - weather_line: use this exact sentence — "${deterministicWeatherLine}"
 - traffic_line: one sentence about commute pressure using the traffic snapshot when available.
 - stories: up to 8 high-signal stories tagged with one topic each from: Traffic, Tech, Money, LocalBuzz, Entertainment.
-- Each story headline must be a complete thought in ≤12 words (≤70 characters) — never end mid-phrase or mid-name.
+- Each story headline must be one complete English sentence with the full outcome — who did what, plus role, amount, or decision when the article has one.
+- Appointments must name the post (e.g. "appoints Dr. X as Secretary-General") — never stop at a person's name without the action.
+- Prefer active voice: "IOC appoints Dr. X as Secretary-General" not "IOC: Dr. X...".
 - Each story source must be the article hostname from the feed (e.g. lemauricien.com, lexpress.mu).
 - Do not invent stories that are not grounded in the article list.
 - brief_date must be ${input.briefDate}
@@ -227,9 +210,14 @@ export function buildPersonalizedMorningBriefMessage(input: {
 
   if (stories.length > 0) {
     lines.push("");
-    for (const story of stories) {
+    for (let index = 0; index < stories.length; index += 1) {
+      if (index > 0) {
+        lines.push("");
+      }
+
+      const story = stories[index]!;
       lines.push(
-        formatMorningBriefStoryLine({
+        ...formatMorningBriefStoryLines({
           topic: story.topic,
           headline: story.headline,
           source: story.source
