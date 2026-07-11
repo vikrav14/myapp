@@ -257,7 +257,7 @@ export function buildHelpFocusEnginePrompt(input: {
   }
 
   lines.push(
-    "Never name-drop books unless the user asked for sources. Synthesize frameworks into ≤60 words of localized advice. Personal stuff stays out of the 7am brief."
+    "When advising, use strategic transparency: name the playbook source, show your reasoning, and seek opt-in. Personal stuff stays out of the 7am brief."
   );
 
   return lines.join("\n");

@@ -1,4 +1,5 @@
 import { env } from "../lib/env.js";
+import { MAURI_SIGNATURE_EMOJI } from "../lib/mauri-voice.js";
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
 import type { UserMindSnapshotPayload } from "../schemas/user-mind.js";
@@ -205,7 +206,7 @@ export async function handleMorningMoodMessage(input: {
   const name = input.user.first_name?.trim() || "there";
   return {
     handled: true,
-    reply: `Got it, ${name} — logged ${score}/5 for today. I'm keeping the personal stuff out of your 7am pulse.`
+    reply: `${MAURI_SIGNATURE_EMOJI} Got it, ${name} — logged ${score}/5 for today. I'm keeping the personal stuff out of your 7am pulse.`
   };
 }
 
