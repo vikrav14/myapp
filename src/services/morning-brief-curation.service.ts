@@ -161,13 +161,17 @@ export function buildPersonalizedMorningBriefMessage(input: {
     .filter((story) => topicSet.has(story.topic as MorningBriefTopicKey))
     .slice(0, 3);
   const weatherLine = input.weatherLine?.trim() || input.curated.weather_line;
+  const trafficLine = input.curated.traffic_line.trim();
 
-  const lines = [
-    `Morning ${name}`,
-    "",
-    `☁️ ${weatherLine}`,
-    `🚗 ${input.curated.traffic_line}`
-  ];
+  const lines = [`Morning ${name} — your 7am pulse`, ""];
+
+  if (!/unavailable/i.test(weatherLine)) {
+    lines.push(`☁️ ${weatherLine}`);
+  }
+
+  if (trafficLine && !/unavailable/i.test(trafficLine)) {
+    lines.push(`🚗 ${trafficLine}`);
+  }
 
   if (stories.length > 0) {
     lines.push("");
@@ -179,6 +183,6 @@ export function buildPersonalizedMorningBriefMessage(input: {
     lines.push("", "Quiet news day for your tags — weather and traffic are the main signal.");
   }
 
-  lines.push("", "Reply anytime — log spend, tasks, or vent.");
+  lines.push("", "Reply lesson for today's insight · my pace · digest off");
   return lines.join("\n");
 }

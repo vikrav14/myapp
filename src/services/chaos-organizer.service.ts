@@ -1,4 +1,5 @@
 import type { UserMindFact } from "../types.js";
+import { MAURI_BRAND_HEADER, MAURI_PRIVACY_NOTE } from "../lib/mauri-voice.js";
 import { combinedFactBlob } from "./profile-inference.service.js";
 
 export type ChaosMapLineKey = "money" | "home" | "family" | "work" | "goals" | "live";
@@ -138,11 +139,15 @@ export function buildChaosOrganizerMap(input: {
   }
 
   return [
+    `${MAURI_BRAND_HEADER}`,
+    "",
     `${name} — here's your map (not more homework):`,
     "",
     lines.map((line) => formatChaosMapLine(line)).join("\n"),
     "",
-    "One pin this week beats trying to fix everything at once. Which line should we tackle first?"
+    "One pin this week beats trying to fix everything at once. Which line should we tackle first?",
+    "",
+    MAURI_PRIVACY_NOTE
   ].join("\n");
 }
 

@@ -8,6 +8,7 @@ import { hasEngagementDelivery, recordEngagementDelivery } from "./engagement-de
 import { loadUserMindFacts } from "./user-mind.service.js";
 import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
 import { canSendProactiveOutbound, recordProactivePing } from "./outbound-pace.service.js";
+import { appendMatePingReceipt } from "./notification-pace.service.js";
 import { isReminderEligible } from "./reminder-schedule.service.js";
 import { mapUser } from "./user.service.js";
 import { sendMauriReply, sendWhatsAppMessage } from "./whatsapp.service.js";
@@ -383,10 +384,13 @@ export async function runEveningRelationshipDeliveries(requestId?: string): Prom
     }
 
     try {
-      const message = buildEveningRelationshipPing({
-        firstName: user.first_name,
-        threadSnippet
-      });
+      const message = await appendMatePingReceipt(
+        user,
+        buildEveningRelationshipPing({
+          firstName: user.first_name,
+          threadSnippet
+        })
+      );
 
       await sendWhatsAppMessage(user.phone_number, message, {
         userId: user.id,

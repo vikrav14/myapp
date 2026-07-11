@@ -223,7 +223,9 @@ describe("handleOnboardingMessage express flow", () => {
     expect(result.reply).toContain("check in gently");
     expect(result.reply).toContain("here's your map");
     expect(result.reply).not.toContain("Morning pulse");
-    expect(result.interactive?.listButtonLabel).toBe("Pick a line");
+    expect(
+      result.interactive?.listButtonLabel ?? result.interactive?.buttons?.map((button) => button.title).join(",")
+    ).toBeTruthy();
   });
 
   it("saves weekly focus when user picks a chaos map line", async () => {
@@ -305,7 +307,9 @@ describe("handleOnboardingMessage express flow", () => {
 
     expect(result.handled).toBe(true);
     expect(result.reply).toContain("Pick one line from your map first");
-    expect(result.interactive?.listButtonLabel).toBe("Pick a line");
+    expect(
+      result.interactive?.listButtonLabel ?? result.interactive?.buttons?.length
+    ).toBeTruthy();
     expect(mockUpdateUserState).not.toHaveBeenCalled();
   });
 

@@ -28,7 +28,7 @@ import { hasModule } from "./user-modules.service.js";
 import { TRIAL_PROACTIVE_MIN_SILENCE_HOURS } from "./relationship-engagement.constants.js";
 import { isWithinTrialRelationshipWindow } from "./relationship-engagement.service.js";
 import { sendWhatsAppMessage } from "./whatsapp.service.js";
-import { resolveNotificationConfig, formatPacePresetLabel } from "./notification-pace.service.js";
+import { resolveNotificationConfig, formatPacePresetLabel, appendMatePingReceipt } from "./notification-pace.service.js";
 
 function effectiveMinSilenceHours(user: MauriUser): number {
   const paceMinutes = resolveNotificationConfig(user).proactive_min_interval_minutes;
@@ -502,7 +502,9 @@ export async function deliverProactiveCheckIn(input: {
       userMind: input.mind
     }).catch(() => null)) ?? buildFallbackMessage(input.user, input.candidate);
 
-  await sendWhatsAppMessage(input.user.phone_number, message, {
+  const messageWithReceipt = await appendMatePingReceipt(input.user, message);
+
+  await sendWhatsAppMessage(input.user.phone_number, messageWithReceipt, {
     userId: input.user.id,
     requestId: input.requestId,
     metadata: {
@@ -517,7 +519,7 @@ export async function deliverProactiveCheckIn(input: {
     user_id: input.user.id,
     mode: input.candidate.mode,
     hook_summary: input.candidate.hookSummary,
-    message_text: message,
+    message_text: messageWithReceipt,
     delivery_key: input.candidate.deliveryKey,
     sent_at: sentAt
   });

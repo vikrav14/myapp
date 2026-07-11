@@ -48,6 +48,7 @@ describe("chaos organizer", () => {
     });
 
     expect(map).toContain("here's your map");
+    expect(map).toContain("What you shared stays private");
     expect(map).toContain("Money:");
     expect(map).toContain("Which line should we tackle first?");
     expect(map).not.toContain("loan shark");

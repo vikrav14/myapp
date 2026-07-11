@@ -247,13 +247,8 @@ describe("help focus activation playbook UX", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toContain("your playbook");
-    expect(result.reply).toContain("Tap Looks good to lock this lane");
-    expect(result.interactive?.buttons?.map((button) => button.title)).toEqual([
-      "Looks good",
-      "Pick lane",
-      "My playbook"
-    ]);
+    expect(result.reply).toContain("your custom playbook");
+    expect(result.interactive?.buttons?.map((button) => button.title)).toEqual(["Looks good"]);
   });
 
   it("returns activation buttons after lane pick during fresh activation, not another list", async () => {
@@ -317,52 +312,63 @@ describe("help focus activation playbook UX", () => {
     expect(result.interactive?.listButtonLabel).toBeUndefined();
   });
 
-  it("offers pace picker after help focus confirm when pace is not configured", async () => {
-    const result = await handleHelpFocusMessage({
-      user: {
-        id: "u1",
-        phone_number: "23050000000",
-        first_name: "Vik",
-        archetype: "Corporate / Career",
-        brief_focus: null,
-        active_modules: [],
-        onboarding_state: "active",
-        subscription_status: "Trial_Active",
-        onboarding_completed_at: new Date().toISOString(),
-        trial_started_at: new Date().toISOString(),
-        trial_ends_at: null,
-        locked_at: null,
-        subscription_started_at: null,
-        subscription_ends_at: null,
-        last_payment_at: null,
-        topic_preferences: [],
-        morning_digest_enabled: true,
-        calendar_sync_enabled: true,
-        memory_resurfacing_enabled: true,
-        local_alerts_enabled: true,
-        school_alerts_enabled: true,
-        payday_day_of_month: null,
-        monthly_income_rs: null,
-        weekly_focus_habit: null,
-        weekly_focus_set_at: null,
-        open_loop_followups_enabled: true,
-        proactive_checkins_paused_until: null,
-        quiet_hours_enabled: true,
-        quiet_hours_start_hour: 22,
-        quiet_hours_end_hour: 7,
-        notification_config: null,
-        help_focus_primary: "personal_finance",
-        help_focus_secondary: "relationship",
-        created_at: "2026-01-01T00:00:00.000Z",
-        updated_at: "2026-01-01T00:00:00.000Z"
-      },
+  it("shows playbook step after help focus confirm, then pace after playbook confirm", async () => {
+    const user = {
+      id: "u1",
+      phone_number: "23050000000",
+      first_name: "Vik",
+      archetype: "Corporate / Career",
+      brief_focus: null,
+      active_modules: [],
+      onboarding_state: "active",
+      subscription_status: "Trial_Active",
+      onboarding_completed_at: new Date().toISOString(),
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: null,
+      locked_at: null,
+      subscription_started_at: null,
+      subscription_ends_at: null,
+      last_payment_at: null,
+      topic_preferences: [],
+      morning_digest_enabled: true,
+      calendar_sync_enabled: true,
+      memory_resurfacing_enabled: true,
+      local_alerts_enabled: true,
+      school_alerts_enabled: true,
+      payday_day_of_month: null,
+      monthly_income_rs: null,
+      weekly_focus_habit: null,
+      weekly_focus_set_at: null,
+      open_loop_followups_enabled: true,
+      proactive_checkins_paused_until: null,
+      quiet_hours_enabled: true,
+      quiet_hours_start_hour: 22,
+      quiet_hours_end_hour: 7,
+      notification_config: null,
+      help_focus_primary: "personal_finance",
+      help_focus_secondary: "relationship",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z"
+    };
+
+    const confirmResult = await handleHelpFocusMessage({
+      user,
       message: "help focus confirm"
     });
 
-    expect(result.handled).toBe(true);
-    expect(result.reply).toContain("Locked in");
-    expect(result.reply).toContain("how often should I check in unprompted");
-    expect(result.interactive?.listButtonLabel).toBe("Pick pace");
+    expect(confirmResult.handled).toBe(true);
+    expect(confirmResult.reply).toContain("Locked in");
+    expect(confirmResult.reply).toContain("custom playbook");
+    expect(confirmResult.interactive?.buttons?.[0]?.title).toBe("Looks good");
+
+    const paceResult = await handleHelpFocusMessage({
+      user,
+      message: "help playbook confirm"
+    });
+
+    expect(paceResult.handled).toBe(true);
+    expect(paceResult.reply).toContain("how often should I check in unprompted");
+    expect(paceResult.interactive?.listButtonLabel).toBe("Pick pace");
   });
 
   it("suppresses pasted help-focus card echoes", async () => {

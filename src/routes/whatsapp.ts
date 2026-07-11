@@ -477,7 +477,8 @@ async function processInboundWhatsAppMessage(input: {
           userId: (helpFocusResult.user ?? accessPolicyResult.user).id,
           requestId,
           sendTextBeforeInteractive: Boolean(
-            helpFocusResult.reply?.trim() && helpFocusResult.interactive
+            helpFocusResult.sendTextBeforeInteractive ??
+              (helpFocusResult.reply?.trim() && helpFocusResult.interactive)
           ),
           metadata: {
             sourceType: inboundMessage.kind,

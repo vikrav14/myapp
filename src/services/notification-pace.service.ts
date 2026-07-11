@@ -178,7 +178,19 @@ export async function setUserPacePreset(user: MauriUser, preset: ProactivePacePr
 
 export function buildPostActivationPacePrompt(firstName?: string | null): string {
   const name = firstName?.trim() || "there";
-  return `Last beat, ${name} — how often should I check in unprompted?`;
+  return `One last thing, ${name} — how often should I check in unprompted? Your 7am pulse is separate.`;
+}
+
+export function buildMatePingReceiptLine(user: MauriUser, pingNumberToday: number): string {
+  const config = resolveNotificationConfig(user);
+  const label = formatPacePresetLabel(config.proactive_preset);
+  return `Mate ping ${pingNumberToday}/${config.proactive_max_per_day} today · ${label} · reply my pace`;
+}
+
+export async function appendMatePingReceipt(user: MauriUser, message: string): Promise<string> {
+  const sentToday = await countProactivePingsToday(user.id);
+  const receipt = buildMatePingReceiptLine(user, sentToday + 1);
+  return `${message.trim()}\n\n${receipt}`;
 }
 
 export function getProactiveMaxWords(user: MauriUser): number {

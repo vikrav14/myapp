@@ -1,5 +1,6 @@
 import type { UserMindFact } from "../types.js";
 import { formatStrategyTrackBlock } from "./mauri-memory-view.service.js";
+import { MAURI_NO_HOMEWORK_LINE } from "../lib/mauri-voice.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_BY_KEY, HELP_FOCUS_CATALOG, HELP_FOCUS_KEYS } from "./help-focus.constants.js";
 import { HELP_FOCUS_PLAYBOOK, formatPlaybookLaneSection } from "./help-focus-playbook.js";
@@ -310,6 +311,47 @@ export function buildHelpFocusSourcesReply(input: {
     "",
     "Not homework — proven thinking compressed into WhatsApp-sized steps for your life.",
     "Reply my playbook <lane> for another domain (e.g. my playbook psychology), or help focus to switch."
+  ].join("\n");
+}
+
+export function buildActivationPlaybookReply(input: {
+  firstName?: string | null;
+  primary: HelpFocusKey | null;
+  secondary: HelpFocusKey | null;
+}): string {
+  const name = input.firstName?.trim() || "there";
+
+  if (!input.primary) {
+    return `${name} — reply help focus to pick a lane, then I'll show your playbook.`;
+  }
+
+  const lanes: HelpFocusKey[] = [input.primary];
+  if (input.secondary && input.secondary !== input.primary) {
+    lanes.push(input.secondary);
+  }
+
+  const laneLabels =
+    lanes.length > 1
+      ? `${formatHelpFocusLabel(lanes[0])} + ${formatHelpFocusLabel(lanes[1]!)}`
+      : formatHelpFocusLabel(lanes[0]!);
+
+  const sections = lanes.map((key, index) => {
+    const label = formatHelpFocusLabel(key);
+    const roleSuffix = lanes.length > 1 ? (index === 0 ? " (primary)" : " (secondary)") : "";
+
+    return formatPlaybookLaneSection({
+      label,
+      roleSuffix,
+      playbook: HELP_FOCUS_PLAYBOOK[key]
+    });
+  });
+
+  return [
+    `${name} — your custom playbook for ${laneLabels}:`,
+    "",
+    sections.join("\n\n"),
+    "",
+    `— ${MAURI_NO_HOMEWORK_LINE}`
   ].join("\n");
 }
 
