@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   MAURITIUS_WEATHER_FALLBACK_LINE,
+  appendWeatherGoOutTip,
   buildIslandWeatherLine,
   buildPersonalizedWeatherLine,
+  buildWeatherGoOutTip,
   buildZoneWeatherLine,
   describeWmoWeatherCode,
   parseMauritiusWeatherSummary,
@@ -109,7 +111,38 @@ describe("mauritius weather zones", () => {
     expect(line).toContain("Central Plateau");
     expect(line).toContain("18°C");
     expect(line).toContain("45%");
+    expect(line).toContain("umbrella");
     expect(line).not.toContain("Cooler inland");
+  });
+
+  it("adds proactive go-out tips for high rain and heat", () => {
+    const rainy = zoneSnapshot({
+      id: "central",
+      label: "Central Plateau",
+      temp: 19,
+      condition: "partly cloudy",
+      rainChance: 92,
+      tempMin: 18,
+      tempMax: 24
+    });
+
+    expect(buildWeatherGoOutTip(rainy)).toContain("umbrella");
+    expect(
+      buildPersonalizedWeatherLine(summaryFromZones([rainy]), "Vacoas")
+    ).toContain("grab an umbrella if you're heading out");
+
+    const hot = zoneSnapshot({
+      id: "north",
+      label: "North / Grand Baie",
+      temp: 29,
+      condition: "clear",
+      rainChance: 5,
+      tempMin: 24,
+      tempMax: 31
+    });
+
+    expect(buildWeatherGoOutTip(hot)).toContain("water and shade");
+    expect(appendWeatherGoOutTip("North: 29°C, clear", hot)).toContain("water and shade");
   });
 
   it("falls back when weather data is missing", () => {
