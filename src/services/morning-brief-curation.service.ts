@@ -11,6 +11,56 @@ import {
 } from "./mauritius-weather.service.js";
 import { MORNING_BRIEF_TOPIC_KEYS } from "./morning-brief.constants.js";
 
+const MORNING_BRIEF_STORY_LINE_MAX = 118;
+const MORNING_BRIEF_HEADLINE_MIN_CHARS = 24;
+
+const MORNING_BRIEF_SOURCE_LABELS: Record<string, string> = {
+  "defimedia.info": "Defi Media",
+  "lexpress.mu": "L'Express",
+  "lemauricien.com": "Le Mauricien"
+};
+
+export function formatMorningBriefSourceLabel(source: string): string {
+  const normalized = source.trim().toLowerCase().replace(/^www\./, "");
+  if (!normalized) {
+    return "Mauri brief";
+  }
+
+  return MORNING_BRIEF_SOURCE_LABELS[normalized] ?? normalized;
+}
+
+export function truncateMorningBriefHeadline(text: string, maxLength: number): string {
+  const trimmed = text.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  let candidate = trimmed.slice(0, maxLength);
+  const lastSpace = candidate.lastIndexOf(" ");
+  if (lastSpace >= Math.floor(maxLength * 0.55)) {
+    candidate = candidate.slice(0, lastSpace);
+  }
+
+  return `${candidate.trim()}…`;
+}
+
+export function formatMorningBriefStoryLine(input: {
+  topic: string;
+  headline: string;
+  source: string;
+}): string {
+  const sourceLabel = formatMorningBriefSourceLabel(input.source);
+  const prefix = `#${input.topic} · `;
+  const suffix = ` · ${sourceLabel}`;
+  const headlineBudget = Math.max(
+    MORNING_BRIEF_HEADLINE_MIN_CHARS,
+    MORNING_BRIEF_STORY_LINE_MAX - prefix.length - suffix.length
+  );
+  const headline = truncateMorningBriefHeadline(input.headline, headlineBudget);
+
+  return `${prefix}${headline}${suffix}`;
+}
+
 const curatedStorySchema = z.object({
   topic: z.enum(MORNING_BRIEF_TOPIC_KEYS),
   headline: z.string().min(1),
@@ -120,6 +170,8 @@ ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - weather_line: use this exact sentence — "${deterministicWeatherLine}"
 - traffic_line: one sentence about commute pressure using the traffic snapshot when available.
 - stories: up to 8 high-signal stories tagged with one topic each from: Traffic, Tech, Money, LocalBuzz, Entertainment.
+- Each story headline must be a complete thought in ≤12 words (≤70 characters) — never end mid-phrase or mid-name.
+- Each story source must be the article hostname from the feed (e.g. lemauricien.com, lexpress.mu).
 - Do not invent stories that are not grounded in the article list.
 - brief_date must be ${input.briefDate}
 
@@ -176,8 +228,13 @@ export function buildPersonalizedMorningBriefMessage(input: {
   if (stories.length > 0) {
     lines.push("");
     for (const story of stories) {
-      const headline = story.headline.length > 72 ? `${story.headline.slice(0, 69).trim()}…` : story.headline;
-      lines.push(`#${story.topic} · ${headline}`);
+      lines.push(
+        formatMorningBriefStoryLine({
+          topic: story.topic,
+          headline: story.headline,
+          source: story.source
+        })
+      );
     }
   } else {
     lines.push("", "Quiet news day for your tags — weather and traffic are the main signal.");

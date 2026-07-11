@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { parseRssItems } from "../src/services/morning-brief-scraper.service.js";
-import { buildPersonalizedMorningBriefMessage } from "../src/services/morning-brief-curation.service.js";
+import {
+  buildPersonalizedMorningBriefMessage,
+  formatMorningBriefSourceLabel,
+  formatMorningBriefStoryLine,
+  truncateMorningBriefHeadline
+} from "../src/services/morning-brief-curation.service.js";
 import {
   buildSuggestedTopicsPrompt,
   buildTopicSelectionPrompt,
@@ -88,9 +93,56 @@ describe("morning brief personalization", () => {
     expect(message).toContain("Morning Ava");
     expect(message).toContain("☁️");
     expect(message).toContain("🚗");
-    expect(message).toContain("#Traffic · Port Louis bottleneck");
+    expect(message).toContain("#Traffic · Port Louis bottleneck · L'Express");
     expect(message).not.toContain("coworking space");
     expect(message).not.toContain("Your brief:");
+  });
+
+  it("truncates long headlines on word boundaries and shows source labels", () => {
+    const longHeadline =
+      "Indian Ocean Commission: Dr. Ibrahim Norbert Richard Appointed Secretary-General of the bloc";
+
+    expect(truncateMorningBriefHeadline(longHeadline, 62)).toBe(
+      "Indian Ocean Commission: Dr. Ibrahim Norbert Richard…"
+    );
+    expect(formatMorningBriefSourceLabel("lemauricien.com")).toBe("Le Mauricien");
+    expect(
+      formatMorningBriefStoryLine({
+        topic: "LocalBuzz",
+        headline: longHeadline,
+        source: "lemauricien.com"
+      })
+    ).toMatch(/^#LocalBuzz · .+ · Le Mauricien$/);
+    expect(
+      formatMorningBriefStoryLine({
+        topic: "LocalBuzz",
+        headline: longHeadline,
+        source: "lemauricien.com"
+      })
+    ).not.toMatch(/Secret…/);
+
+    const curated: CuratedMorningBrief = {
+      brief_date: "2026-07-11",
+      weather_line: "Warm morning.",
+      traffic_line: "Traffic is normal.",
+      stories: [
+        {
+          topic: "LocalBuzz",
+          headline: longHeadline,
+          summary: "Regional appointment.",
+          source: "lemauricien.com"
+        }
+      ]
+    };
+
+    const message = buildPersonalizedMorningBriefMessage({
+      firstName: "Vik",
+      topics: ["LocalBuzz"],
+      curated
+    });
+
+    expect(message).toContain("· Le Mauricien");
+    expect(message).not.toMatch(/\bSecret…/);
   });
 
   it("uses a personalized weather line override when provided", () => {
