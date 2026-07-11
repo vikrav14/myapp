@@ -80,13 +80,14 @@ export async function deliverMorningBriefRun(input: {
       // Best-effort — island-wide pulse still sends.
     }
 
-    const pulseContext = buildUserPulseContext({
+    const pulseContext = await buildUserPulseContext({
       user,
       curated,
       weatherSnapshot: input.run.weather_snapshot,
       trafficSnapshot: input.run.traffic_snapshot,
       facts,
-      openLoops
+      openLoops,
+      fetchCustomCommute: true
     });
 
     let baseMessage = buildPersonalizedMorningBriefMessage({
@@ -158,21 +159,22 @@ export async function deliverMorningBriefRun(input: {
   return { sent, failed, skipped };
 }
 
-export function previewMorningBriefMessage(input: {
+export async function previewMorningBriefMessage(input: {
   user: MauriUser;
   curated: CuratedMorningBrief;
   weatherSnapshot?: Record<string, unknown> | null | undefined;
   trafficSnapshot?: Record<string, unknown> | null | undefined;
   facts?: Awaited<ReturnType<typeof loadUserMindFacts>> | undefined;
   openLoops?: string[] | undefined;
-}): string {
-  const pulseContext = buildUserPulseContext({
+}): Promise<string> {
+  const pulseContext = await buildUserPulseContext({
     user: input.user,
     curated: input.curated,
     weatherSnapshot: input.weatherSnapshot ?? null,
     trafficSnapshot: input.trafficSnapshot ?? null,
     facts: input.facts ?? [],
-    openLoops: input.openLoops ?? []
+    openLoops: input.openLoops ?? [],
+    fetchCustomCommute: false
   });
 
   return buildPersonalizedMorningBriefMessage({

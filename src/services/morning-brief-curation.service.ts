@@ -264,6 +264,6 @@ export function buildPersonalizedMorningBriefMessage(input: {
     lines.push("", input.activePinLine.trim());
   }
 
-  lines.push("", "Reply lesson for today's insight · my pace · digest off");
+  lines.push("", "Reply lesson for today's insight · brief full · my pace · digest off");
   return lines.join("\n");
 }

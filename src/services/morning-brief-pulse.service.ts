@@ -3,34 +3,32 @@ import type {
   CuratedMorningStory,
   MauriArchetype,
   MauriUser,
+  MorningBriefDensity,
   MorningBriefTopicKey,
   UserMindFact
 } from "../types.js";
-import { MAURI_REPLY_MAX_WORDS_PROACTIVE } from "../lib/mauri-voice.js";
+import { MORNING_BRIEF_DENSITY_MAX_WORDS } from "./morning-brief-density.constants.js";
 import { buildMorningPulseLabel } from "./express-onboarding.service.js";
 import {
   buildPersonalizedWeatherLine,
   parseMauritiusWeatherSummary,
   resolveZoneIdFromArea,
-  type MauritiusWeatherSummary,
   type MauritiusWeatherZoneId
 } from "./mauritius-weather.service.js";
+import {
+  buildCommuteCorridorLabel,
+  extractWorkPlace,
+  fetchTrafficCorridor,
+  isTrafficCorridorLive,
+  parseTrafficSnapshot,
+  type TrafficCorridorSnapshot,
+  type TrafficSnapshot
+} from "./mauritius-traffic.service.js";
 import { isRemoteWorkerProfile } from "./profile-inference.service.js";
 import type { HelpFocusKey } from "./help-focus.constants.js";
 import { HELP_FOCUS_CATALOG } from "./help-focus.constants.js";
 
-export interface TrafficCorridorSnapshot {
-  label: string;
-  duration_text: string;
-  duration_seconds: number | null;
-  status: string;
-}
-
-export interface TrafficSnapshot {
-  configured: boolean;
-  corridors: TrafficCorridorSnapshot[];
-  note?: string | undefined;
-}
+export type { TrafficCorridorSnapshot, TrafficSnapshot } from "./mauritius-traffic.service.js";
 
 export interface PulseStoryForUser {
   story: CuratedMorningStory;
@@ -43,6 +41,7 @@ export interface UserPulseContext {
   stories: PulseStoryForUser[];
   activePinLine: string | null;
   pulseLabel: string;
+  density: MorningBriefDensity;
 }
 
 const CORRIDOR_ZONE_HINTS: Record<
@@ -79,49 +78,6 @@ export function resolveWorkLocation(facts: UserMindFact[]): string | null {
     /\b(work in|office in|job in|commute to|based in ebene|cybercity|ébène|ebene)\b/i.test(factBlob(fact))
   );
   return workMatch?.fact_value?.trim() || null;
-}
-
-export function parseTrafficSnapshot(snapshot: Record<string, unknown> | null | undefined): TrafficSnapshot | null {
-  if (!snapshot) {
-    return null;
-  }
-
-  const configured = Boolean(snapshot.configured);
-  const corridorsRaw = snapshot.corridors;
-  if (!Array.isArray(corridorsRaw)) {
-    return {
-      configured,
-      corridors: [],
-      ...(typeof snapshot.note === "string" ? { note: snapshot.note } : {})
-    };
-  }
-
-  const corridors = corridorsRaw
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
-        return null;
-      }
-
-      const row = entry as Record<string, unknown>;
-      const label = String(row.label ?? "").trim();
-      if (!label) {
-        return null;
-      }
-
-      return {
-        label,
-        duration_text: String(row.duration_text ?? "unknown").trim(),
-        duration_seconds: typeof row.duration_seconds === "number" ? row.duration_seconds : null,
-        status: String(row.status ?? "UNKNOWN")
-      };
-    })
-    .filter((entry): entry is TrafficCorridorSnapshot => entry !== null);
-
-  return {
-    configured,
-    corridors,
-    ...(typeof snapshot.note === "string" ? { note: snapshot.note } : {})
-  };
 }
 
 function scoreCorridorForUser(
@@ -174,24 +130,65 @@ export function pickCommuteCorridor(
   return ranked[0] ?? null;
 }
 
-export function buildPersonalizedTrafficLine(input: {
+function formatTrafficLineFromCorridor(
+  corridor: TrafficCorridorSnapshot,
+  facts: UserMindFact[],
+  customRoute = false
+): string {
+  const area = resolveUserArea(facts);
+  const work = resolveWorkLocation(facts);
+  const workPlace = work ? extractWorkPlace(work) : null;
+  const routeHint =
+    area && workPlace ? `${area} → ${workPlace}` : area ? `from ${area}` : corridor.label;
+
+  if (customRoute) {
+    return `Your commute (${routeHint}): ${corridor.duration_text}.`;
+  }
+
+  return `${corridor.label}: ${corridor.duration_text} (${routeHint}).`;
+}
+
+export async function fetchCustomCommuteCorridor(facts: UserMindFact[]): Promise<TrafficCorridorSnapshot | null> {
+  const home = resolveUserArea(facts);
+  const work = resolveWorkLocation(facts);
+  if (!home || !work) {
+    return null;
+  }
+
+  const workPlace = extractWorkPlace(work);
+  if (!workPlace || workPlace.toLowerCase() === home.toLowerCase()) {
+    return null;
+  }
+
+  return fetchTrafficCorridor({
+    origin: home,
+    destination: workPlace,
+    label: buildCommuteCorridorLabel(home, workPlace)
+  });
+}
+
+export async function buildPersonalizedTrafficLine(input: {
   curatedTrafficLine: string;
   trafficSnapshot: Record<string, unknown> | null | undefined;
   facts: UserMindFact[];
-}): string | null {
+  fetchCustomCommute?: boolean | undefined;
+}): Promise<string | null> {
   if (isRemoteWorkerProfile(input.facts)) {
     return "Remote day — corridor lines matter less; your weather line is the commute.";
+  }
+
+  if (input.fetchCustomCommute !== false) {
+    const customCorridor = await fetchCustomCommuteCorridor(input.facts);
+    if (isTrafficCorridorLive(customCorridor)) {
+      return formatTrafficLineFromCorridor(customCorridor!, input.facts, true);
+    }
   }
 
   const snapshot = parseTrafficSnapshot(input.trafficSnapshot);
   const corridor = pickCommuteCorridor(snapshot, input.facts);
 
-  if (corridor && corridor.status === "OK" && !TRAFFIC_UNAVAILABLE_PATTERN.test(corridor.duration_text)) {
-    const area = resolveUserArea(input.facts);
-    const work = resolveWorkLocation(input.facts);
-    const routeHint =
-      area && work ? `${area} → ${work}` : area ? `from ${area}` : corridor.label;
-    return `${corridor.label}: ${corridor.duration_text} (${routeHint}).`;
+  if (isTrafficCorridorLive(corridor)) {
+    return formatTrafficLineFromCorridor(corridor!, input.facts);
   }
 
   const fallback = input.curatedTrafficLine.trim();
@@ -299,7 +296,10 @@ export function rankStoriesForUser(input: {
   topics: MorningBriefTopicKey[];
   user: MauriUser;
   facts: UserMindFact[];
+  maxStories?: number | undefined;
 }): CuratedMorningStory[] {
+  const maxStories = input.maxStories ?? 3;
+
   return [...input.curated.stories]
     .map((story, index) => ({
       story,
@@ -314,7 +314,7 @@ export function rankStoriesForUser(input: {
     }))
     .filter((entry) => entry.score > 0)
     .sort((left, right) => right.score - left.score || left.index - right.index)
-    .slice(0, 3)
+    .slice(0, maxStories)
     .map((entry) => entry.story);
 }
 
@@ -379,8 +379,13 @@ function countWords(text: string): number {
 export function trimPulseStoriesToWordLimit(
   stories: PulseStoryForUser[],
   maxWords: number,
-  overheadWords: number
+  overheadWords: number,
+  density: MorningBriefDensity
 ): PulseStoryForUser[] {
+  if (density === "full") {
+    return stories;
+  }
+
   let trimmed = [...stories];
 
   while (trimmed.length > 0) {
@@ -418,28 +423,32 @@ export function trimPulseStoriesToWordLimit(
   return trimmed;
 }
 
-export function buildUserPulseContext(input: {
+export async function buildUserPulseContext(input: {
   user: MauriUser;
   curated: CuratedMorningBrief;
   weatherSnapshot: Record<string, unknown> | null | undefined;
   trafficSnapshot: Record<string, unknown> | null | undefined;
   facts: UserMindFact[];
   openLoops: string[];
-}): UserPulseContext {
+  fetchCustomCommute?: boolean | undefined;
+}): Promise<UserPulseContext> {
+  const density = input.user.morning_brief_density ?? "pulse";
   const weatherSummary = parseMauritiusWeatherSummary(input.weatherSnapshot ?? null);
   const userArea = resolveUserArea(input.facts);
   const weatherLine = buildPersonalizedWeatherLine(weatherSummary, userArea);
-  const trafficLine = buildPersonalizedTrafficLine({
+  const trafficLine = await buildPersonalizedTrafficLine({
     curatedTrafficLine: input.curated.traffic_line,
     trafficSnapshot: input.trafficSnapshot,
-    facts: input.facts
+    facts: input.facts,
+    fetchCustomCommute: input.fetchCustomCommute
   });
 
   const rankedStories = rankStoriesForUser({
     curated: input.curated,
     topics: input.user.topic_preferences as MorningBriefTopicKey[],
     user: input.user,
-    facts: input.facts
+    facts: input.facts,
+    maxStories: density === "full" ? 3 : 3
   });
 
   const stories = rankedStories.map((story) => ({
@@ -452,6 +461,7 @@ export function buildUserPulseContext(input: {
     input.facts
   );
   const activePinLine = buildActivePinLine(input.openLoops);
+  const maxWords = MORNING_BRIEF_DENSITY_MAX_WORDS[density];
 
   const overhead =
     countWords(`Morning there — your 7am pulse (${pulseLabel})`) +
@@ -460,13 +470,14 @@ export function buildUserPulseContext(input: {
     countWords(activePinLine ?? "") +
     12;
 
-  const trimmedStories = trimPulseStoriesToWordLimit(stories, MAURI_REPLY_MAX_WORDS_PROACTIVE, overhead);
+  const trimmedStories = trimPulseStoriesToWordLimit(stories, maxWords, overhead, density);
 
   return {
     weatherLine,
     trafficLine,
     stories: trimmedStories,
     activePinLine,
-    pulseLabel
+    pulseLabel,
+    density
   };
 }

@@ -40,6 +40,7 @@ function baseUser(overrides: Partial<MauriUser> = {}): MauriUser {
     trial_ends_at: "2026-07-01T00:00:00.000Z",
     subscription_ends_at: null,
     morning_digest_enabled: true,
+    morning_brief_density: "pulse" as const,
     topic_preferences: ["Traffic", "Money", "Tech"],
     payday_day_of_month: null,
     notification_pace: null,
@@ -112,15 +113,15 @@ describe("morning brief pulse context", () => {
     expect(corridor?.label).toBe("Rose Hill to Port Louis");
   });
 
-  it("builds a personalized traffic line with route hint", () => {
+  it("builds a personalized traffic line with route hint", async () => {
     const facts = [
       fact({ category: "location", fact_key: "area", fact_value: "Vacoas" }),
       fact({ category: "life_context", fact_key: "work", fact_value: "Port Louis" }),
       fact({ category: "stressors", fact_key: "commute", fact_value: "2 hours in traffic daily" })
     ];
 
-    const line = buildPersonalizedTrafficLine({
-      curatedTrafficLine: "Traffic not available right now.",
+    const line = await buildPersonalizedTrafficLine({
+      curatedTrafficLine: "Port Louis and Ebene corridors are tight.",
       trafficSnapshot: {
         configured: true,
         corridors: [
@@ -132,18 +133,20 @@ describe("morning brief pulse context", () => {
           }
         ]
       },
-      facts
+      facts,
+      fetchCustomCommute: false
     });
 
     expect(line).toContain("Rose Hill to Port Louis");
     expect(line).toContain("Vacoas");
   });
 
-  it("falls back when live traffic is not available but user commutes", () => {
-    const line = buildPersonalizedTrafficLine({
+  it("falls back when live traffic is not available but user commutes", async () => {
+    const line = await buildPersonalizedTrafficLine({
       curatedTrafficLine: "Traffic not available right now.",
       trafficSnapshot: { configured: false },
-      facts: [fact({ category: "stressors", fact_key: "commute", fact_value: "daily drive to Ebene" })]
+      facts: [fact({ category: "stressors", fact_key: "commute", fact_value: "daily drive to Ebene" })],
+      fetchCustomCommute: false
     });
 
     expect(line).toContain("leave 15 min early");
@@ -165,14 +168,14 @@ describe("morning brief pulse context", () => {
     expect(ranked[0]?.topic).toBe("Money");
   });
 
-  it("adds relevance lines and active pin in the composed pulse", () => {
+  it("adds relevance lines and active pin in the composed pulse", async () => {
     const facts = [
       fact({ category: "location", fact_key: "area", fact_value: "Vacoas" }),
       fact({ category: "stressors", fact_key: "commute", fact_value: "2 hours in traffic daily" }),
       fact({ category: "goals", fact_key: "rent", fact_value: "rent due next week" })
     ];
 
-    const pulse = buildUserPulseContext({
+    const pulse = await buildUserPulseContext({
       user: baseUser(),
       curated: curatedFixture,
       weatherSnapshot: {
@@ -219,12 +222,12 @@ describe("morning brief pulse context", () => {
     expect(buildActivePinLine(["uncle loan follow-up"])).toContain("uncle loan");
   });
 
-  it("uses remote-worker traffic copy instead of corridor lines", () => {
+  it("uses remote-worker traffic copy instead of corridor lines", async () => {
     const facts = [
       fact({ category: "life_context", fact_key: "work", fact_value: "Remote for EU company" })
     ];
 
-    const line = buildPersonalizedTrafficLine({
+    const line = await buildPersonalizedTrafficLine({
       curatedTrafficLine: "Port Louis and Ebene corridors are tight.",
       trafficSnapshot: {
         configured: true,

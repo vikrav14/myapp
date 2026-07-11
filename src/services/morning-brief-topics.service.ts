@@ -6,6 +6,8 @@ import {
   MORNING_BRIEF_TOPIC_KEYS,
   type MorningBriefTopicKey
 } from "./morning-brief.constants.js";
+import type { MorningBriefDensity } from "./morning-brief-density.constants.js";
+import { MORNING_BRIEF_DENSITY_LABELS } from "./morning-brief-density.constants.js";
 
 function normalize(text: string): string {
   return text.trim().toLowerCase().replace(/^#/, "");
@@ -105,8 +107,30 @@ export function isValidTopicSelection(topics: MorningBriefTopicKey[]): boolean {
 
 export function parseTopicPreferenceCommand(
   message: string
-): { type: "show" } | { type: "update"; selection: string } | { type: "digest"; enabled: boolean } | null {
+):
+  | { type: "show" }
+  | { type: "update"; selection: string }
+  | { type: "digest"; enabled: boolean }
+  | { type: "density"; density: MorningBriefDensity }
+  | { type: "brief_status" }
+  | null {
   const normalized = message.trim().toLowerCase().replace(/\s+/g, " ");
+
+  if (
+    normalized === "my brief" ||
+    normalized === "brief status" ||
+    normalized === "morning brief status"
+  ) {
+    return { type: "brief_status" };
+  }
+
+  if (normalized === "brief pulse" || normalized === "brief mode pulse" || normalized === "pulse brief") {
+    return { type: "density", density: "pulse" };
+  }
+
+  if (normalized === "brief full" || normalized === "brief mode full" || normalized === "full brief") {
+    return { type: "density", density: "full" };
+  }
 
   if (
     normalized === "my topics" ||
@@ -163,7 +187,11 @@ ${lines.join("\n")}
 Example: update topics Traffic Money Tech`;
 }
 
-export function buildTopicStatusReply(topics: MorningBriefTopicKey[], digestEnabled: boolean): string {
+export function buildTopicStatusReply(
+  topics: MorningBriefTopicKey[],
+  digestEnabled: boolean,
+  density: MorningBriefDensity = "pulse"
+): string {
   if (!topics.length) {
     return `You don't have morning brief topics set yet.
 
@@ -176,16 +204,38 @@ I'll use those tags for your 7:00 vibe check.`;
   return `Your morning brief tags: ${formatTopicList(topics)}
 
 Digest: ${digestEnabled ? "on" : "off"}
+Mode: ${MORNING_BRIEF_DENSITY_LABELS[density]}
+
 I'll match stories to those tags at 7:00.
 
 To change tags:
 update topics Traffic Money Tech
+
+To switch length:
+brief pulse
+brief full
 
 To pause or resume the 7:00 brief:
 digest off
 digest on
 
 Reply help for the full command menu.`;
+}
+
+export function buildDigestDensityReply(input: {
+  density: MorningBriefDensity;
+}): string {
+  if (input.density === "full") {
+    return `Morning brief set to Full — more context (~200 words) with all three story angles.
+
+Tighter again anytime:
+brief pulse`;
+  }
+
+  return `Morning brief set to Pulse — tight scan (~100 words).
+
+More context anytime:
+brief full`;
 }
 
 export function buildDigestToggleReply(input: {

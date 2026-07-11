@@ -8,6 +8,7 @@ import {
   fetchMauritiusWeatherSummary,
   type MauritiusWeatherSummary
 } from "./mauritius-weather.service.js";
+import { fetchTrafficCorridors } from "./mauritius-traffic.service.js";
 
 export interface ScrapedNewsItem {
   title: string;
@@ -97,42 +98,12 @@ async function fetchTrafficSnapshot(): Promise<Record<string, unknown> | null> {
   }
 
   try {
-    const corridors = await Promise.all(
-      MAURITIUS_TRAFFIC_CORRIDORS.map(async (corridor) => {
-        const params = new URLSearchParams({
-          origins: corridor.origin,
-          destinations: corridor.destination,
-          key: env.GOOGLE_MAPS_API_KEY!,
-          departure_time: "now",
-          traffic_model: "best_guess"
-        });
-
-        const response = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`);
-        if (!response.ok) {
-          return {
-            label: corridor.label,
-            status: "HTTP_ERROR",
-            duration_text: "unknown"
-          };
-        }
-
-        const payload = (await response.json()) as Record<string, unknown>;
-        const element = (payload.rows as Array<{ elements?: Array<Record<string, unknown>> }> | undefined)?.[0]
-          ?.elements?.[0];
-
-        return {
-          label: corridor.label,
-          duration_text:
-            (element?.duration_in_traffic as { text?: string } | undefined)?.text ??
-            (element?.duration as { text?: string } | undefined)?.text ??
-            "unknown",
-          duration_seconds:
-            (element?.duration_in_traffic as { value?: number } | undefined)?.value ??
-            (element?.duration as { value?: number } | undefined)?.value ??
-            null,
-          status: String(element?.status ?? "UNKNOWN")
-        };
-      })
+    const corridors = await fetchTrafficCorridors(
+      MAURITIUS_TRAFFIC_CORRIDORS.map((corridor) => ({
+        label: corridor.label,
+        origin: corridor.origin,
+        destination: corridor.destination
+      }))
     );
 
     return {

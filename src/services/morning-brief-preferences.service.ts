@@ -1,6 +1,7 @@
 import type { MauriUser, MorningBriefTopicKey } from "../types.js";
 import { recordAuditEventBestEffort } from "./audit.service.js";
 import {
+  buildDigestDensityReply,
   buildDigestToggleReply,
   buildTopicStatusReply,
   buildTopicUpdatePrompt,
@@ -35,14 +36,47 @@ export async function handleTopicPreferenceMessage(input: {
     };
   }
 
-  if (command.type === "show") {
+  if (command.type === "show" || command.type === "brief_status") {
     return {
       handled: true,
       user: input.user,
       reply: buildTopicStatusReply(
         input.user.topic_preferences as MorningBriefTopicKey[],
-        input.user.morning_digest_enabled
+        input.user.morning_digest_enabled,
+        input.user.morning_brief_density
       )
+    };
+  }
+
+  if (command.type === "density") {
+    if (command.density === input.user.morning_brief_density) {
+      return {
+        handled: true,
+        user: input.user,
+        reply: buildDigestDensityReply({ density: input.user.morning_brief_density })
+      };
+    }
+
+    const updatedUser = await updateUserState(input.user.id, {
+      morning_brief_density: command.density
+    });
+
+    await recordAuditEventBestEffort({
+      requestId: input.requestId,
+      eventType: "morning_brief_density_updated",
+      userId: updatedUser.id,
+      entityType: "user",
+      entityId: updatedUser.id,
+      message: `User set morning brief density to ${command.density}.`,
+      metadata: {
+        morning_brief_density: command.density
+      }
+    });
+
+    return {
+      handled: true,
+      user: updatedUser,
+      reply: buildDigestDensityReply({ density: command.density })
     };
   }
 
