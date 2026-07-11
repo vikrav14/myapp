@@ -1,9 +1,10 @@
 import { supabase } from "../lib/supabase.js";
-import type { MauriModuleKey, MauriUser, MorningBriefTopicKey, HelpFocusKey, NotificationConfig } from "../types.js";
+import type { MauriModuleKey, MauriUser, MorningBriefDensity, MorningBriefTopicKey, HelpFocusKey, NotificationConfig } from "../types.js";
 import { MAURI_MODULE_KEYS, MAX_ACTIVE_MODULES } from "./user-modules.constants.js";
 import { isHelpFocusKey } from "./help-focus-inference.service.js";
 import type { ProactivePacePreset } from "./notification-pace.constants.js";
 import { PACE_PRESET_CATALOG } from "./notification-pace.constants.js";
+import { sanitizeMorningBriefDensity } from "./morning-brief-density.constants.js";
 
 function sanitizeUserModules(value: unknown): MauriModuleKey[] {
   if (!Array.isArray(value)) {
@@ -86,6 +87,7 @@ export function mapUser(record: Record<string, unknown>): MauriUser {
         )
       : [],
     morning_digest_enabled: record.morning_digest_enabled !== false,
+    morning_brief_density: sanitizeMorningBriefDensity(record.morning_brief_density),
     calendar_sync_enabled: record.calendar_sync_enabled !== false,
     memory_resurfacing_enabled: record.memory_resurfacing_enabled !== false,
     local_alerts_enabled: record.local_alerts_enabled !== false,

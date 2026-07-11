@@ -4,11 +4,10 @@ import type { CuratedMorningBrief, DailyBriefRunRecord, MauriUser, MorningBriefT
 import { mapUser } from "./user.service.js";
 import { buildPersonalizedMorningBriefMessage } from "./morning-brief-curation.service.js";
 import { parseCuratedMorningBrief } from "./morning-brief-run.service.js";
-import {
-  buildPersonalizedWeatherLine,
-  parseMauritiusWeatherSummary
-} from "./mauritius-weather.service.js";
+import { parseMauritiusWeatherSummary } from "./mauritius-weather.service.js";
 import { loadUserMindFacts } from "./user-mind.service.js";
+import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
+import { buildUserPulseContext } from "./morning-brief-pulse.service.js";
 import { hasModule } from "./user-modules.service.js";
 import { loadPayCycleSpend, buildPaydayRunwaySnippet } from "./payday-runway.service.js";
 import { deliverMorningMoodCheck } from "./relationship-engagement.service.js";
@@ -51,11 +50,6 @@ export async function listMorningDigestRecipients(): Promise<MauriUser[]> {
   );
 }
 
-function resolveUserArea(facts: Awaited<ReturnType<typeof loadUserMindFacts>>): string | null {
-  const areaFact = facts.find((fact) => fact.category === "location" && fact.fact_key === "area");
-  return areaFact?.fact_value?.trim() || null;
-}
-
 export async function deliverMorningBriefRun(input: {
   run: DailyBriefRunRecord;
   requestId?: string | undefined;
@@ -65,7 +59,6 @@ export async function deliverMorningBriefRun(input: {
     throw new Error("Daily brief run is missing curated payload.");
   }
 
-  const weatherSummary = parseMauritiusWeatherSummary(input.run.weather_snapshot);
   const recipients = await listMorningDigestRecipients();
   let sent = 0;
   let failed = 0;
@@ -73,20 +66,39 @@ export async function deliverMorningBriefRun(input: {
 
   for (const user of recipients) {
     const topics = user.topic_preferences as MorningBriefTopicKey[];
-    let userArea: string | null = null;
+    let facts: Awaited<ReturnType<typeof loadUserMindFacts>> = [];
+    let openLoops: string[] = [];
+
     try {
-      const facts = await loadUserMindFacts(user.id);
-      userArea = resolveUserArea(facts);
+      const [loadedFacts, mindRecord] = await Promise.all([
+        loadUserMindFacts(user.id),
+        getUserMindSnapshot(user.id).catch(() => null)
+      ]);
+      facts = loadedFacts;
+      openLoops = mindRecord?.snapshot.open_loops ?? [];
     } catch {
-      // Best-effort — island-wide weather line still sends.
+      // Best-effort — island-wide pulse still sends.
     }
 
-    const weatherLine = buildPersonalizedWeatherLine(weatherSummary, userArea);
+    const pulseContext = await buildUserPulseContext({
+      user,
+      curated,
+      weatherSnapshot: input.run.weather_snapshot,
+      trafficSnapshot: input.run.traffic_snapshot,
+      facts,
+      openLoops,
+      fetchCustomCommute: true
+    });
+
     let baseMessage = buildPersonalizedMorningBriefMessage({
       firstName: user.first_name,
       topics,
       curated,
-      weatherLine
+      weatherLine: pulseContext.weatherLine,
+      trafficLine: pulseContext.trafficLine,
+      pulseStories: pulseContext.stories,
+      activePinLine: pulseContext.activePinLine,
+      pulseLabel: pulseContext.pulseLabel
     });
 
     if (hasModule(user, "career") && user.payday_day_of_month) {
@@ -147,19 +159,32 @@ export async function deliverMorningBriefRun(input: {
   return { sent, failed, skipped };
 }
 
-export function previewMorningBriefMessage(input: {
+export async function previewMorningBriefMessage(input: {
   user: MauriUser;
   curated: CuratedMorningBrief;
   weatherSnapshot?: Record<string, unknown> | null | undefined;
-  userArea?: string | null | undefined;
-}): string {
-  const weatherSummary = parseMauritiusWeatherSummary(input.weatherSnapshot ?? null);
-  const weatherLine = buildPersonalizedWeatherLine(weatherSummary, input.userArea ?? null);
+  trafficSnapshot?: Record<string, unknown> | null | undefined;
+  facts?: Awaited<ReturnType<typeof loadUserMindFacts>> | undefined;
+  openLoops?: string[] | undefined;
+}): Promise<string> {
+  const pulseContext = await buildUserPulseContext({
+    user: input.user,
+    curated: input.curated,
+    weatherSnapshot: input.weatherSnapshot ?? null,
+    trafficSnapshot: input.trafficSnapshot ?? null,
+    facts: input.facts ?? [],
+    openLoops: input.openLoops ?? [],
+    fetchCustomCommute: false
+  });
 
   return buildPersonalizedMorningBriefMessage({
     firstName: input.user.first_name,
     topics: input.user.topic_preferences as MorningBriefTopicKey[],
     curated: input.curated,
-    weatherLine
+    weatherLine: pulseContext.weatherLine,
+    trafficLine: pulseContext.trafficLine,
+    pulseStories: pulseContext.stories,
+    activePinLine: pulseContext.activePinLine,
+    pulseLabel: pulseContext.pulseLabel
   });
 }

@@ -29,6 +29,7 @@ const activeUser = {
   last_payment_at: null,
   topic_preferences: ["Traffic", "Money", "LocalBuzz"] as const,
   morning_digest_enabled: true,
+  morning_brief_density: "pulse" as const,
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z"
 };
@@ -124,5 +125,23 @@ describe("handleTopicPreferenceMessage", () => {
     });
 
     expect(result.handled).toBe(false);
+  });
+
+  it("updates morning brief density", async () => {
+    mockUpdateUserState.mockResolvedValue({
+      ...activeUser,
+      morning_brief_density: "full"
+    });
+
+    const result = await handleTopicPreferenceMessage({
+      user: activeUser,
+      message: "brief full"
+    });
+
+    expect(result.handled).toBe(true);
+    expect(mockUpdateUserState).toHaveBeenCalledWith(activeUser.id, {
+      morning_brief_density: "full"
+    });
+    expect(result.reply).toContain("Full");
   });
 });

@@ -4,7 +4,8 @@ import { env } from "../lib/env.js";
 import { sanitizeGeminiResponseSchema } from "../lib/gemini-schema.js";
 import { MAURI_ENGLISH_ONLY_LANGUAGE_RULE } from "../lib/mauri-voice.js";
 import { parseStructuredJson } from "../schemas/extraction.js";
-import type { CuratedMorningBrief, MorningBriefTopicKey } from "../types.js";
+import type { CuratedMorningBrief, CuratedMorningStory, MorningBriefTopicKey } from "../types.js";
+import type { PulseStoryForUser } from "./morning-brief-pulse.service.js";
 import type { MorningBriefScrapeResult } from "./morning-brief-scraper.service.js";
 import {
   MAURITIUS_WEATHER_FALLBACK_LINE
@@ -184,38 +185,69 @@ ${articleSample || "No articles fetched. Return a brief with practical weather/t
   };
 }
 
+const PULSE_UNAVAILABLE_PATTERN = /(unavailable|not available)/i;
+
 export function buildPersonalizedMorningBriefMessage(input: {
   firstName: string | null;
   topics: MorningBriefTopicKey[];
   curated: CuratedMorningBrief;
   weatherLine?: string | undefined;
+  trafficLine?: string | null | undefined;
+  pulseStories?: PulseStoryForUser[] | undefined;
+  activePinLine?: string | null | undefined;
+  pulseLabel?: string | undefined;
 }): string {
   const name = input.firstName?.trim() || "there";
   const topicSet = new Set(input.topics);
-  const stories = input.curated.stories
+  const defaultStories = input.curated.stories
     .filter((story) => topicSet.has(story.topic as MorningBriefTopicKey))
     .slice(0, 3);
+  const pulseStories = input.pulseStories;
   const weatherLine = input.weatherLine?.trim() || input.curated.weather_line;
-  const trafficLine = input.curated.traffic_line.trim();
+  const trafficLine = (input.trafficLine ?? input.curated.traffic_line).trim();
+  const pulseLabel = input.pulseLabel?.trim();
 
-  const lines = [`Morning ${name} — your 7am pulse`, ""];
+  const header = pulseLabel
+    ? `Morning ${name} — your 7am pulse (${pulseLabel})`
+    : `Morning ${name} — your 7am pulse`;
 
-  if (!/unavailable/i.test(weatherLine)) {
+  const lines = [header, ""];
+
+  if (!PULSE_UNAVAILABLE_PATTERN.test(weatherLine)) {
     lines.push(`☁️ ${weatherLine}`);
   }
 
-  if (trafficLine && !/unavailable/i.test(trafficLine)) {
+  if (trafficLine && !PULSE_UNAVAILABLE_PATTERN.test(trafficLine)) {
     lines.push(`🚗 ${trafficLine}`);
   }
 
-  if (stories.length > 0) {
+  if (pulseStories && pulseStories.length > 0) {
     lines.push("");
-    for (let index = 0; index < stories.length; index += 1) {
+    for (let index = 0; index < pulseStories.length; index += 1) {
       if (index > 0) {
         lines.push("");
       }
 
-      const story = stories[index]!;
+      const entry = pulseStories[index]!;
+      lines.push(
+        ...formatMorningBriefStoryLines({
+          topic: entry.story.topic,
+          headline: entry.story.headline,
+          source: entry.story.source
+        })
+      );
+      if (entry.relevanceLine.trim()) {
+        lines.push(`→ ${entry.relevanceLine}`);
+      }
+    }
+  } else if (defaultStories.length > 0) {
+    lines.push("");
+    for (let index = 0; index < defaultStories.length; index += 1) {
+      if (index > 0) {
+        lines.push("");
+      }
+
+      const story = defaultStories[index] as CuratedMorningStory;
       lines.push(
         ...formatMorningBriefStoryLines({
           topic: story.topic,
@@ -228,6 +260,10 @@ export function buildPersonalizedMorningBriefMessage(input: {
     lines.push("", "Quiet news day for your tags — weather and traffic are the main signal.");
   }
 
-  lines.push("", "Reply lesson for today's insight · my pace · digest off");
+  if (input.activePinLine?.trim()) {
+    lines.push("", input.activePinLine.trim());
+  }
+
+  lines.push("", "Reply lesson for today's insight · brief full · my pace · digest off");
   return lines.join("\n");
 }

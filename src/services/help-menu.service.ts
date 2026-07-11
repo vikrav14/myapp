@@ -31,8 +31,9 @@ Morning brief
 - my lane — brief lane, tags, and modules
 - my modules — career / habits / founder / student tools
 - add habits / remove founder — toggle modules
-- my topics — show your tags
+- my topics / my brief — show your tags and brief mode
 - update topics Traffic Money Tech
+- brief pulse / brief full — tight scan vs more context
 - my pace — unprompted check-in frequency (twice a day, every few hours, silent, etc.)
 - digest off / digest on
 

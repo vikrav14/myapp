@@ -22,6 +22,7 @@ export type UserMindCategory =
   | "user_stated";
 export type UserMindSource = "onboarding" | "user_stated" | "inferred" | "feedback";
 export type MorningBriefTopicKey = "Traffic" | "Tech" | "Money" | "LocalBuzz" | "Entertainment";
+export type MorningBriefDensity = "pulse" | "full";
 export type PaymentProvider = "MCB_JUICE" | "BLINK" | "MANUAL";
 export type MemoryType = "user_message" | "assistant_reply" | "emotion_signal" | "weekly_report";
 export type AuditSeverity = "info" | "warning" | "error";
@@ -98,6 +99,7 @@ export interface MauriUser {
   last_payment_at: string | null;
   topic_preferences: MorningBriefTopicKey[];
   morning_digest_enabled: boolean;
+  morning_brief_density: MorningBriefDensity;
   calendar_sync_enabled: boolean;
   memory_resurfacing_enabled: boolean;
   local_alerts_enabled: boolean;
