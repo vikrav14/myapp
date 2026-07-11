@@ -249,8 +249,11 @@ export async function handlePaceMessage(input: {
   };
 }
 
-export async function buildPostActivationPaceOffer(user: MauriUser): Promise<PaceCommandResult | null> {
-  if (isPaceConfigured(user)) {
+export async function buildPostActivationPaceOffer(
+  user: MauriUser,
+  options?: { force?: boolean | undefined }
+): Promise<PaceCommandResult | null> {
+  if (!options?.force && isPaceConfigured(user)) {
     return null;
   }
 
@@ -260,7 +263,9 @@ export async function buildPostActivationPaceOffer(user: MauriUser): Promise<Pac
     reply: buildPostActivationPacePrompt(user.first_name),
     interactive: buildPacePickerInteractive({
       firstName: user.first_name,
-      suggestedPreset: DEFAULT_PROACTIVE_PACE_PRESET
+      suggestedPreset: isPaceConfigured(user)
+        ? resolveNotificationConfig(user).proactive_preset
+        : DEFAULT_PROACTIVE_PACE_PRESET
     })
   };
 }

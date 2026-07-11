@@ -145,7 +145,7 @@ function buildPlaybookHelpFocusResult(
 }
 
 async function offerPaceAfterPlaybook(user: MauriUser): Promise<HelpFocusCommandResult> {
-  const paceOffer = await buildPostActivationPaceOffer(user);
+  const paceOffer = await buildPostActivationPaceOffer(user, { force: true });
 
   if (paceOffer?.reply || paceOffer?.interactive) {
     return {
@@ -167,7 +167,7 @@ async function offerPaceAfterPlaybook(user: MauriUser): Promise<HelpFocusCommand
   return {
     handled: true,
     user,
-    reply: `All set, ${user.first_name?.trim() || "there"} — ${labels} locked in. Reply my pace anytime to change rhythm.`
+    reply: `All set, ${user.first_name?.trim() || "there"} — ${labels} locked in. Reply my pace to pick how often I check in.`
   };
 }
 

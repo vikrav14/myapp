@@ -371,6 +371,61 @@ describe("help focus activation playbook UX", () => {
     expect(paceResult.interactive?.listButtonLabel).toBe("Pick pace");
   });
 
+  it("still shows pace picker after playbook confirm when pace was set earlier", async () => {
+    const user = {
+      id: "u1",
+      phone_number: "23050000000",
+      first_name: "Vik",
+      archetype: "Corporate / Career",
+      brief_focus: null,
+      active_modules: [],
+      onboarding_state: "active" as const,
+      subscription_status: "Trial_Active" as const,
+      onboarding_completed_at: new Date().toISOString(),
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: null,
+      locked_at: null,
+      subscription_started_at: null,
+      subscription_ends_at: null,
+      last_payment_at: null,
+      topic_preferences: [],
+      morning_digest_enabled: true,
+      calendar_sync_enabled: true,
+      memory_resurfacing_enabled: true,
+      local_alerts_enabled: true,
+      school_alerts_enabled: true,
+      payday_day_of_month: null,
+      monthly_income_rs: null,
+      weekly_focus_habit: null,
+      weekly_focus_set_at: null,
+      open_loop_followups_enabled: true,
+      proactive_checkins_paused_until: null,
+      quiet_hours_enabled: true,
+      quiet_hours_start_hour: 22,
+      quiet_hours_end_hour: 7,
+      notification_config: {
+        proactive_preset: "steady" as const,
+        density_profile: "pulse" as const,
+        proactive_max_per_day: 4,
+        proactive_min_interval_minutes: 180,
+        proactive_max_per_week: 21,
+        configured_at: "2026-06-22T12:00:00.000Z"
+      },
+      help_focus_primary: "personal_finance" as const,
+      help_focus_secondary: "relationship" as const,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z"
+    };
+
+    const paceResult = await handleHelpFocusMessage({
+      user,
+      message: "help playbook confirm"
+    });
+
+    expect(paceResult.interactive?.listButtonLabel).toBe("Pick pace");
+    expect(paceResult.reply).toContain("how often should I check in");
+  });
+
   it("suppresses pasted help-focus card echoes", async () => {
     const result = await handleHelpFocusMessage({
       user: {
