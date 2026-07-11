@@ -11,6 +11,37 @@ import {
 } from "./mauritius-weather.service.js";
 import { MORNING_BRIEF_TOPIC_KEYS } from "./morning-brief.constants.js";
 
+const MORNING_BRIEF_SOURCE_LABELS: Record<string, string> = {
+  "defimedia.info": "Defi Media",
+  "lexpress.mu": "L'Express",
+  "lemauricien.com": "Le Mauricien"
+};
+
+export function formatMorningBriefSourceLabel(source: string): string {
+  const normalized = source.trim().toLowerCase().replace(/^www\./, "");
+  if (!normalized) {
+    return "Mauri brief";
+  }
+
+  return MORNING_BRIEF_SOURCE_LABELS[normalized] ?? normalized;
+}
+
+export function normalizeMorningBriefHeadline(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}
+
+/** Tag + source on one line; full headline on the next — never truncated. */
+export function formatMorningBriefStoryLines(input: {
+  topic: string;
+  headline: string;
+  source: string;
+}): string[] {
+  const sourceLabel = formatMorningBriefSourceLabel(input.source);
+  const headline = normalizeMorningBriefHeadline(input.headline);
+
+  return [`#${input.topic} · ${sourceLabel}`, headline];
+}
+
 const curatedStorySchema = z.object({
   topic: z.enum(MORNING_BRIEF_TOPIC_KEYS),
   headline: z.string().min(1),
@@ -120,6 +151,10 @@ ${MAURI_ENGLISH_ONLY_LANGUAGE_RULE}
 - weather_line: use this exact sentence — "${deterministicWeatherLine}"
 - traffic_line: one sentence about commute pressure using the traffic snapshot when available.
 - stories: up to 8 high-signal stories tagged with one topic each from: Traffic, Tech, Money, LocalBuzz, Entertainment.
+- Each story headline must be one complete English sentence with the full outcome — who did what, plus role, amount, or decision when the article has one.
+- Appointments must name the post (e.g. "appoints Dr. X as Secretary-General") — never stop at a person's name without the action.
+- Prefer active voice: "IOC appoints Dr. X as Secretary-General" not "IOC: Dr. X...".
+- Each story source must be the article hostname from the feed (e.g. lemauricien.com, lexpress.mu).
 - Do not invent stories that are not grounded in the article list.
 - brief_date must be ${input.briefDate}
 
@@ -175,9 +210,19 @@ export function buildPersonalizedMorningBriefMessage(input: {
 
   if (stories.length > 0) {
     lines.push("");
-    for (const story of stories) {
-      const headline = story.headline.length > 72 ? `${story.headline.slice(0, 69).trim()}…` : story.headline;
-      lines.push(`#${story.topic} · ${headline}`);
+    for (let index = 0; index < stories.length; index += 1) {
+      if (index > 0) {
+        lines.push("");
+      }
+
+      const story = stories[index]!;
+      lines.push(
+        ...formatMorningBriefStoryLines({
+          topic: story.topic,
+          headline: story.headline,
+          source: story.source
+        })
+      );
     }
   } else {
     lines.push("", "Quiet news day for your tags — weather and traffic are the main signal.");
