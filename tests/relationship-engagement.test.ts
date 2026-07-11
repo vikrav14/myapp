@@ -165,6 +165,7 @@ describe("relationship engagement", () => {
     });
 
     expect(result.handled).toBe(true);
+    expect(result.reply).toContain("🦤");
     expect(result.reply).toContain("3/5");
     expect(mockRecordEngagementDelivery).toHaveBeenCalled();
   });

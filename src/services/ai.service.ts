@@ -13,6 +13,13 @@ import {
   MAURI_TEXT_REPLY_GUARDRAILS
 } from "../lib/mauri-voice.js";
 import {
+  buildStrategicTransparencyPromptBlock,
+  ensureMauriDodoOnAdviceReply,
+  extractionHasReportableData,
+  MAURI_MEASURABLE_ACK_DODO_RULE,
+  prependMeasurableAckIfMissing
+} from "../lib/strategic-transparency.js";
+import {
   parseUserMindSnapshot,
   userMindExtractionJsonSchema,
   userMindExtractionSchema,
@@ -587,6 +594,13 @@ export async function generateConversationalReply(input: {
 }): Promise<string> {
   const { user, message, extraction, context } = input;
   const chaosMode = isChaosProfile(context.userMindFacts, message);
+  const { block: strategicBlock, mode: strategicMode } = buildStrategicTransparencyPromptBlock({
+    user,
+    message,
+    extraction,
+    chaosMode
+  });
+  const hasMeasurable = extractionHasReportableData(extraction);
 
   const replyPrompt = `
 You are Mauri.
@@ -596,6 +610,8 @@ You sound grounded, sharp, warm, direct.
 Hard guardrails:
 ${MAURI_TEXT_REPLY_GUARDRAILS}
 ${chaosMode ? `\n${CHAOS_ORGANIZER_AI_RULES}\n` : ""}
+${strategicBlock ? `\n${strategicBlock}\n` : ""}
+${hasMeasurable ? `\n${MAURI_MEASURABLE_ACK_DODO_RULE}\n` : ""}
 
 User profile:
 First name: ${user.first_name ?? "Unknown"}
@@ -637,7 +653,13 @@ Reply in plain text only.
 ${
   chaosMode
     ? "User is in chaos mode. Organize their threads into a short map, then ONE next pin. No therapy monologue."
-    : "If the user shared stress, acknowledge briefly then move to one next step. If they seem scattered, help them narrow without sounding robotic."
+    : strategicMode === "lens"
+      ? "They are sharing what's going wrong. Mirror first, then apply one playbook principle as a hypothesis — never lecture."
+      : strategicMode === "tactical"
+        ? "They want direction. Use Action → Why (named framework) → Opt-in. Never demand — seek validation."
+        : hasMeasurable
+          ? "Short measurable acknowledgment only unless they also asked for advice."
+          : "If the user shared stress, acknowledge briefly then move to one next step. If they seem scattered, help them narrow without sounding robotic."
 }
 Never reference details that are not in their profile facts, snapshot, recent logs, or latest message. Do not invent loan sharks, crypto, threats, electricity bills, relatives in danger, or storylines from old test data.
 `;
@@ -647,7 +669,15 @@ Never reference details that are not in their profile facts, snapshot, recent lo
     responseMimeType: "text/plain"
   });
 
-  return finalizeMauriTextReply({ message, reply: rawReply });
+  let reply = finalizeMauriTextReply({ message, reply: rawReply });
+
+  if (hasMeasurable) {
+    reply = prependMeasurableAckIfMissing(reply, extraction);
+  }
+
+  reply = ensureMauriDodoOnAdviceReply(reply, strategicMode !== "none");
+
+  return reply;
 }
 
 export async function generateTierOneDeepenReply(input: {

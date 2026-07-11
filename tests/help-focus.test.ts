@@ -95,7 +95,7 @@ describe("help focus inference", () => {
 
     expect(prompt).toContain("Primary help focus: Personal Finance");
     expect(prompt).toContain("Secondary help focus: Discipline");
-    expect(prompt).toContain("Never name-drop books unless the user asked for sources");
+    expect(prompt).toContain("strategic transparency");
   });
 
   it("reveals playbook copy when the user asks", () => {

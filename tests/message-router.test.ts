@@ -69,7 +69,7 @@ describe("message router helpers", () => {
           fact_value: "Parents still expect payment"
         }
       ])
-    ).toBe("Got it — updated how I read your money pressure.");
+    ).toBe("🦤 Got it — updated how I read your money pressure.");
   });
 
   it("skips ack for non-material preference tweaks", () => {
