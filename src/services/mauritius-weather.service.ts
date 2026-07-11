@@ -58,6 +58,90 @@ function isRainyCondition(condition: string): boolean {
   return /drizzle|rain|shower|thunder/i.test(condition);
 }
 
+/** One short, proactive tip when the user might head out. */
+export function buildWeatherGoOutTip(zone: MauritiusWeatherZoneSnapshot): string | null {
+  const { condition, wind_kmh, weather_code, temperature_c } = zone.current;
+  const { precip_probability_max, precip_sum_mm, temp_min_c, temp_max_c } = zone.today;
+
+  if (weather_code >= 95 || /thunder/i.test(condition)) {
+    return "storms possible — keep trips short if you can";
+  }
+
+  if (precip_probability_max >= 50 || precip_sum_mm >= 3 || /rain|shower|drizzle/i.test(condition)) {
+    return "high rain chance — grab an umbrella if you're heading out";
+  }
+
+  if (precip_probability_max >= 30) {
+    return "light rain possible — toss an umbrella in your bag just in case";
+  }
+
+  if (temp_min_c <= 16 || temperature_c <= 17) {
+    return "cool inland morning — layer up if you're out early";
+  }
+
+  if (temp_max_c >= 30 || temperature_c >= 28) {
+    return "heat building — water and shade if you're out later";
+  }
+
+  if (/fog/i.test(condition)) {
+    return "foggy patches — take it slow on the road";
+  }
+
+  if (wind_kmh >= 35) {
+    return "breezy — secure light layers if you're moving around";
+  }
+
+  if (/clear|partly cloudy/i.test(condition) && temp_max_c >= 26) {
+    return "decent day — sunscreen if you're on the coast";
+  }
+
+  return null;
+}
+
+export function pickZoneForWeatherAdvice(
+  zones: MauritiusWeatherZoneSnapshot[],
+  preferredZoneId?: MauritiusWeatherZoneId | null
+): MauritiusWeatherZoneSnapshot | null {
+  if (zones.length === 0) {
+    return null;
+  }
+
+  if (preferredZoneId) {
+    const preferred = zones.find((zone) => zone.id === preferredZoneId);
+    if (preferred) {
+      return preferred;
+    }
+  }
+
+  return zones.reduce((best, zone) => {
+    const zoneScore =
+      (zone.today.precip_probability_max >= 50 ? 100 : zone.today.precip_probability_max) +
+      (isRainyCondition(zone.current.condition) ? 20 : 0) +
+      (zone.current.weather_code >= 95 ? 40 : 0);
+
+    const bestScore =
+      (best.today.precip_probability_max >= 50 ? 100 : best.today.precip_probability_max) +
+      (isRainyCondition(best.current.condition) ? 20 : 0) +
+      (best.current.weather_code >= 95 ? 40 : 0);
+
+    return zoneScore > bestScore ? zone : best;
+  });
+}
+
+export function appendWeatherGoOutTip(line: string, zone: MauritiusWeatherZoneSnapshot | null): string {
+  if (!zone) {
+    return line;
+  }
+
+  const tip = buildWeatherGoOutTip(zone);
+  if (!tip) {
+    return line;
+  }
+
+  const trimmed = line.trim().replace(/[.!?]\s*$/, "");
+  return `${trimmed} — ${tip}.`;
+}
+
 function formatTemperature(value: number): string {
   return `${roundTemperature(value)}°C`;
 }
@@ -151,23 +235,25 @@ export function buildPersonalizedWeatherLine(
   }
 
   const zoneId = resolveZoneIdFromArea(area);
+  const adviceZone = pickZoneForWeatherAdvice(summary.zones, zoneId);
+
   if (!zoneId) {
-    return summary.island_line;
+    return appendWeatherGoOutTip(summary.island_line, adviceZone);
   }
 
   const userZone = summary.zones.find((zone) => zone.id === zoneId);
   if (!userZone) {
-    return summary.island_line;
+    return appendWeatherGoOutTip(summary.island_line, adviceZone);
   }
 
   const localLine = formatZoneShortLine(userZone);
   const islandLine = summary.island_line;
 
   if (islandLine.toLowerCase().includes(userZone.label.split(" / ")[0]!.toLowerCase())) {
-    return `${localLine}.`;
+    return appendWeatherGoOutTip(`${localLine}.`, userZone);
   }
 
-  return `${localLine}. ${islandLine}`;
+  return appendWeatherGoOutTip(`${localLine}. ${islandLine}`, userZone);
 }
 
 function parseOpenMeteoZone(
