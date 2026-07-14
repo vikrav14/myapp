@@ -586,6 +586,11 @@ Reply in plain text only.`;
   return finalizeMauriGeneratedReply({ reply: rawReply, maxWords: getProactiveMaxWords(input.user) });
 }
 
+function isDirectAnswerToLastQuestion(history: UserContextSnapshot["recentConversationTurns"]): boolean {
+  const lastTurn = history[history.length - 1];
+  return Boolean(lastTurn && lastTurn.role === "assistant" && lastTurn.text.trim().endsWith("?"));
+}
+
 export async function generateConversationalReply(input: {
   user: MauriUser;
   message: string;
@@ -593,7 +598,8 @@ export async function generateConversationalReply(input: {
   context: UserContextSnapshot;
 }): Promise<string> {
   const { user, message, extraction, context } = input;
-  const chaosMode = isChaosProfile(context.userMindFacts, message);
+  const answeringPriorQuestion = isDirectAnswerToLastQuestion(context.recentConversationTurns);
+  const chaosMode = !answeringPriorQuestion && isChaosProfile(context.userMindFacts, message);
   const { block: strategicBlock, mode: strategicMode } = buildStrategicTransparencyPromptBlock({
     user,
     message,
@@ -650,7 +656,9 @@ Structured extraction from the latest message:
 ${JSON.stringify(extraction)}
 
 ${
-  chaosMode
+  answeringPriorQuestion
+    ? "They are directly answering the question you just asked. Read the conversation history and respond to what they actually said — do not revert to a status recap or map unless that is genuinely the most useful next step."
+    : chaosMode
     ? "User is in chaos mode. Organize their threads into a short map, then ONE next pin. No therapy monologue."
     : strategicMode === "lens"
       ? "They are sharing what's going wrong. Mirror first, then apply one playbook principle as a hypothesis — never lecture."
