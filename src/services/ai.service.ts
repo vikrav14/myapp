@@ -232,6 +232,19 @@ Return only keys that are clearly supported by the message.
 If a field is absent, omit it entirely.
 The valid top-level keys are finance, todos, habits, emotions.
 
+Critical rule for short or ambiguous messages:
+- You do not see the conversation history — this message may simply be answering a
+  question you cannot see (e.g. "how many people are you cooking for?", "what's your
+  income?"). A bare number, single word, or short phrase with no clear loggable
+  content of its own is NOT enough on its own to extract anything.
+- "emotions" requires actual emotional or mood language in the message itself
+  (e.g. stressed, anxious, sad, tired, overwhelmed, feeling sick, happy, frustrated).
+  Never infer an anxiety_score from a standalone number alone — a bare "4" is not a
+  mood score unless the message also describes how they feel.
+- Only extract finance, todos, or habits when the message clearly describes a real
+  spend, task, or activity — not just a number or short reply with no other context.
+- When in doubt, omit the field rather than guessing.
+
 JSON shape:
 {
   "finance": {
