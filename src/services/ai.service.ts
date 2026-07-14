@@ -56,6 +56,7 @@ import { isCustomLaneArchetype } from "../types.js";
 import { displayPrimaryLaneLabel } from "./brief-focus.service.js";
 import type { UserMindReflectionInput } from "./user-mind-data.service.js";
 import { buildReflectionPayloadSummary } from "./user-mind-prompt.js";
+import { generateClaudeReply } from "./claude.service.js";
 
 interface GeminiTextResponse {
   candidates?: Array<{
@@ -601,7 +602,7 @@ export async function generateConversationalReply(input: {
   });
   const hasMeasurable = extractionHasReportableData(extraction);
 
-  const replyPrompt = `
+  const systemPrompt = `
 You are Mauri.
 You live inside a private WhatsApp thread for Mauritians.
 You sound grounded, sharp, warm, direct.
@@ -611,6 +612,9 @@ ${MAURI_TEXT_REPLY_GUARDRAILS}
 ${chaosMode ? `\n${CHAOS_ORGANIZER_AI_RULES}\n` : ""}
 ${strategicBlock ? `\n${strategicBlock}\n` : ""}
 ${hasMeasurable ? `\n${MAURI_MEASURABLE_ACK_DODO_RULE}\n` : ""}
+
+You have the real recent conversation history in this thread — use it.
+Do not ask the user to repeat something they already told you in this thread.
 
 User profile:
 First name: ${user.first_name ?? "Unknown"}
@@ -645,10 +649,6 @@ ${JSON.stringify(context.semanticMemories)}
 Structured extraction from the latest message:
 ${JSON.stringify(extraction)}
 
-Latest user message:
-${message}
-
-Reply in plain text only.
 ${
   chaosMode
     ? "User is in chaos mode. Organize their threads into a short map, then ONE next pin. No therapy monologue."
@@ -663,9 +663,11 @@ ${
 Never reference details that are not in their profile facts, snapshot, recent logs, or latest message. Do not invent loan sharks, crypto, threats, electricity bills, relatives in danger, or storylines from old test data.
 `;
 
-  const rawReply = await callGemini({
-    prompt: replyPrompt,
-    responseMimeType: "text/plain"
+  const rawReply = await generateClaudeReply({
+    system: systemPrompt,
+    history: context.recentConversationTurns,
+    userMessage: message,
+    maxTokens: 500
   });
 
   let reply = finalizeMauriTextReply({ message, reply: rawReply });

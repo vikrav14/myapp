@@ -1,14 +1,22 @@
 import { supabase } from "../lib/supabase.js";
 import type { UserContextSnapshot } from "../types.js";
-import { searchRelevantMemories } from "./memory.service.js";
+import { getRecentConversationTurns, searchRelevantMemories } from "./memory.service.js";
 import { formatUserMindForPrompt, loadUserMindFacts } from "./user-mind.service.js";
 import { getUserMindSnapshot } from "./user-mind-snapshot.service.js";
 import { formatUserMindSnapshotForPrompt } from "./user-mind-prompt.js";
 import { filterGroundedSemanticMemories } from "./context-grounding.service.js";
 
 export async function loadUserContext(userId: string, queryText?: string): Promise<UserContextSnapshot> {
-  const [todosResult, financeResult, habitsResult, emotionsResult, semanticMemories, userMindFacts, mindRecord] =
-    await Promise.all([
+  const [
+    todosResult,
+    financeResult,
+    habitsResult,
+    emotionsResult,
+    semanticMemories,
+    userMindFacts,
+    mindRecord,
+    recentConversationTurns
+  ] = await Promise.all([
       supabase
         .from("todo_logs")
         .select("id, task_description, priority, due_date")
@@ -36,7 +44,8 @@ export async function loadUserContext(userId: string, queryText?: string): Promi
         .limit(5),
       queryText ? searchRelevantMemories(userId, queryText) : Promise.resolve([]),
       loadUserMindFacts(userId),
-      getUserMindSnapshot(userId).catch(() => null)
+      getUserMindSnapshot(userId).catch(() => null),
+      getRecentConversationTurns(userId)
     ]);
 
   const failures = [todosResult, financeResult, habitsResult, emotionsResult]
@@ -79,6 +88,7 @@ export async function loadUserContext(userId: string, queryText?: string): Promi
     userMindPrompt: formatUserMindForPrompt(userMindFacts),
     userMindSnapshot,
     userMindSnapshotPrompt: userMindSnapshot ? formatUserMindSnapshotForPrompt(userMindSnapshot) : null,
-    userMindSnapshotGeneratedAt: mindRecord?.generated_at ?? null
+    userMindSnapshotGeneratedAt: mindRecord?.generated_at ?? null,
+    recentConversationTurns
   };
 }

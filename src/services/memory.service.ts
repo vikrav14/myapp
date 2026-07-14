@@ -77,6 +77,31 @@ export async function buildEmotionEmbedding(rawVentText: string): Promise<string
   });
 }
 
+export async function getRecentConversationTurns(
+  userId: string,
+  limit = 12
+): Promise<Array<{ role: "user" | "assistant"; text: string }>> {
+  const { data, error } = await supabase
+    .from("conversation_memories")
+    .select("memory_type, content_text, created_at")
+    .eq("user_id", userId)
+    .in("memory_type", ["user_message", "assistant_reply"])
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    logger.warn({ error, userId }, "Failed to load recent conversation turns.");
+    return [];
+  }
+
+  return (data ?? [])
+    .reverse()
+    .map((row) => ({
+      role: row.memory_type === "assistant_reply" ? ("assistant" as const) : ("user" as const),
+      text: String(row.content_text)
+    }));
+}
+
 export async function searchRelevantMemories(userId: string, queryText: string): Promise<SemanticMemoryMatch[]> {
   const trimmedQuery = queryText.trim();
   if (!trimmedQuery) {

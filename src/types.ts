@@ -468,6 +468,7 @@ export interface UserContextSnapshot {
   userMindSnapshot: UserMindSnapshotPayload | null;
   userMindSnapshotPrompt: string | null;
   userMindSnapshotGeneratedAt: string | null;
+  recentConversationTurns: Array<{ role: "user" | "assistant"; text: string }>;
 }
 
 export interface UserMindFact {
